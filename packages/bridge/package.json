@@ -1,0 +1,37 @@
+{
+  "name": "@oblivionis/bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "oblivionis-bridge": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "smoke": "tsx src/smoke.ts",
+    "smoke:loop": "tsx src/smoke-loop.ts",
+    "typecheck": "tsc --noEmit",
+    "bundle": "node build.mjs",
+    "package": "node build.mjs && pkg dist/bridge.cjs --targets node22-win-x64 --output ../../apps/desktop/src-tauri/binaries/oblivionis-bridge-x86_64-pc-windows-msvc.exe"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.50.0",
+    "@oblivionis/shared": "workspace:*",
+    "cross-spawn": "^7.0.6",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "@yao-pkg/pkg": "^6.3.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

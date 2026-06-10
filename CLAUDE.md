@@ -1,0 +1,50 @@
+# OblivionisAgent — Claude Code 项目说明
+
+把飞书(Feishu)群聊接入**本地 Claude Code 会话**的 Windows 桌面工具：不同群路由到不同会话、
+意图分流、主人/访客权限隔离、访客会话自动脱敏，连线式画布配置，Tauri 打包成绿色 exe。
+
+## ⚠️ 不可违反的硬约束
+
+1. **必须遥控官方 `claude` CLI，绝不能拿订阅 OAuth 令牌直连 API**。
+   Anthropic 自 2026-01 起服务端封禁第三方工具使用订阅令牌（2026-02 写入 ToS）。
+   本项目一切 LLM 调用都通过 spawn 官方 CLI（`claude -p --output-format stream-json`），
+   `apiKeySource:"none"` 即订阅鉴权。改成直连 API = 用户封号风险。
+2. **两会话模型**：`baseSessionId`（开发会话）只属于软件内的终端；**所有飞书消息**
+   （含主人）一律走它 fork 出的脱敏分身（`sessionId`）。详见
+   `.claude/docs/architecture.md`。改路由逻辑前先读它。
+3. **访客安全**：访客回复前要二次脱敏（`redactText`）；fork 时 transcript 抹密钥
+   （`fork-prepare.ts`）。不要削弱这条链路。
+
+## 仓库结构（详见 .claude/docs/architecture.md）
+
+- `packages/shared` — zod 配置 schema + WS 协议 + stream-json 类型（被两端共享）
+- `packages/bridge` — Node 引擎：飞书长连接、路由、会话管理、脱敏、审计（打包成 sidecar exe）
+- `apps/desktop` — Tauri v2 + React：连线画布(@xyflow)、xterm 终端、Rust PTY(lib.rs)
+- `rebuild-deploy.bat` — 一键构建+部署到便携版（先构建后关应用，顺序勿改）
+
+## 常用命令
+
+```bash
+pnpm install                      # 首次
+pnpm --filter @oblivionis/bridge typecheck   # 引擎类型检查
+cd apps/desktop && pnpm tauri build --no-bundle   # 构建桌面 app（不碰运行中的程序）
+cd packages/bridge && pnpm package           # 打包 sidecar exe
+# 部署 = 双击 rebuild-deploy.bat（构建→关应用→覆盖便携版→重启）
+```
+
+运行时配置在 `~/.oblivionis/config.json`（**不在仓库里**，含 App Secret）。
+会话 transcript 在 `~/.claude/projects/<编码cwd>/<sessionId>.jsonl`。
+
+## 改代码前必读
+
+- **踩坑记录**：`.claude/docs/pitfalls.md` — 本项目所有已付过学费的坑
+  （会话路径编码、PTY 竞态、xterm 渲染、Shift+Enter 字节序、bat 编码…）。
+  遇到"终端显示怪/会话接不上/配置丢失"先查它，大概率已有答案。
+- **调试工具**：`apps/desktop/src-tauri/examples/` 下有现成的 PTY 探针
+  （抓 claude 原始字节、测按键序列、验证历史回放），用法见 `.claude/docs/workflows.md`。
+- xterm 三件套**锁定在 6.1/0.20 beta**（含上游图集修复 #5883），等 7.0 stable 再升，
+  原因见 pitfalls.md「WebGL 中文乱码」条。
+- 编辑 `~/.oblivionis/config.json` 时**绝不要把 sessionId/baseSessionId 写成空字符串**
+  （schema 已加固为空串=未设置，但别依赖它）；清空会话用 GUI 的「刷新快照」。
+- Windows 下写 `.bat`/`.cmd` 必须 **CRLF + 纯 ASCII**（GBK 码页 + LF 会整文件解析错乱）。
+- 不要并行开多个 Claude Code 会话改同一批文件（历史上造成过终端组件被重构覆盖的事故）。

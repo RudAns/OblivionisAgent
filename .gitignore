@@ -1,0 +1,31 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+
+# tauri / rust
+apps/desktop/src-tauri/target/
+target/
+
+# bundled sidecar binary (build artifact: pnpm --filter @oblivionis/bridge package)
+apps/desktop/src-tauri/binaries/
+packages/bridge/dist/
+
+# runtime state & secrets
+.oblivionis/
+config.json
+*.local.json
+.env
+.env.*
+
+# logs
+*.log
+logs/
+
+# os
+.DS_Store
+Thumbs.db
