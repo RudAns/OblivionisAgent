@@ -73,7 +73,7 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 | `usage-monitor.ts` | **订阅用量**：每 5 分钟 `claude -p "/usage"`（零 token、合规）解析 5h/周窗口百分比，广播 `usage-status` 给顶栏 |
 | `knowledge-store.ts` + `claude/extract-knowledge.ts` | **知识收件箱**：问答后 haiku 提取"规则性指令"候选→`~/.oblivionis/knowledge-inbox.jsonl`→GUI 裁决→采纳追加 cwd 的 CLAUDE.md「群聊沉淀规则」小节 |
 | `cron-scheduler.ts` | **定时任务**：30s tick；cron 节点到点→下游会话(脱敏分身)跑 prompt→结果(出站脱敏)发节点群或 homeChatId。栅栏：运行中跳过/无特权/不暴露建任务能力 |
-| `claude/reflect-soul.ts` | **人格反思**：每 24h 对有人格+有近期群聊的节点提议 SOUL.md 修订 → 收件箱(kind=soul) 主人裁决 |
+| `claude/reflect-soul.ts` | **人格反思**（人格自主演化）：每 24h 对有人格+有近期群聊的节点提议 SOUL.md 修订 → 收件箱(kind=soul) 主人裁决。**⚠️ 已按用户要求关闭**——`index.ts` 的 24h 调度已注释（人格由主人手写、严格设计）；实现保留，恢复=取消注释 |
 | `perm/mcp-perm-server.ts` | **审批 MCP 服务器**（`bridge --mcp-perm` 双模式自举）：claude 的 permission-prompt-tool → WS 回连 bridge → 等卡片决定 |
 | `perm/permission-broker.ts` | **审批中枢**：挂起请求 ↔ 飞书交互卡片 ↔ 仅主人有效的回调；100s 超时拒绝 |
 | `group-memory-store.ts` + `claude/distill-memory.ts` | **群记忆**：每群 `~/.oblivionis/groups/<chatId>.md`(配额 1500 字)注入会话；问答后 haiku 提炼覆写。GUI 飞书群节点「🧠 群记忆」可编辑 |
@@ -114,7 +114,9 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 
 ### 其它
 - `scripts/gen-icon.mjs` — 生成图标（Windows 必须有 .ico）
+- `scripts/gen-notices.cjs` — 生成 `THIRD-PARTY-NOTICES.md`（扫 JS 生产依赖 + Rust crate），发布前重跑
 - `rebuild-deploy.bat` — 一键发布（构建→taskkill→覆盖便携版→重启）
+- `LICENSE` — PolyForm Noncommercial 1.0.0（禁商用）；`THIRD-PARTY-NOTICES.md` — 第三方许可声明
 
 ## 关键运行时路径（都在用户目录，不进仓库）
 - `~/.oblivionis/config.json` — 全部配置（含 App Secret，**明文**，待加密）

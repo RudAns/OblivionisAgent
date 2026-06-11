@@ -35,6 +35,11 @@ cd packages/bridge && pnpm package           # 打包 sidecar exe
 运行时配置在 `~/.oblivionis/config.json`（**不在仓库里**，含 App Secret）。
 会话 transcript 在 `~/.claude/projects/<编码cwd>/<sessionId>.jsonl`。
 
+## 许可证 & 第三方合规
+
+- 本项目：**PolyForm Noncommercial 1.0.0**（禁商用；署名 Derek·JW·Chen），见 `LICENSE`。改许可前先确认意图（用户要"随便用但别拿去卖"，故非 MIT/Apache）。
+- 成品捆绑的第三方依赖须保留其许可声明：`THIRD-PARTY-NOTICES.md` 由 `node scripts/gen-notices.cjs` 生成，**发布前重跑刷新**。依赖全宽松、无强 copyleft（含 5 个 MPL-2.0 弱 copyleft，未改动即可用）。
+
 ## 改代码前必读
 
 - **踩坑记录**：`.claude/docs/pitfalls.md` — 本项目所有已付过学费的坑
@@ -48,3 +53,4 @@ cd packages/bridge && pnpm package           # 打包 sidecar exe
   （schema 已加固为空串=未设置，但别依赖它）；清空会话用 GUI 的「刷新快照」。
 - Windows 下写 `.bat`/`.cmd` 必须 **CRLF + 纯 ASCII**（GBK 码页 + LF 会整文件解析错乱）。
 - 不要并行开多个 Claude Code 会话改同一批文件（历史上造成过终端组件被重构覆盖的事故）。
+- **人格(SOUL.md)由主人手写严格设计**。做成可连线的「🎭 人格节点」，单「人格口」接到会话 = 作用于该会话飞书 fork（详见 architecture.md）；终端(base)人格评估后不做。人格**自动演化反思**（`runSoulReflection`/`reflect-soul.ts`）**已按用户要求关闭**（index.ts 注释掉了 24h 调度），别擅自重开。
