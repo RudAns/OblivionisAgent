@@ -43,6 +43,8 @@ export interface ServerDeps {
   ensureSoul: (nodeId: string) => { path: string; created: boolean };
   /** 知识收件箱 */
   knowledge: import("./knowledge-store.js").KnowledgeStore;
+  /** 工具权限审批中枢 */
+  permBroker: import("./perm/permission-broker.js").PermissionBroker;
   /** 配置(graph)被 GUI 改写后回调 */
   onConfigChanged: () => void;
 }
@@ -69,7 +71,7 @@ export class ControlServer {
       const u = this.deps.getUsage();
       if (u) this.send(ws, { type: "usage-status", ...u });
       this.send(ws, { type: "knowledge-inbox", items: this.deps.knowledge.all() });
-      ws.on("message", (raw) => this.onClientMessage(raw.toString()));
+      ws.on("message", (raw) => this.onClientMessage(raw.toString(), ws));
       ws.on("close", () => this.clients.delete(ws));
       ws.on("error", () => this.clients.delete(ws));
     });
@@ -80,7 +82,7 @@ export class ControlServer {
     this.deps.log.info(`控制面 WebSocket 监听 ws://127.0.0.1:${this.port}`);
   }
 
-  private onClientMessage(text: string): void {
+  private onClientMessage(text: string, ws: WebSocket): void {
     let msg: ClientMessage;
     try {
       msg = JSON.parse(text) as ClientMessage;
@@ -123,6 +125,15 @@ export class ControlServer {
       case "ensure-soul": {
         const r = this.deps.ensureSoul(msg.nodeId);
         hub.broadcast({ type: "soul-path", nodeId: msg.nodeId, path: r.path, created: r.created });
+        break;
+      }
+      case "permission-request": {
+        // 来自 MCP 审批进程：挂给 broker(发飞书卡片等主人)，决定后定向回当前连接
+        void this.deps.permBroker
+          .request(msg.requestId, msg.toolName, msg.input, msg.ctx)
+          .then((r) =>
+            this.send(ws, { type: "permission-response", requestId: msg.requestId, ...r }),
+          );
         break;
       }
       case "knowledge-decide": {

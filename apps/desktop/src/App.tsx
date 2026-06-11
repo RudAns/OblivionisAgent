@@ -66,6 +66,7 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
       guestPermissionMode: "default",
       includePartialMessages: true,
       extraArgs: [],
+      approvalMode: false,
     },
   }),
   cron: () => ({
@@ -939,6 +940,15 @@ function Inspector({
             </select>
           </label>
           {field("追加 system prompt", d.appendSystemPrompt, "appendSystemPrompt")}
+          <label className="field">
+            <span>敏感操作飞书审批</span>
+            <input
+              type="checkbox"
+              checked={!!d.approvalMode}
+              title="工具调用需要授权时，向来源群发卡片由主人[允许/拒绝]（需 permissionMode=default 才会询问）"
+              onChange={(e) => onPatch({ approvalMode: e.target.checked })}
+            />
+          </label>
 
           <div className="fs-actions">
             <button

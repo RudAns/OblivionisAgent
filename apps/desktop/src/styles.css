@@ -1186,6 +1186,20 @@ button.primary {
   background: #1d2027;
   padding: 9px 11px;
 }
+.inbox-card.soul {
+  border-color: rgba(192, 140, 255, 0.4);
+  border-left-color: #c08cff;
+}
+.inbox-kind {
+  font-size: 11px;
+  font-weight: 600;
+  color: #c08cff;
+  margin-bottom: 6px;
+}
+.inbox-card.soul .inbox-rule {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 11.5px;
+}
 .inbox-rule {
   width: 100%;
   background: #14171c;

@@ -53,6 +53,9 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 | `usage-monitor.ts` | **订阅用量**：每 5 分钟 `claude -p "/usage"`（零 token、合规）解析 5h/周窗口百分比，广播 `usage-status` 给顶栏 |
 | `knowledge-store.ts` + `claude/extract-knowledge.ts` | **知识收件箱**：问答后 haiku 提取"规则性指令"候选→`~/.oblivionis/knowledge-inbox.jsonl`→GUI 裁决→采纳追加 cwd 的 CLAUDE.md「群聊沉淀规则」小节 |
 | `cron-scheduler.ts` | **定时任务**：30s tick；cron 节点到点→下游会话(脱敏分身)跑 prompt→结果(出站脱敏)发节点群或 homeChatId。栅栏：运行中跳过/无特权/不暴露建任务能力 |
+| `claude/reflect-soul.ts` | **人格反思**：每 24h 对有人格+有近期群聊的节点提议 SOUL.md 修订 → 收件箱(kind=soul) 主人裁决 |
+| `perm/mcp-perm-server.ts` | **审批 MCP 服务器**（`bridge --mcp-perm` 双模式自举）：claude 的 permission-prompt-tool → WS 回连 bridge → 等卡片决定 |
+| `perm/permission-broker.ts` | **审批中枢**：挂起请求 ↔ 飞书交互卡片 ↔ 仅主人有效的回调；100s 超时拒绝 |
 | `config-store.ts` | 配置读写（解析失败直接抛=宁崩不带病运行，保护数据） |
 | `server.ts` | WS 控制面（GUI 测试框、刷新快照、列会话、查 openId…） |
 | `hub.ts` | 向所有 GUI 客户端广播事件 |

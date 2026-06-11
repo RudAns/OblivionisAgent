@@ -31,7 +31,15 @@ export type ClientMessage =
   /** 确保节点人格文件(SOUL.md)存在（无则播种 starter），回 soul-path */
   | { type: "ensure-soul"; nodeId: string }
   /** 知识收件箱裁决：accept(可带编辑后规则)→写 cwd 的 CLAUDE.md；dismiss=抛弃 */
-  | { type: "knowledge-decide"; id: string; action: "accept" | "dismiss"; editedRule?: string };
+  | { type: "knowledge-decide"; id: string; action: "accept" | "dismiss"; editedRule?: string }
+  /** 工具权限审批请求（来自 MCP 审批进程，非 GUI）；定向回 permission-response */
+  | {
+      type: "permission-request";
+      requestId: string;
+      toolName: string;
+      input: unknown;
+      ctx: { nodeId?: string; nodeLabel?: string; chatId?: string; senderId?: string; senderName?: string };
+    };
 
 export interface AuditEntry {
   chatId: string;
@@ -41,21 +49,27 @@ export interface AuditEntry {
   ts: number;
 }
 
-/** 知识收件箱条目：从群聊问答中提取的"规则性指令"候选，等主人裁决 */
+/** 知识收件箱条目：等主人裁决的提案 */
 export interface KnowledgeItem {
   id: string;
   ts: number;
   nodeId: string;
   nodeLabel: string;
-  /** 采纳时写入该目录的 CLAUDE.md */
+  /** kind=rule 时采纳写入该目录的 CLAUDE.md */
   cwd: string;
   chatId: string;
   sender: string;
-  /** 规则文本（采纳前可编辑） */
+  /**
+   * kind=rule：规则一句话（采纳→追加 CLAUDE.md）
+   * kind=soul：修订后的完整 SOUL.md 全文（采纳→覆写人格文件）
+   * 采纳前都可编辑。
+   */
   rule: string;
-  /** 来源提问摘要 */
+  /** 来源摘要 */
   source: string;
   status: "pending" | "accepted" | "dismissed";
+  /** 条目类型：rule=群聊沉淀规则(默认)；soul=人格修订提案 */
+  kind?: "rule" | "soul";
 }
 
 /** Claude 订阅用量快照（5 小时滚动窗口 / 周窗口） */
@@ -125,7 +139,9 @@ export type BridgeMessage =
   /** 人格文件路径（响应 ensure-soul；created=本次播种了 starter） */
   | { type: "soul-path"; nodeId: string; path: string; created: boolean }
   /** 知识收件箱全量（连接时 + 每次变更后推送） */
-  | { type: "knowledge-inbox"; items: KnowledgeItem[] };
+  | { type: "knowledge-inbox"; items: KnowledgeItem[] }
+  /** 工具权限审批决定（定向发给发起请求的 MCP 连接） */
+  | { type: "permission-response"; requestId: string; behavior: "allow" | "deny"; message?: string };
 
 export type FeishuStatus = "disconnected" | "connecting" | "connected" | "error" | "mock";
 

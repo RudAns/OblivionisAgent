@@ -50,32 +50,38 @@ function PendingCard({
   onDecide: Props["onDecide"];
 }) {
   const [text, setText] = useState(item.rule);
+  const isSoul = item.kind === "soul";
   return (
-    <div className="inbox-card">
+    <div className={`inbox-card ${isSoul ? "soul" : ""}`}>
+      {isSoul && <div className="inbox-kind">🎭 人格演化提案 · {item.nodeLabel}</div>}
       <textarea
         className="inbox-rule"
         value={text}
-        rows={2}
+        rows={isSoul ? 10 : 2}
         onChange={(e) => setText(e.target.value)}
-        title="可直接编辑后再采纳"
+        title={isSoul ? "修订后的完整 SOUL.md，可直接编辑后采纳" : "可直接编辑后再采纳"}
       />
       <div className="inbox-meta">
-        <span title="将写入该会话 cwd 的 CLAUDE.md">{item.nodeLabel}</span>
+        <span>{item.nodeLabel}</span>
         <span>·</span>
         <span>{item.sender}</span>
         <span>·</span>
         <span>{new Date(item.ts).toLocaleString()}</span>
       </div>
       <div className="inbox-src" title={item.source}>
-        源于提问：{item.source}
+        {isSoul ? item.source : `源于提问：${item.source}`}
       </div>
       <div className="inbox-actions">
         <button
           className="inbox-accept"
-          title={`写入 ${item.cwd}\\CLAUDE.md 的「群聊沉淀规则」小节`}
+          title={
+            isSoul
+              ? "覆写该会话的 SOUL.md（下条消息生效）"
+              : `写入 ${item.cwd}\\CLAUDE.md 的「群聊沉淀规则」小节`
+          }
           onClick={() => onDecide(item.id, "accept", text)}
         >
-          ✅ 采纳 → CLAUDE.md
+          {isSoul ? "✅ 采纳 → 更新人格" : "✅ 采纳 → CLAUDE.md"}
         </button>
         <button className="inbox-dismiss" onClick={() => onDecide(item.id, "dismiss")}>
           抛弃

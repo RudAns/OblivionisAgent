@@ -20,6 +20,10 @@ import { readSoul, ensureSoul } from "./soul-store.js";
 import { KnowledgeStore } from "./knowledge-store.js";
 import { extractKnowledge } from "./claude/extract-knowledge.js";
 import { CronScheduler } from "./cron-scheduler.js";
+import { reflectSoul } from "./claude/reflect-soul.js";
+import { PermissionBroker } from "./perm/permission-broker.js";
+import { runMcpPermServer } from "./perm/mcp-perm-server.js";
+import { writeFileSync } from "node:fs";
 
 /** 审计：把每条入站消息追加到 ~/.oblivionis/audit.jsonl（durable 记录，按群+时间可排序） */
 function appendAudit(entry: Record<string, unknown>): void {
@@ -30,6 +34,29 @@ function appendAudit(entry: Record<string, unknown>): void {
     appendFileSync(p, JSON.stringify(entry) + "\n", "utf8");
   } catch {
     /* 审计失败不影响主流程 */
+  }
+}
+
+/** 取某节点近 sinceMs 内的审计对话（人格反思的输入素材） */
+function readRecentChats(nodeId: string, sinceMs: number): string[] {
+  try {
+    const p = process.env.OBLIVIONIS_AUDIT || join(homedir(), ".oblivionis", "audit.jsonl");
+    if (!existsSync(p)) return [];
+    const cutoff = Date.now() - sinceMs;
+    const out: string[] = [];
+    for (const line of readFileSync(p, "utf8").split("\n").filter(Boolean).slice(-2000)) {
+      try {
+        const o = JSON.parse(line) as Record<string, unknown>;
+        if (o.nodeId !== nodeId || Number(o.ts ?? 0) < cutoff) continue;
+        const t = new Date(Number(o.ts)).toLocaleString();
+        out.push(`[${t}] ${String(o.senderName ?? "?")}（${o.role === "owner" ? "主人" : "访客"}）: ${String(o.text ?? "")}`);
+      } catch {
+        /* skip */
+      }
+    }
+    return out;
+  } catch {
+    return [];
   }
 }
 
@@ -75,10 +102,31 @@ async function main() {
   // 知识收件箱：问答后提取规则候选，等主人在 GUI 裁决（采纳→写 cwd 的 CLAUDE.md）
   const knowledge = new KnowledgeStore();
 
-  // 订阅用量监控（5h/周窗口）：每 5 分钟轮询一次 `claude -p "/usage"`，广播给 GUI 顶栏
+  // 订阅用量监控（5h/周窗口）：每 5 分钟轮询，广播 GUI 顶栏；
+  // 5h 窗口 ≥85% 时往 Home Chat 发一次预警（穿越式触发：回落 <60% 后解除，下个高峰再报）
+  let usageAlerted = false;
   const usage = new UsageMonitor(
     store.get().claude.binPath,
-    (u) => hub.broadcast({ type: "usage-status", ...u }),
+    (u) => {
+      hub.broadcast({ type: "usage-status", ...u });
+      const pct = u.sessionPct;
+      if (pct == null) return;
+      if (pct >= 85 && !usageAlerted) {
+        usageAlerted = true;
+        const home = store.get().homeChatId;
+        if (home && gateway.transport) {
+          const msg = `⚠️ **Claude 订阅 5 小时窗口已用 ${Math.round(pct)}%**${
+            u.sessionResets ? `（${u.sessionResets.trim()} 重置）` : ""
+          }${u.weekPct != null ? `\n本周(全模型)：${Math.round(u.weekPct)}%` : ""}\n注意安排剩余任务。`;
+          void gateway.transport.reply(home, msg).catch(() => {});
+          log.warn(`用量预警已发 Home Chat: 5h=${pct}%`);
+        } else {
+          log.warn(`用量已达 ${pct}%（未配置 Home Chat，仅记日志）`);
+        }
+      } else if (pct < 60 && usageAlerted) {
+        usageAlerted = false;
+      }
+    },
     (lvl, m) => log[lvl](m),
   );
   usage.start();
@@ -125,6 +173,9 @@ async function main() {
           onStatus: (s, detail, bot) => this.setStatus(s, detail, bot),
         });
         t.onMessage(handleInbound);
+        t.onCardAction((requestId, decision, operator) =>
+          permBroker.onCardAction(requestId, decision, operator),
+        );
         this.transport = t;
         try {
           await t.start();
@@ -207,7 +258,7 @@ async function main() {
     const appendPrompt =
       [soul, node.data.appendSystemPrompt, guardrail].filter(Boolean).join("\n\n") || undefined;
 
-    // 审计落盘：每条入站(尤其访客提问)
+    // 审计落盘：每条入站(尤其访客提问)。nodeId 供人格反思按节点取近期对话
     appendAudit({
       ts: Date.now(),
       chatId: inbound.chatId,
@@ -215,6 +266,7 @@ async function main() {
       senderName: inbound.senderName,
       role: isOwner ? "owner" : "guest",
       sessionNode: node.label,
+      nodeId: node.id,
       text: inbound.text,
       quoted: inbound.quoted,
     });
@@ -228,7 +280,13 @@ async function main() {
 
     const replyOpts = { replyToMessageId: inbound.messageId, atUserId: inbound.senderId };
     try {
-      const reply = await sessions.send(node.id, finalText, permissionMode, appendPrompt);
+      const reply = await sessions.send(node.id, finalText, permissionMode, appendPrompt, {
+        nodeId: node.id,
+        nodeLabel: node.label,
+        chatId: inbound.chatId,
+        senderId: inbound.senderId,
+        senderName: inbound.senderName,
+      });
       // 出站脱敏：访客回复发回飞书前，再抹一遍密钥（防 Claude 现读文件把密钥写进回复）
       const safeReply = isOwner
         ? reply
@@ -266,6 +324,34 @@ async function main() {
     }
   }
 
+  // 工具权限审批中枢：MCP 审批进程的请求 → 飞书卡片 → 主人裁决。
+  // 写一份 MCP 配置（claude --mcp-config 指向它）：本 exe 以 --mcp-perm 模式自举为审批服务器。
+  const permBroker = new PermissionBroker({
+    log,
+    isOwner: (openId) => store.get().owners.some((o) => o.openId === openId),
+    sender: () => {
+      const t = gateway.transport;
+      return t?.sendPermissionCard
+        ? { sendCard: (c, r, ti, d) => t.sendPermissionCard!(c, r, ti, d) }
+        : null;
+    },
+    homeChatId: () => store.get().homeChatId,
+  });
+  try {
+    // command=当前可执行 + 原样参数 + --mcp-perm：pkg 单 exe 与 dev(tsx) 两种形态都成立
+    const permCfg = {
+      mcpServers: {
+        oblivionis_perm: {
+          command: process.execPath,
+          args: [...process.argv.slice(1), "--mcp-perm"],
+        },
+      },
+    };
+    writeFileSync(join(homedir(), ".oblivionis", "perm-mcp.json"), JSON.stringify(permCfg, null, 2), "utf8");
+  } catch (e) {
+    log.warn(`写审批 MCP 配置失败(审批功能不可用): ${(e as Error).message}`);
+  }
+
   // 定时任务调度：cron 节点到点 → 下游会话（脱敏分身）跑 prompt → 结果(出站脱敏后)发群
   const cronScheduler = new CronScheduler({
     store,
@@ -278,7 +364,11 @@ async function main() {
       const append =
         [soul, isSession ? n.data.appendSystemPrompt : undefined].filter(Boolean).join("\n\n") ||
         undefined;
-      return sessions.send(sessionNodeId, prompt, isSession ? n.data.permissionMode : undefined, append);
+      return sessions.send(sessionNodeId, prompt, isSession ? n.data.permissionMode : undefined, append, {
+        nodeId: sessionNodeId,
+        nodeLabel: isSession ? n.label : undefined,
+        chatId: store.get().homeChatId || undefined,
+      });
     },
     deliver: async (chatId, text) => {
       const safe = redactText(text, collectSecrets(store.get().feishu.appSecret));
@@ -289,6 +379,43 @@ async function main() {
     },
   });
   cronScheduler.start();
+
+  // 人格自主迭代闭环（Hermes 的"soul evolution"，但提案须经主人裁决）：
+  // 每 24h 一次（启动 15 分钟后首跑）：对"有人格文件 + 近24h有群聊"的节点跑反思，
+  // 修订提案进知识收件箱(kind=soul)，主人采纳后覆写 SOUL.md。
+  const runSoulReflection = async () => {
+    const cfg = store.get();
+    for (const n of cfg.graph.nodes) {
+      if (n.kind !== "claude-session") continue;
+      const soul = readSoul(n.id);
+      if (!soul) continue; // 没播种过人格的节点不迭代
+      const chats = readRecentChats(n.id, 24 * 3600_000);
+      if (chats.length < 3) continue; // 聊得太少，没有演化素材
+      // 已有未处理的人格提案就不再堆
+      if (knowledge.all().some((k) => k.status === "pending" && k.kind === "soul" && k.nodeId === n.id)) continue;
+      log.info(`人格反思: ${n.label}（近24h ${chats.length} 条对话）…`);
+      const proposal = await reflectSoul(soul, chats.join("\n"), {
+        binPath: cfg.claude.binPath,
+        cwd: cfg.claude.defaultCwd || process.cwd(),
+        log: (m) => log.info(m),
+      });
+      if (proposal && proposal.trim() !== soul.trim()) {
+        knowledge.add({
+          nodeId: n.id,
+          nodeLabel: n.label,
+          cwd: n.data.cwd || "",
+          chatId: "",
+          sender: "人格反思",
+          rule: proposal,
+          source: `基于近 24h ${chats.length} 条群聊的自动人格演化提案`,
+          kind: "soul",
+        });
+        hub.broadcast({ type: "knowledge-inbox", items: knowledge.all() });
+      }
+    }
+  };
+  setTimeout(() => void runSoulReflection().catch(() => {}), 15 * 60_000);
+  setInterval(() => void runSoulReflection().catch(() => {}), 24 * 3600_000);
 
   const server = new ControlServer(store.get().bridge.wsPort, {
     store,
@@ -306,6 +433,7 @@ async function main() {
     getUsage: () => usage.getLast(),
     ensureSoul: (nodeId) => ensureSoul(nodeId),
     knowledge,
+    permBroker,
     onConfigChanged: () => {
       // 图(graph)变更不必重连飞书；仅会话需要失效（已在 server 内处理）
     },
@@ -323,7 +451,12 @@ async function main() {
   process.on("SIGTERM", shutdown);
 }
 
-main().catch((e) => {
-  console.error("Bridge 启动失败:", e);
-  process.exit(1);
-});
+// 双模式：--mcp-perm = 作为 stdio MCP 审批服务器被 claude 启动（同一 exe 自举）；否则正常跑 Bridge
+if (process.argv.includes("--mcp-perm")) {
+  runMcpPermServer();
+} else {
+  main().catch((e) => {
+    console.error("Bridge 启动失败:", e);
+    process.exit(1);
+  });
+}

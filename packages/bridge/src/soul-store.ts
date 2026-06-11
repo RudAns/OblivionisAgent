@@ -54,6 +54,16 @@ export function readSoul(nodeId: string): string | undefined {
   }
 }
 
+/** 覆写人格文件（人格修订提案被采纳时用；自动迭代闭环的落点） */
+export function writeSoul(nodeId: string, content: string): void {
+  try {
+    mkdirSync(SOULS_DIR(), { recursive: true });
+    writeFileSync(soulPath(nodeId), content.trim() + "\n", "utf8");
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 确保人格文件存在（无则播种 starter，绝不覆盖已有）。返回 { path, created } */
 export function ensureSoul(nodeId: string): { path: string; created: boolean } {
   const p = soulPath(nodeId);

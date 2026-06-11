@@ -34,4 +34,8 @@ export interface FeishuTransport {
     mobile?: string,
     email?: string,
   ): Promise<Array<{ label: string; openId: string }>>;
+  /** 发送工具审批交互卡片（可选；按钮 value 携带 requestId+decision） */
+  sendPermissionCard?(chatId: string, requestId: string, title: string, detail: string): Promise<boolean>;
+  /** 注册卡片按钮回调（可选）。回调返回 toast 文案 */
+  onCardAction?(cb: (requestId: string, decision: "allow" | "deny", operatorOpenId: string) => string): void;
 }

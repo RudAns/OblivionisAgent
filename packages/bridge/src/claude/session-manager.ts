@@ -34,6 +34,7 @@ export class SessionManager {
     text: string,
     permissionMode?: string,
     appendSystemPrompt?: string,
+    permCtx?: import("./claude-session.js").PermCtxLite,
   ): Promise<string> {
     const node = this.findNode(nodeId);
     if (!node) throw new Error(`未找到会话节点: ${nodeId}`);
@@ -45,7 +46,7 @@ export class SessionManager {
       const session = this.ensureSession(fresh, nodeId, fresh.data.sessionId, (id) =>
         this.persistSessionId(nodeId, id),
       );
-      return session.send(text, permissionMode, appendSystemPrompt);
+      return session.send(text, permissionMode, appendSystemPrompt, permCtx);
     }
 
     // 无 base：单一会话(sessionId)，主客共用（访客仅靠护栏限制）
@@ -57,7 +58,7 @@ export class SessionManager {
     const session = this.ensureSession(this.findNode(nodeId)!, nodeId, sid, (id) =>
       this.persistSessionId(nodeId, id),
     );
-    return session.send(text, permissionMode, appendSystemPrompt);
+    return session.send(text, permissionMode, appendSystemPrompt, permCtx);
   }
 
   /** 从 baseSessionId 重新 fork 出访客会话并脱敏，写回 sessionId（刷新快照 / 首次） */
@@ -110,6 +111,8 @@ export class SessionManager {
       appendSystemPrompt: node.data.appendSystemPrompt,
       includePartialMessages: node.data.includePartialMessages,
       extraArgs: node.data.extraArgs,
+      approval: node.data.approvalMode,
+      wsPort: cfg.bridge.wsPort,
       onEvent: (event) => this.hub.broadcast({ type: "session-event", nodeId: node.id, sessionId: sid ?? "", event }),
       onStatus: (status) => this.hub.broadcast({ type: "session-status", nodeId: node.id, sessionId: sid ?? "", status }),
       onSessionId: (id) => {

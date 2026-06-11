@@ -3,6 +3,7 @@ import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type { KnowledgeItem } from "@oblivionis/shared";
+import { writeSoul } from "./soul-store.js";
 
 /**
  * 知识收件箱（vision-agentic-roadmap.md §3）：
@@ -82,7 +83,14 @@ export class KnowledgeStore {
       return item;
     }
     const rule = (editedRule ?? item.rule).trim();
-    if (rule) this.appendToClaudeMd(item.cwd, rule);
+    if (rule) {
+      if (item.kind === "soul") {
+        // 人格修订提案：rule = 修订后的完整 SOUL.md，采纳即覆写人格文件（下条消息生效）
+        writeSoul(item.nodeId, rule);
+      } else {
+        this.appendToClaudeMd(item.cwd, rule);
+      }
+    }
     item.status = "accepted";
     item.rule = rule;
     this.save();

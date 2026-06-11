@@ -1,9 +1,20 @@
 import { randomUUID } from "node:crypto";
 import spawn from "cross-spawn";
 import type { ChildProcess } from "node:child_process";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import type { ClaudeStreamEvent, SessionStatus } from "@oblivionis/shared";
 import { isResult } from "@oblivionis/shared";
 import { sessionArgs } from "./session-path.js";
+
+/** 审批请求的上下文（spawn 时经 env 传给 MCP 审批进程，卡片据此发到来源群） */
+export interface PermCtxLite {
+  nodeId: string;
+  nodeLabel?: string;
+  chatId?: string;
+  senderId?: string;
+  senderName?: string;
+}
 
 /** 大数字格式化：849000 -> 849k，1230000 -> 1.23M */
 function fmtTokens(n: number): string {
@@ -27,6 +38,10 @@ export interface ClaudeSessionOptions {
   appendSystemPrompt?: string;
   includePartialMessages: boolean;
   extraArgs: string[];
+  /** 敏感操作飞书审批：true 时挂 MCP 审批工具（--permission-prompt-tool） */
+  approval?: boolean;
+  /** bridge WS 端口（审批 MCP 进程回连用） */
+  wsPort?: number;
   onEvent: (e: ClaudeStreamEvent) => void;
   onStatus: (s: SessionStatus) => void;
   /** 发现/分配会话 id 时回调（fork 出新 id 或自动生成时），用于持久化到配置 */
@@ -40,6 +55,8 @@ interface Job {
   permissionMode?: string;
   /** 本次运行追加的 system prompt（访客护栏等），覆盖节点默认 */
   appendSystemPrompt?: string;
+  /** 审批上下文（卡片发到来源群） */
+  permCtx?: PermCtxLite;
   resolve: (finalText: string) => void;
   reject: (err: Error) => void;
 }
@@ -72,9 +89,14 @@ export class ClaudeSession {
   }
 
   /** 入队一条消息，返回最终回复文本。permissionMode / appendSystemPrompt 可按本次发送者覆盖 */
-  send(text: string, permissionMode?: string, appendSystemPrompt?: string): Promise<string> {
+  send(
+    text: string,
+    permissionMode?: string,
+    appendSystemPrompt?: string,
+    permCtx?: PermCtxLite,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
-      this.queue.push({ text, permissionMode, appendSystemPrompt, resolve, reject });
+      this.queue.push({ text, permissionMode, appendSystemPrompt, permCtx, resolve, reject });
       void this.pump();
     });
   }
@@ -94,7 +116,7 @@ export class ClaudeSession {
     this.busy = true;
     this.opts.onStatus("running");
     try {
-      const finalText = await this.runOnce(job.text, job.permissionMode, job.appendSystemPrompt);
+      const finalText = await this.runOnce(job.text, job.permissionMode, job.appendSystemPrompt, job.permCtx);
       job.resolve(finalText);
       this.opts.onStatus("idle");
     } catch (err) {
@@ -120,6 +142,15 @@ export class ClaudeSession {
       "--permission-mode",
       permissionMode,
       ...(append ? ["--append-system-prompt", append] : []),
+      // 飞书审批：挂上 MCP 审批工具，需要授权的工具调用会先发卡片问主人
+      ...(o.approval
+        ? [
+            "--mcp-config",
+            join(homedir(), ".oblivionis", "perm-mcp.json"),
+            "--permission-prompt-tool",
+            "mcp__oblivionis_perm__approve",
+          ]
+        : []),
       ...o.extraArgs,
     ];
   }
@@ -128,6 +159,7 @@ export class ClaudeSession {
     text: string,
     permissionMode?: string,
     appendSystemPrompt?: string,
+    permCtx?: PermCtxLite,
   ): Promise<string> {
     const o = this.opts;
     const args = this.buildArgs(permissionMode ?? o.permissionMode, appendSystemPrompt);
@@ -138,7 +170,13 @@ export class ClaudeSession {
       const child = spawn(o.binPath, args, {
         cwd: o.cwd,
         stdio: ["pipe", "pipe", "pipe"],
-        env: process.env,
+        env: o.approval
+          ? {
+              ...process.env,
+              OBLIVIONIS_PERM_CTX: JSON.stringify(permCtx ?? { nodeId: o.nodeId, nodeLabel: o.label }),
+              OBLIVIONIS_WS_PORT: String(o.wsPort ?? 8920),
+            }
+          : process.env,
       });
       this.active = child;
 

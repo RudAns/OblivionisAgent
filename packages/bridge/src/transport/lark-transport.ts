@@ -42,6 +42,9 @@ export class LarkTransport implements FeishuTransport {
   private botOpenId: string | null = null;
   /** openId -> 真实姓名缓存（通讯录接口结果；失败缓存 null 避免每条消息都打 API） */
   private nameCache = new Map<string, string | null>();
+  /** 审批卡片按钮回调（PermissionBroker 注入） */
+  private cardActionCb: ((requestId: string, decision: "allow" | "deny", operatorOpenId: string) => string) | null =
+    null;
 
   constructor(private opts: LarkOptions) {}
 
@@ -84,6 +87,22 @@ export class LarkTransport implements FeishuTransport {
         } catch (e) {
           this.opts.log("error", `解析入站消息失败: ${(e as Error).message}`);
         }
+      },
+      // 审批卡片按钮回调（工具权限审批）：校验在 broker 内做（仅主人有效）
+      "card.action.trigger": async (data: any) => {
+        try {
+          const value = data?.action?.value ?? {};
+          const requestId = String(value.requestId ?? "");
+          const decision = value.decision === "allow" ? "allow" : "deny";
+          const operator = String(data?.operator?.open_id ?? "");
+          if (requestId && this.cardActionCb) {
+            const toast = this.cardActionCb(requestId, decision, operator);
+            return { toast: { type: "info", content: toast } };
+          }
+        } catch (e) {
+          this.opts.log("warn", `卡片回调处理失败: ${(e as Error).message}`);
+        }
+        return { toast: { type: "info", content: "已收到" } };
       },
     });
 
@@ -239,6 +258,50 @@ export class LarkTransport implements FeishuTransport {
 
   onMessage(cb: (m: InboundMessage) => void): void {
     this.cb = cb;
+  }
+
+  onCardAction(cb: (requestId: string, decision: "allow" | "deny", operatorOpenId: string) => string): void {
+    this.cardActionCb = cb;
+  }
+
+  /** 发送工具审批交互卡片：允许/拒绝按钮，value 携带 requestId+decision */
+  async sendPermissionCard(chatId: string, requestId: string, title: string, detail: string): Promise<boolean> {
+    if (!this.client) return false;
+    const card = {
+      config: { wide_screen_mode: true },
+      header: { title: { tag: "plain_text", content: title }, template: "orange" },
+      elements: [
+        { tag: "div", text: { tag: "lark_md", content: detail } },
+        {
+          tag: "action",
+          actions: [
+            {
+              tag: "button",
+              text: { tag: "plain_text", content: "✅ 允许一次" },
+              type: "primary",
+              value: { requestId, decision: "allow" },
+            },
+            {
+              tag: "button",
+              text: { tag: "plain_text", content: "❌ 拒绝" },
+              type: "danger",
+              value: { requestId, decision: "deny" },
+            },
+          ],
+        },
+        {
+          tag: "note",
+          elements: [{ tag: "plain_text", content: "仅主人的点击有效 · 100 秒未处理自动拒绝" }],
+        },
+      ],
+    };
+    try {
+      await this.sendContent(chatId, undefined, "interactive", JSON.stringify(card));
+      return true;
+    } catch (e) {
+      this.opts.log("warn", `审批卡片发送失败: ${(e as Error).message}`);
+      return false;
+    }
   }
 
   /** 用手机号/邮箱查 open_id（需通讯录权限 contact:user.id:readonly） */

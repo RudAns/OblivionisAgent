@@ -89,6 +89,11 @@ export const ClaudeSessionData = z.object({
   ),
   /** 追加到默认 system prompt 之后的内容 */
   appendSystemPrompt: z.string().optional(),
+  /**
+   * 敏感操作飞书审批：开启后，工具调用需要授权时（按 permissionMode 规则）
+   * 往来源群发交互卡片，主人点[允许/拒绝]决定放行（官方 Channels 没有的能力）。
+   */
+  approvalMode: z.boolean().default(false),
   /** 是否开启 --include-partial-messages（逐 token 流式，GUI 转录更顺滑） */
   includePartialMessages: z.boolean().default(true),
   /** 透传给 claude 的额外参数 */
