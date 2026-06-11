@@ -93,13 +93,24 @@ function TerminalView({
   // 缩略图芯片浮层"贴着 claude 输入框上方"的底部偏移(px)，由 measureRef 按输入框实际位置动态算
   const [chipBottom, setChipBottom] = useState(64);
   const measureRef = useRef<() => number>(() => 64);
+  const inputTextRef = useRef<() => string | null>(() => null); // 读 claude 输入框当前文本(null=读不到，别误清)
   // 卸载时统一释放所有缩略图 blob URL
   useEffect(() => () => chipsRef.current.forEach((c) => URL.revokeObjectURL(c.url)), []);
-  // 有芯片时轻量轮询输入框位置，让浮层跟着输入框走(claude 重绘/多行输入时也对得上)
+  // 有芯片时轻量轮询：① 让浮层跟着输入框走；② 若路径已离开输入框(=消息已发送)就清空芯片。
+  // 这条兜住"贴图是异步加的、回车比芯片先到"的竞态——回车清不掉时这里也能清。
   useEffect(() => {
     if (!imgChips.length) return;
     setChipBottom(measureRef.current());
-    const id = window.setInterval(() => setChipBottom(measureRef.current()), 140);
+    const tick = () => {
+      const txt = inputTextRef.current();
+      // 只有"读到了输入框、但路径已不在其中"才清(=已发送/已删)；读不到(null)不动，避免误清
+      if (txt !== null && chipsRef.current.length && !chipsRef.current.some((c) => txt.includes(c.name))) {
+        clearChipsRef.current();
+      } else {
+        setChipBottom(measureRef.current());
+      }
+    };
+    const id = window.setInterval(tick, 150);
     return () => window.clearInterval(id);
   }, [imgChips.length]);
   const activeRef = useRef(active);
@@ -310,6 +321,21 @@ function TerminalView({
         return Math.max(26, Math.round(rowsBelowTop * cellH) + 4);
       } catch {
         return 64;
+      }
+    };
+    // 读输入框区域当前文本(逐行拼接，不加分隔符 → 折行的长路径也连续)，给"是否已发送"判断用。
+    // 读不到输入框(滚到历史里/claude 全屏重绘)返回 null → 轮询不误清。
+    inputTextRef.current = (): string | null => {
+      try {
+        const reg = detectInputRegion();
+        if (!reg) return null;
+        let s = "";
+        for (let r = reg.startRow; r <= reg.endRow; r++) {
+          s += reg.buf.getLine(reg.top + r)?.translateToString(true) ?? "";
+        }
+        return s;
+      } catch {
+        return null;
       }
     };
 
