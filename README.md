@@ -125,3 +125,5 @@ OblivionisAgent/
 [PolyForm Noncommercial License 1.0.0](LICENSE) —— **仅限非商业用途**（个人 / 研究 / 教学 / 非营利可自由使用、修改、分享、二次开发；**禁止任何商业用途**）。分发时须保留署名。
 
 Copyright © 2026 Derek·JW·Chen
+
+成品捆绑的第三方开源组件的许可证与版权声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)（随发行物分发；`node scripts/gen-notices.cjs` 可重新生成）。其中含 5 个 MPL-2.0 弱 copyleft 组件（Tauri 的 CSS 解析链，未改动即可使用）。
