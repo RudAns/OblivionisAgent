@@ -122,4 +122,6 @@ OblivionisAgent/
 
 ## License
 
-MIT
+[PolyForm Noncommercial License 1.0.0](LICENSE) —— **仅限非商业用途**（个人 / 研究 / 教学 / 非营利可自由使用、修改、分享、二次开发；**禁止任何商业用途**）。分发时须保留署名。
+
+Copyright © 2026 Derek·JW·Chen
