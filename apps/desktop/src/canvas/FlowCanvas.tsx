@@ -22,6 +22,7 @@ import { RouteNode } from "./nodes/RouteNode.js";
 import { IntentSwitchNode } from "./nodes/IntentSwitchNode.js";
 import { ClaudeSessionNode } from "./nodes/ClaudeSessionNode.js";
 import { CronNode } from "./nodes/CronNode.js";
+import { WebhookNode } from "./nodes/WebhookNode.js";
 
 interface Props {
   nodes: Node[];
@@ -51,6 +52,7 @@ const NODE_COLORS: Record<string, string> = {
   "intent-switch": "#ffb84d",
   "claude-session": "#4f8cff",
   cron: "#39c5cf",
+  webhook: "#e0b13e",
 };
 const miniMapNodeColor = (node: Node) => NODE_COLORS[node.type ?? ""] ?? "#3a4250";
 
@@ -62,6 +64,7 @@ export function FlowCanvas(props: Props) {
       "intent-switch": IntentSwitchNode,
       "claude-session": ClaudeSessionNode,
       cron: CronNode,
+      webhook: WebhookNode,
     }),
     [],
   );

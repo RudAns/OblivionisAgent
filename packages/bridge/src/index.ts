@@ -21,6 +21,11 @@ import { KnowledgeStore } from "./knowledge-store.js";
 import { extractKnowledge } from "./claude/extract-knowledge.js";
 import { CronScheduler } from "./cron-scheduler.js";
 import { reflectSoul } from "./claude/reflect-soul.js";
+import { readGroupMemory, writeGroupMemory, ensureGroupMemory } from "./group-memory-store.js";
+import { distillGroupMemory } from "./claude/distill-memory.js";
+import { looksLikeSchedule, parseSchedule } from "./claude/parse-schedule.js";
+import { randomUUID } from "node:crypto";
+import { WebhookServer } from "./webhook-server.js";
 import { PermissionBroker } from "./perm/permission-broker.js";
 import { runMcpPermServer } from "./perm/mcp-perm-server.js";
 import { writeFileSync } from "node:fs";
@@ -242,11 +247,46 @@ async function main() {
     const isOwner = cfg.owners.some((o) => o.openId === inbound.senderId);
     const node = resolved.sessionNode;
     const permissionMode = isOwner ? node.data.permissionMode : node.data.guestPermissionMode;
+
+    // 自然语言建定时任务：仅主人 + 含定时关键词时解析；命中则建 cron 节点+连线，回执并跳过正常问答
+    const replyOptsEarly = { replyToMessageId: inbound.messageId, atUserId: inbound.senderId };
+    if (isOwner && looksLikeSchedule(resolved.text)) {
+      const ps = await parseSchedule(resolved.text, {
+        binPath: cfg.claude.binPath,
+        cwd: cfg.claude.defaultCwd || process.cwd(),
+        log: (m) => log.info(m),
+      });
+      if (ps.isSchedule && ps.schedule && ps.prompt) {
+        const cronId = randomUUID();
+        store.update((c) => {
+          c.graph.nodes.push({
+            id: cronId,
+            kind: "cron",
+            position: { x: (node.position?.x ?? 0) - 280, y: (node.position?.y ?? 0) + 140 },
+            label: `定时 · ${ps.prompt!.slice(0, 10)}`,
+            data: { schedule: ps.schedule!, prompt: ps.prompt!, chatId: inbound.chatId, enabled: true },
+          });
+          c.graph.edges.push({ id: randomUUID(), source: cronId, target: node.id });
+        });
+        hub.broadcast({ type: "config", config: store.get() });
+        sessions.invalidate();
+        const ok = `⏰ 已创建定时任务：**${ps.schedule}** 触发「${ps.prompt}」，结果发到本群。\n（可在桌面端画布里调整或停用）`;
+        await gateway.transport?.reply(inbound.chatId, ok, replyOptsEarly).catch(() => {});
+        hub.broadcast({ type: "outbound", chatId: inbound.chatId, text: ok, ts: Date.now() });
+        log.info(`自然语言建定时任务: ${ps.schedule} → ${node.label}`);
+        return;
+      }
+    }
     // 拼接顺序（参照 Hermes 的 system prompt 分层）：
     //   1. 人格 SOUL.md —— slot #1，原文注入（有则注入，纯文件驱动）
     //   2. 节点 appendSystemPrompt（操作性指令）
     //   3. 访客护栏 —— 永远压轴，并声明优先级（人格只影响表达，不得越权）
     const soul = readSoul(node.id);
+    // 群记忆：注入该群的 GROUP.md，让机器人"记得这个群"（成员称呼、约定、关注点）
+    const groupMem = readGroupMemory(inbound.chatId);
+    const memBlock = groupMem
+      ? `【关于这个群的记忆（你过去积累的，仅作背景，不要照搬复述）】\n${groupMem}`
+      : undefined;
     const guardrail = isOwner
       ? undefined
       : [
@@ -256,7 +296,7 @@ async function main() {
           .filter(Boolean)
           .join("\n");
     const appendPrompt =
-      [soul, node.data.appendSystemPrompt, guardrail].filter(Boolean).join("\n\n") || undefined;
+      [soul, memBlock, node.data.appendSystemPrompt, guardrail].filter(Boolean).join("\n\n") || undefined;
 
     // 审计落盘：每条入站(尤其访客提问)。nodeId 供人格反思按节点取近期对话
     appendAudit({
@@ -295,6 +335,19 @@ async function main() {
         await gateway.transport.reply(inbound.chatId, safeReply, replyOpts);
         hub.broadcast({ type: "outbound", chatId: inbound.chatId, text: safeReply, ts: Date.now() });
       }
+      // 群记忆提炼（异步、绝不影响主链路）：把这轮里值得长期记住的群信息写进 GROUP.md
+      if (inbound.chatId) {
+        void distillGroupMemory(readGroupMemory(inbound.chatId) ?? "", resolved.text, reply, inbound.senderName, {
+          binPath: cfg.claude.binPath,
+          cwd: cfg.claude.defaultCwd || process.cwd(),
+          log: (m) => log.info(m),
+        })
+          .then((mem) => {
+            if (mem) writeGroupMemory(inbound.chatId, mem);
+          })
+          .catch(() => {});
+      }
+
       // 知识提取（异步、绝不影响主链路）：从这轮问答提取规则候选 → 收件箱 → 推送 GUI
       void extractKnowledge(resolved.text, reply, {
         binPath: cfg.claude.binPath,
@@ -380,6 +433,30 @@ async function main() {
   });
   cronScheduler.start();
 
+  // Webhook 入口：复用 cron 的 runPrompt/deliver（脱敏分身 + 出站脱敏）
+  const runWebhookPrompt = async (sessionNodeId: string, prompt: string) => {
+    const c = store.get();
+    const n = c.graph.nodes.find((x) => x.id === sessionNodeId);
+    const isSession = n?.kind === "claude-session";
+    const soul = readSoul(sessionNodeId);
+    const append =
+      [soul, isSession ? n.data.appendSystemPrompt : undefined].filter(Boolean).join("\n\n") || undefined;
+    return sessions.send(sessionNodeId, prompt, isSession ? n.data.permissionMode : undefined, append, {
+      nodeId: sessionNodeId,
+      nodeLabel: isSession ? n.label : undefined,
+      chatId: store.get().homeChatId || undefined,
+    });
+  };
+  const deliverToChat = async (chatId: string, text: string) => {
+    const safe = redactText(text, collectSecrets(store.get().feishu.appSecret));
+    if (gateway.transport) {
+      await gateway.transport.reply(chatId, safe);
+      hub.broadcast({ type: "outbound", chatId, text: safe, ts: Date.now() });
+    }
+  };
+  const webhookServer = new WebhookServer({ store, log, runPrompt: runWebhookPrompt, deliver: deliverToChat });
+  webhookServer.sync();
+
   // 人格自主迭代闭环（Hermes 的"soul evolution"，但提案须经主人裁决）：
   // 每 24h 一次（启动 15 分钟后首跑）：对"有人格文件 + 近24h有群聊"的节点跑反思，
   // 修订提案进知识收件箱(kind=soul)，主人采纳后覆写 SOUL.md。
@@ -432,10 +509,13 @@ async function main() {
     getTranscripts: () => transcripts.histories(),
     getUsage: () => usage.getLast(),
     ensureSoul: (nodeId) => ensureSoul(nodeId),
+    ensureGroupMemory: (chatId) => ensureGroupMemory(chatId),
     knowledge,
     permBroker,
     onConfigChanged: () => {
-      // 图(graph)变更不必重连飞书；仅会话需要失效（已在 server 内处理）
+      // 图(graph)变更不必重连飞书；仅会话需要失效（已在 server 内处理）。
+      // webhook 节点增删/端口改 → 重同步监听
+      webhookServer.sync();
     },
   });
   server.start();

@@ -56,6 +56,9 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 | `claude/reflect-soul.ts` | **人格反思**：每 24h 对有人格+有近期群聊的节点提议 SOUL.md 修订 → 收件箱(kind=soul) 主人裁决 |
 | `perm/mcp-perm-server.ts` | **审批 MCP 服务器**（`bridge --mcp-perm` 双模式自举）：claude 的 permission-prompt-tool → WS 回连 bridge → 等卡片决定 |
 | `perm/permission-broker.ts` | **审批中枢**：挂起请求 ↔ 飞书交互卡片 ↔ 仅主人有效的回调；100s 超时拒绝 |
+| `group-memory-store.ts` + `claude/distill-memory.ts` | **群记忆**：每群 `~/.oblivionis/groups/<chatId>.md`(配额 1500 字)注入会话；问答后 haiku 提炼覆写。GUI 飞书群节点「🧠 群记忆」可编辑 |
+| `claude/parse-schedule.ts` | **自然语言建 cron**：仅主人+定时关键词粗筛→haiku 解析 {schedule,prompt}→建 cron 节点+连线 |
+| `webhook-server.ts` | **Webhook 入口**：node:http 监听 `/hook/<token>`(0.0.0.0)；有 webhook 节点才起；事件→下游会话→脱敏发群 |
 | `config-store.ts` | 配置读写（解析失败直接抛=宁崩不带病运行，保护数据） |
 | `server.ts` | WS 控制面（GUI 测试框、刷新快照、列会话、查 openId…） |
 | `hub.ts` | 向所有 GUI 客户端广播事件 |

@@ -120,6 +120,21 @@ export const CronData = z.object({
 });
 export type CronData = z.infer<typeof CronData>;
 
+/**
+ * Webhook 入口节点：外部系统(GitHub/Jenkins/CI)POST 到 /hook/<token>，
+ * 触发下游「Claude 会话」分析请求体，结果发指定群。token 即口令(放在 URL 里)。
+ */
+export const WebhookData = z.object({
+  /** URL 路径口令（/hook/<token>）；建节点时自动生成随机值 */
+  token: z.string().default(""),
+  /** 指令模板，{{body}} 会被替换为 POST 请求体（截断） */
+  prompt: z.string().default("收到一个 webhook 事件，请简要分析以下内容并用中文总结：\n{{body}}"),
+  /** 结果发到的群 chatId；留空=homeChatId */
+  chatId: z.string().optional(),
+  enabled: z.boolean().default(true),
+});
+export type WebhookData = z.infer<typeof WebhookData>;
+
 const BaseNode = z.object({
   id: z.string(),
   position: XY,
@@ -132,6 +147,7 @@ export const GraphNode = z.discriminatedUnion("kind", [
   BaseNode.extend({ kind: z.literal("intent-switch"), data: IntentSwitchData }),
   BaseNode.extend({ kind: z.literal("claude-session"), data: ClaudeSessionData }),
   BaseNode.extend({ kind: z.literal("cron"), data: CronData }),
+  BaseNode.extend({ kind: z.literal("webhook"), data: WebhookData }),
 ]);
 export type GraphNode = z.infer<typeof GraphNode>;
 
@@ -140,6 +156,7 @@ export type RouteNode = Extract<GraphNode, { kind: "route" }>;
 export type IntentSwitchNode = Extract<GraphNode, { kind: "intent-switch" }>;
 export type ClaudeSessionNode = Extract<GraphNode, { kind: "claude-session" }>;
 export type CronNode = Extract<GraphNode, { kind: "cron" }>;
+export type WebhookNode = Extract<GraphNode, { kind: "webhook" }>;
 
 export const GraphEdge = z.object({
   id: z.string(),
@@ -159,8 +176,10 @@ export const OblivionisConfig = z.object({
   bridge: z
     .object({
       wsPort: z.number().int().default(8920),
+      /** Webhook HTTP 入口端口（有 webhook 节点时才监听）；0.0.0.0 绑定供局域网 CI 回调 */
+      webhookPort: z.number().int().default(8921),
     })
-    .default({ wsPort: 8920 }),
+    .default({ wsPort: 8920, webhookPort: 8921 }),
   feishu: z
     .object({
       appId: z.string().default(""),

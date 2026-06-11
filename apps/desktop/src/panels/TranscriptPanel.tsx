@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClaudeStreamEvent } from "@oblivionis/shared";
 import { assistantText, isAssistant, isInit, isResult } from "@oblivionis/shared";
 
@@ -7,29 +7,81 @@ interface Props {
   events: ClaudeStreamEvent[];
 }
 
-/** 解析 stream-json，把一个会话节点的运行过程渲染成可读转录 */
+/** 取一条事件里可供搜索/显示的文本 */
+function eventText(e: ClaudeStreamEvent): string {
+  if (isAssistant(e)) return assistantText(e) ?? "";
+  if (isInit(e)) return `init ${e.model} ${e.cwd}`;
+  if (isResult(e)) return `done ${e.subtype}`;
+  return "";
+}
+
+/** 解析 stream-json，把一个会话节点的运行过程渲染成可读转录（支持关键词过滤） */
 export function TranscriptPanel({ nodeId, events }: Props) {
   const endRef = useRef<HTMLDivElement>(null);
-  // 新事件自动滚到底（最新内容永远可见）
+  const [filter, setFilter] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return events;
+    return events.filter((e) => eventText(e).toLowerCase().includes(q));
+  }, [events, filter]);
+
+  // 新事件自动滚到底（仅未过滤时；过滤态不抢滚动）
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [nodeId, events.length]);
+    if (!filter) endRef.current?.scrollIntoView({ block: "end" });
+  }, [nodeId, events.length, filter]);
 
   if (!nodeId) return <div className="panel-empty">从左侧会话列表选择一个会话，查看访客提问的处理过程</div>;
   if (events.length === 0)
     return <div className="panel-empty">该会话暂无访客活动。群里 @机器人 提问、或在节点编辑里发测试消息后，这里会实时显示处理过程（记录保留约 3 天）。</div>;
 
   return (
-    <div className="transcript">
-      {events.map((e, i) => (
-        <EventRow key={i} e={e} />
-      ))}
-      <div ref={endRef} />
+    <div className="transcript-wrap">
+      <div className="transcript-search">
+        <input
+          value={filter}
+          placeholder="🔎 搜索这个会话的历史…（保留约 3 天）"
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        {filter && (
+          <span className="ts-count">
+            {filtered.length}/{events.length}
+          </span>
+        )}
+      </div>
+      <div className="transcript">
+        {filter && filtered.length === 0 && <div className="panel-empty">没有匹配的内容</div>}
+        {filtered.map((e, i) => (
+          <EventRow key={i} e={e} highlight={filter} />
+        ))}
+        <div ref={endRef} />
+      </div>
     </div>
   );
 }
 
-function EventRow({ e }: { e: ClaudeStreamEvent }) {
+/** 关键词高亮 */
+function mark(text: string, q: string) {
+  if (!q) return text;
+  const lower = text.toLowerCase();
+  const ql = q.toLowerCase();
+  const out: Array<string | JSX.Element> = [];
+  let i = 0;
+  let k = 0;
+  while (i < text.length) {
+    const idx = lower.indexOf(ql, i);
+    if (idx < 0) {
+      out.push(text.slice(i));
+      break;
+    }
+    if (idx > i) out.push(text.slice(i, idx));
+    out.push(<mark key={k++}>{text.slice(idx, idx + q.length)}</mark>);
+    i = idx + q.length;
+  }
+  return out;
+}
+
+function EventRow({ e, highlight }: { e: ClaudeStreamEvent; highlight: string }) {
   if (isInit(e)) {
     return (
       <div className="evt evt-init">
@@ -42,7 +94,7 @@ function EventRow({ e }: { e: ClaudeStreamEvent }) {
     const tools = e.message.content.filter((b) => b.type === "tool_use");
     return (
       <div className="evt evt-assistant">
-        {text ? <div className="evt-text">{text}</div> : null}
+        {text ? <div className="evt-text">{highlight ? mark(text, highlight) : text}</div> : null}
         {tools.map((t, i) => (
           <div key={i} className="evt-tool">🔧 {String(t.name)}</div>
         ))}

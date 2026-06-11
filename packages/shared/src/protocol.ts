@@ -30,6 +30,8 @@ export type ClientMessage =
   | { type: "get-audit" }
   /** 确保节点人格文件(SOUL.md)存在（无则播种 starter），回 soul-path */
   | { type: "ensure-soul"; nodeId: string }
+  /** 确保某群的 GROUP.md 存在（无则建模板），回 file-path 供 GUI 打开编辑 */
+  | { type: "ensure-group-memory"; chatId: string }
   /** 知识收件箱裁决：accept(可带编辑后规则)→写 cwd 的 CLAUDE.md；dismiss=抛弃 */
   | { type: "knowledge-decide"; id: string; action: "accept" | "dismiss"; editedRule?: string }
   /** 工具权限审批请求（来自 MCP 审批进程，非 GUI）；定向回 permission-response */
@@ -138,6 +140,8 @@ export type BridgeMessage =
   | ({ type: "usage-status" } & UsageSnapshot)
   /** 人格文件路径（响应 ensure-soul；created=本次播种了 starter） */
   | { type: "soul-path"; nodeId: string; path: string; created: boolean }
+  /** 群记忆文件路径（响应 ensure-group-memory），GUI 用 VSCode 打开 */
+  | { type: "open-file"; path: string }
   /** 知识收件箱全量（连接时 + 每次变更后推送） */
   | { type: "knowledge-inbox"; items: KnowledgeItem[] }
   /** 工具权限审批决定（定向发给发起请求的 MCP 连接） */

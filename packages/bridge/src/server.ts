@@ -41,6 +41,8 @@ export interface ServerDeps {
   getUsage: () => import("@oblivionis/shared").UsageSnapshot | null;
   /** 确保节点人格文件存在（无则播种），返回路径 */
   ensureSoul: (nodeId: string) => { path: string; created: boolean };
+  /** 确保某群 GROUP.md 存在，返回路径 */
+  ensureGroupMemory: (chatId: string) => string;
   /** 知识收件箱 */
   knowledge: import("./knowledge-store.js").KnowledgeStore;
   /** 工具权限审批中枢 */
@@ -125,6 +127,11 @@ export class ControlServer {
       case "ensure-soul": {
         const r = this.deps.ensureSoul(msg.nodeId);
         hub.broadcast({ type: "soul-path", nodeId: msg.nodeId, path: r.path, created: r.created });
+        break;
+      }
+      case "ensure-group-memory": {
+        const p = this.deps.ensureGroupMemory(msg.chatId);
+        hub.broadcast({ type: "open-file", path: p });
         break;
       }
       case "permission-request": {

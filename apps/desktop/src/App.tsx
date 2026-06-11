@@ -74,6 +74,15 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
     label: "定时任务",
     data: { schedule: "09:00", prompt: "", enabled: true },
   }),
+  webhook: () => ({
+    kind: "webhook",
+    label: "Webhook",
+    data: {
+      token: crypto.randomUUID().replace(/-/g, ""),
+      prompt: "收到一个 webhook 事件，请简要分析以下内容并用中文总结：\n{{body}}",
+      enabled: true,
+    },
+  }),
 };
 
 function graphToRf(config: OblivionisConfig, status: Record<string, string>): {
@@ -259,6 +268,9 @@ function Inner() {
           break;
         case "soul-path":
           // 人格文件已就绪（必要时刚播种了 starter）→ 用 VSCode 打开让用户编辑，保存即生效
+          void invoke("open_path", { path: msg.path, base: "" }).catch(() => {});
+          break;
+        case "open-file":
           void invoke("open_path", { path: msg.path, base: "" }).catch(() => {});
           break;
         case "knowledge-inbox":
@@ -681,6 +693,7 @@ function Inner() {
                   onListSessions={(cwd) => client.send({ type: "list-sessions", cwd })}
                   onRefreshSnapshot={(nodeId) => client.send({ type: "prepare-fork", nodeId })}
                   onEditSoul={(nodeId) => client.send({ type: "ensure-soul", nodeId })}
+                  onEditGroupMemory={(chatId) => client.send({ type: "ensure-group-memory", chatId })}
                 />
                 {selectedIsClaude && (
                   <div className="test-box">
@@ -704,6 +717,7 @@ function Inner() {
             <button onClick={() => addNode("intent-switch")}>+ 意图分流</button>
             <button onClick={() => addNode("claude-session")}>+ Claude 会话</button>
             <button onClick={() => addNode("cron")}>+ 定时任务</button>
+            <button onClick={() => addNode("webhook")}>+ Webhook</button>
           </div>
           </div>
           )}
@@ -815,6 +829,7 @@ function Inspector({
   onListSessions,
   onRefreshSnapshot,
   onEditSoul,
+  onEditGroupMemory,
 }: {
   node: Node | null;
   onPatch: (patch: Record<string, unknown>) => void;
@@ -823,6 +838,7 @@ function Inspector({
   onListSessions: (cwd: string) => void;
   onRefreshSnapshot: (nodeId: string) => void;
   onEditSoul: (nodeId: string) => void;
+  onEditGroupMemory: (chatId: string) => void;
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [pickFilter, setPickFilter] = useState("");
@@ -858,6 +874,15 @@ function Inspector({
               <option value="all">群内全部消息</option>
             </select>
           </label>
+          <div className="fs-actions">
+            <button
+              disabled={!d.chatId}
+              title="查看/编辑机器人对本群积累的长期记忆（GROUP.md，会自动维护，注入到该群会话）"
+              onClick={() => d.chatId && onEditGroupMemory(d.chatId)}
+            >
+              🧠 群记忆 (GROUP.md)
+            </button>
+          </div>
         </>
       )}
       {node.type === "route" && (
@@ -871,6 +896,40 @@ function Inspector({
             />
           </label>
           {field("前缀", d.prefix, "prefix")}
+        </>
+      )}
+      {node.type === "webhook" && (
+        <>
+          <div className="hint" style={{ marginBottom: 6 }}>
+            外部系统（Jenkins/CI/GitHub）POST 到下面这个地址即触发；把它连到一个「Claude 会话」节点。
+          </div>
+          <div className="base-session">
+            <div className="base-session-title">回调地址（POST · 同网段可达）</div>
+            <div className="owner-row">
+              <span className="owner-id" title={`http://<本机IP>:8921/hook/${d.token ?? ""}`}>
+                http://&lt;本机IP&gt;:8921/hook/{d.token ?? ""}
+              </span>
+              <button
+                onClick={() => navigator.clipboard?.writeText(`/hook/${d.token ?? ""}`).catch(() => {})}
+                title="复制路径"
+              >
+                复制
+              </button>
+            </div>
+          </div>
+          {field("指令模板（{{body}}=请求体）", d.prompt, "prompt")}
+          {field("投递群 chatId", d.chatId, "chatId")}
+          <div className="hint" style={{ marginBottom: 6 }}>
+            留空 = 发到 Home Chat。外网回调需自建隧道（cloudflared/ngrok 指向 8921）。
+          </div>
+          <label className="field">
+            <span>启用</span>
+            <input
+              type="checkbox"
+              checked={d.enabled !== false}
+              onChange={(e) => onPatch({ enabled: e.target.checked })}
+            />
+          </label>
         </>
       )}
       {node.type === "cron" && (
@@ -1044,6 +1103,20 @@ function Inspector({
 
           <div className="hint">
             运行会话 sid: {d.sessionId ? d.sessionId : d.baseSessionId ? "首次 fork 后生成" : "首次运行生成"}
+          </div>
+
+          <div className="sec-summary" title="本会话的安全态势（脱敏 fork / 出站脱敏 / 护栏 / 权限分级）">
+            <div className="sec-title">🛡 安全态势</div>
+            <div className={`sec-item ${d.baseSessionId ? "on" : "off"}`}>
+              {d.baseSessionId ? "✓" : "—"} 访客走脱敏 fork（开发会话只读不被污染）
+            </div>
+            <div className="sec-item on">✓ 访客回复出站二次脱敏 + 安全护栏</div>
+            <div className={`sec-item ${d.approvalMode ? "on" : "off"}`}>
+              {d.approvalMode ? "✓" : "—"} 敏感操作飞书审批{d.approvalMode ? "" : "（未开）"}
+            </div>
+            <div className="sec-item dim">
+              主人权限 {d.permissionMode} · 访客权限 {d.guestPermissionMode ?? "default"}
+            </div>
           </div>
         </>
       )}
