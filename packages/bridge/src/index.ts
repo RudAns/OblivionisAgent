@@ -313,9 +313,14 @@ async function main() {
     });
 
     // 把被引用消息拼进上下文
-    const finalText = inbound.quoted
+    const baseText = inbound.quoted
       ? `【被引用的消息】\n${inbound.quoted}\n\n【${isOwner ? "主人" : "访客"}的提问】\n${resolved.text}`
       : resolved.text;
+    // 随消息发来的图片(已下载为本地文件)：把路径附上，让 claude 用 Read 工具看图后再回答
+    const imageBlock = inbound.images?.length
+      ? `${baseText ? "\n\n" : ""}【随消息发来了 ${inbound.images.length} 张图片，请先用 Read 工具逐张查看，再结合上面的内容回答】\n${inbound.images.join("\n")}`
+      : "";
+    const finalText = baseText + imageBlock;
 
     log.info(`处理消息 from=${inbound.senderId} owner=${isOwner} perm=${permissionMode}${inbound.quoted ? " (含引用)" : ""}`);
 

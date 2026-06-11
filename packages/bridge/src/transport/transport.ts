@@ -13,6 +13,8 @@ export interface InboundMessage {
   isMention: boolean;
   /** 被引用/回复的消息原文（用户回复某条消息并@机器人时填充） */
   quoted?: string;
+  /** 随消息发来的图片（含被引用消息里的图）下载后的本地绝对路径；交给 claude 用 Read 读图 */
+  images?: string[];
   /** 原始事件，便于扩展 */
   raw?: unknown;
 }

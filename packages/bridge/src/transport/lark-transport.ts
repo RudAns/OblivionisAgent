@@ -1,5 +1,17 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import type { FeishuStatus } from "@oblivionis/shared";
 import type { FeishuTransport, InboundMessage } from "./transport.js";
+
+/** 按图片二进制头嗅探真实格式，给 claude 正确后缀(它按扩展名识别图片) */
+function sniffImageExt(b: Buffer): string {
+  if (b.length >= 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "png";
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpg";
+  if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return "gif";
+  if (b.length >= 12 && b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WEBP") return "webp";
+  return "png";
+}
 
 export interface BotInfo {
   openId?: string;
@@ -126,15 +138,9 @@ export class LarkTransport implements FeishuTransport {
     const chatId: string = message.chat_id;
     if (!chatId) return;
 
-    // 仅处理文本消息；其它类型(图片/文件/post)后续扩展
-    if (message.message_type !== "text") return;
-
-    let text = "";
-    try {
-      text = JSON.parse(message.content)?.text ?? "";
-    } catch {
-      text = "";
-    }
+    // 解析本条消息：文本(text)/图片(image)/富文本(post)。其它类型(文件/音频/贴纸…)且无文本无图 → 跳过。
+    const { text, imageKeys } = this.extractContent(message.message_type, message.content);
+    if (!text && imageKeys.length === 0) return;
 
     const chatType: string = message.chat_type ?? "p2p"; // p2p | group
     const mentions: any[] = Array.isArray(message.mentions) ? message.mentions : [];
@@ -151,10 +157,32 @@ export class LarkTransport implements FeishuTransport {
         ? mentions.some((m) => m?.id?.open_id === this.botOpenId)
         : mentions.length > 0);
 
-    // 回复/引用某条消息并@机器人时，拉取被引用消息原文一并给 Claude
+    // 仅在机器人被 @（或单聊）时才拉取引用消息 + 下载图片（与原 quoted 逻辑一致，省无谓下载）。
+    // text 始终透传（triggerMode=all 的群靠 router 决定触发，不在这里早退）。
     let quoted: string | undefined;
-    if (isMention && message.parent_id) {
-      quoted = await this.fetchMessageText(message.parent_id);
+    const images: string[] = [];
+    if (isMention) {
+      let parentImageKeys: string[] = [];
+      let parentMsgId: string | undefined;
+      if (message.parent_id) {
+        const parent = await this.fetchMessage(message.parent_id);
+        if (parent) {
+          quoted = parent.text || (parent.imageKeys.length ? "[图片]" : undefined);
+          parentImageKeys = parent.imageKeys;
+          parentMsgId = message.parent_id;
+        }
+      }
+      let idx = 0;
+      for (const k of imageKeys) {
+        const p = await this.downloadImage(message.message_id, k, idx++);
+        if (p) images.push(p);
+      }
+      if (parentMsgId && parentImageKeys.length) {
+        for (const k of parentImageKeys) {
+          const p = await this.downloadImage(parentMsgId, k, idx++);
+          if (p) images.push(p);
+        }
+      }
     }
 
     const senderId: string = sender?.sender_id?.open_id ?? sender?.sender_id?.union_id ?? "unknown";
@@ -170,8 +198,78 @@ export class LarkTransport implements FeishuTransport {
       text,
       isMention,
       quoted,
+      images: images.length ? images : undefined,
       raw: data,
     });
+  }
+
+  /** 解析消息内容：返回纯文本 + 图片 key 列表。支持 text / image / post(富文本)。 */
+  private extractContent(type: string, contentStr: string): { text: string; imageKeys: string[] } {
+    const imageKeys: string[] = [];
+    let text = "";
+    try {
+      if (!contentStr) return { text, imageKeys };
+      const c = JSON.parse(contentStr);
+      if (type === "text") {
+        text = c?.text ?? "";
+      } else if (type === "image") {
+        if (c?.image_key) imageKeys.push(c.image_key);
+      } else if (type === "post") {
+        // post 可能按 locale 包一层(zh_cn/en_us…)；content 是「段落数组」，每段是「元素数组」
+        const body = c?.zh_cn || c?.en_us || c?.ja_jp || c;
+        if (body?.title) text += body.title + "\n";
+        const paras: any[] = Array.isArray(body?.content) ? body.content : [];
+        for (const para of paras) {
+          if (!Array.isArray(para)) continue;
+          for (const el of para) {
+            if (el?.tag === "text") text += el.text ?? "";
+            else if (el?.tag === "a") text += el.text ?? el.href ?? "";
+            else if (el?.tag === "at") text += `@${el.user_name ?? ""}`;
+            else if (el?.tag === "img" && el.image_key) imageKeys.push(el.image_key);
+          }
+          text += "\n";
+        }
+        text = text.trim();
+      }
+    } catch {
+      /* 解析失败 → 空 */
+    }
+    return { text, imageKeys };
+  }
+
+  /** 下载飞书消息里的图片资源(需 im:resource 权限)，按真实格式存到 ~/.oblivionis/inbound-images，返回本地绝对路径 */
+  private async downloadImage(messageId: string, fileKey: string, idx: number): Promise<string | undefined> {
+    if (!this.client || !messageId || !fileKey) return undefined;
+    try {
+      const res: any = await this.client.im.messageResource.get({
+        path: { message_id: messageId, file_key: fileKey },
+        params: { type: "image" },
+      });
+      // 收成 buffer 以嗅探真实格式（claude 按扩展名识别图片）
+      let buf: Buffer | undefined;
+      if (typeof res?.getReadableStream === "function") {
+        const chunks: Buffer[] = [];
+        for await (const ch of res.getReadableStream()) chunks.push(Buffer.isBuffer(ch) ? ch : Buffer.from(ch));
+        buf = Buffer.concat(chunks);
+      }
+      const dir = join(homedir(), ".oblivionis", "inbound-images");
+      mkdirSync(dir, { recursive: true });
+      const safeMsg = String(messageId).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+      if (buf && buf.length) {
+        const path = join(dir, `${safeMsg}_${idx}.${sniffImageExt(buf)}`);
+        writeFileSync(path, buf);
+        return path;
+      }
+      // 退路：SDK 仅暴露 writeFile（拿不到 buffer 嗅探，默认 png）
+      if (typeof res?.writeFile === "function") {
+        const path = join(dir, `${safeMsg}_${idx}.png`);
+        await res.writeFile(path);
+        return path;
+      }
+    } catch (e) {
+      this.opts.log("warn", `下载飞书图片失败(${String(fileKey).slice(0, 10)}…): ${(e as Error).message}`);
+    }
+    return undefined;
   }
 
   /** open_id -> 真实姓名（contact/v3/users/:id，需通讯录读权限；结果含失败都缓存） */
@@ -194,19 +292,16 @@ export class LarkTransport implements FeishuTransport {
     }
   }
 
-  /** 通过消息 id 读取文本内容（用于读取被引用消息） */
-  private async fetchMessageText(messageId: string): Promise<string | undefined> {
+  /** 通过消息 id 读取被引用消息：返回文本 + 图片 key（图片/post 也能读） */
+  private async fetchMessage(messageId: string): Promise<{ text: string; imageKeys: string[] } | undefined> {
     try {
       const resp: any = await this.client.im.message.get({ path: { message_id: messageId } });
       const items = resp?.data?.items ?? resp?.items ?? [];
-      const content = items[0]?.body?.content;
-      if (typeof content === "string") {
-        try {
-          return JSON.parse(content)?.text ?? content;
-        } catch {
-          return content;
-        }
-      }
+      const item = items[0];
+      if (!item) return undefined;
+      const type: string = item?.msg_type ?? item?.body?.msg_type ?? "text";
+      const content: string = item?.body?.content ?? "";
+      return this.extractContent(type, content);
     } catch (e) {
       this.opts.log("warn", `读取被引用消息失败: ${(e as Error).message}`);
     }
