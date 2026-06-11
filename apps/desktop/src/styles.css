@@ -33,6 +33,7 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  overflow: hidden; /* 整个 app 自管内部滚动；禁掉文档级滚动条(否则 DPR 取整时 100vh 略高=出现一条贯穿到状态栏下方的窗口滚动条) */
 }
 /* 根元素背景覆盖整个视口画布（含 DPR 取整缝隙）——底部"特定窗口高度出现的黑边"由它兜底 */
 html {
@@ -521,28 +522,21 @@ button.primary {
   font-size: 10px;
   flex-shrink: 0;
 }
-/* 卡片悬停时浮现的快捷动作（转录/终端）——明确"点卡片之后看哪里" */
-.rail-actions {
-  display: none;
-  gap: 6px;
-  margin-top: 2px;
-}
-.rail-card:hover .rail-actions {
-  display: flex;
-}
-.rail-act {
-  flex: 1;
-  padding: 3px 0;
-  font-size: 10.5px;
-  background: #1a212e;
-  border: 1px solid rgba(79, 140, 255, 0.3);
-  border-radius: 5px;
+/* 访客转录小按钮（少用功能，常态淡显、悬停高亮）。单击卡片本身=打开终端，这个只在想看访客转录时点 */
+.rail-transcript {
+  padding: 1px 5px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
   color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.4;
+  flex-shrink: 0;
 }
-.rail-act:hover {
-  color: var(--text);
-  border-color: var(--accent);
-  background: #223047;
+.rail-transcript:hover {
+  opacity: 1;
+  background: rgba(79, 140, 255, 0.16);
 }
 
 /* 浮窗（节点编辑 / 飞书连接） */

@@ -12,7 +12,10 @@ interface Props {
 
 /**
  * 会话侧栏（常驻）：所有 Claude 会话节点的卡片列表。
- * 单击=选中(看转录·访客会话)；双击=打开开发终端。画布收起时这里是会话的唯一入口。
+ * 交互模型：卡片决定「哪个会话」，左侧图标栏决定「看哪个视图」。
+ * - 单击卡片 = 打开/聚焦该会话的开发终端（主操作；终端保活，再点只聚焦不重开）。
+ * - 访客转录是少用功能 → 降级成卡片上的 💬 小按钮（或图标栏的「转录」）。
+ * 画布收起时这里是会话的唯一入口。
  */
 export function SessionSidebar({
   claudeNodes,
@@ -39,12 +42,11 @@ export function SessionSidebar({
           return (
             <div
               key={n.id}
-              className={`rail-card ${selected === n.id ? "sel" : ""} ${
-                activeTerminalId === n.id ? "active" : ""
+              className={`rail-card ${activeTerminalId === n.id ? "active" : ""} ${
+                selected === n.id && activeTerminalId !== n.id ? "sel" : ""
               }`}
-              title={`${d.cwd || ""}\n单击=选择(看转录·访客会话) · 双击=打开开发终端`}
-              onClick={() => onSelect(n.id)}
-              onDoubleClick={() => onOpenTerminal(n.id)}
+              title={`${d.cwd || ""}\n单击=打开/聚焦开发终端 · 💬=看访客转录`}
+              onClick={() => onOpenTerminal(n.id)}
             >
               <div className="rail-card-top">
                 <span className={`rail-dot status-${d.status ?? "idle"}`} />
@@ -54,30 +56,18 @@ export function SessionSidebar({
                     ▮
                   </span>
                 )}
-              </div>
-              <div className="rail-cwd">{d.cwd || "(未设置工作区)"}</div>
-              <div className="rail-actions">
                 <button
-                  className="rail-act"
-                  title="查看访客会话转录"
+                  className="rail-transcript"
+                  title="查看访客会话转录（少用）"
                   onClick={(e) => {
                     e.stopPropagation();
                     onSelect(n.id);
                   }}
                 >
-                  💬 转录
-                </button>
-                <button
-                  className="rail-act"
-                  title="打开开发终端"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenTerminal(n.id);
-                  }}
-                >
-                  ⌨ 终端
+                  💬
                 </button>
               </div>
+              <div className="rail-cwd">{d.cwd || "(未设置工作区)"}</div>
             </div>
           );
         })}

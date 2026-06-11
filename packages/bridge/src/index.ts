@@ -495,8 +495,11 @@ async function main() {
       }
     }
   };
-  setTimeout(() => void runSoulReflection().catch(() => {}), 15 * 60_000);
-  setInterval(() => void runSoulReflection().catch(() => {}), 24 * 3600_000);
+  // 人格自主演化(24h 反思 → 提案进收件箱)按用户要求【关闭】：人格由主人严格设计，不要自动提案插手。
+  // 如需恢复：取消下面两行注释即可（实现仍保留在 runSoulReflection / reflect-soul.ts）。
+  void runSoulReflection; // 保留引用，避免未使用告警
+  // setTimeout(() => void runSoulReflection().catch(() => {}), 15 * 60_000);
+  // setInterval(() => void runSoulReflection().catch(() => {}), 24 * 3600_000);
 
   const server = new ControlServer(store.get().bridge.wsPort, {
     store,
