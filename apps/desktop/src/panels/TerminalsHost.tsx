@@ -194,7 +194,8 @@ function TerminalView({
     // Ctrl+A："全选输入框"。TUI 没有真正的选区概念，这里在 xterm 层识别底部输入框
     // (❯/> 提示行 + 上下横线边框)并把框内文本选中——随后 Ctrl+C 即可复制。
     // 识别失败则把 ^A 原样交给 claude(光标回行首)。
-    const selectInputBox = (): boolean => {
+    // 识别底部输入框区域(提示行 + 上下横线边框)，返回行列范围。Ctrl+A 全选与"删除/剪切选区"共用同一识别。
+    const detectInputRegion = () => {
       const buf = term.buffer.active;
       const top = buf.viewportY;
       const texts: string[] = [];
@@ -216,7 +217,7 @@ function TerminalView({
           break;
         }
       }
-      if (promptRow < 0) return false;
+      if (promptRow < 0) return null;
       let topRule = -1;
       for (let r = promptRow - 1; r >= 0; r--)
         if (isRule(texts[r] ?? "")) {
@@ -233,10 +234,18 @@ function TerminalView({
       const startRow = Math.max(topRule + 1, 0) <= promptRow ? topRule + 1 : promptRow;
       let endRow = Math.min(botRule - 1, term.rows - 1);
       while (endRow > promptRow && !(texts[endRow] ?? "").trim()) endRow--;
+      const promptIdx = (texts[promptRow] ?? "").search(/[❯>]/); // 提示符前缀是 ASCII，索引==列号
+      const startCol = startRow === promptRow ? promptIdx + 2 : 0;
+      return { buf, top, startRow, endRow, promptRow, startCol };
+    };
+
+    const selectInputBox = (): boolean => {
+      const reg = detectInputRegion();
+      if (!reg) return false;
       // 行的"真实列宽"（去尾随空白）：中文等宽字符占 2 列，不能用字符串长度当列数，
       // 否则选区差几个字符（Ctrl+A 选不全的根因）。逐 cell 累计宽度。
       const lineColWidth = (row: number): number => {
-        const line = buf.getLine(top + row);
+        const line = reg.buf.getLine(reg.top + row);
         if (!line) return 0;
         let lastNonSpace = 0;
         let col = 0;
@@ -253,12 +262,63 @@ function TerminalView({
         }
         return lastNonSpace;
       };
-      const promptIdx = (texts[promptRow] ?? "").search(/[❯>]/); // 提示符前缀是 ASCII，索引==列号
-      const startCol = startRow === promptRow ? promptIdx + 2 : 0;
-      const length = (endRow - startRow) * term.cols + lineColWidth(endRow) - startCol;
+      const length = (reg.endRow - reg.startRow) * term.cols + lineColWidth(reg.endRow) - reg.startCol;
       if (length <= 0) return false;
-      term.select(startCol, top + startRow, length);
+      term.select(reg.startCol, reg.top + reg.startRow, length);
       return term.hasSelection();
+    };
+
+    // 删除/剪切输入框里的选区(框选或 Ctrl+A 后)。终端只是 claude 输入的"视图"，无法得知其光标位置，
+    // 所以不做定点删除，而是"读出整段输入 → 剔掉选中的格子 → 清空整行重打剩余文本"。
+    // 清空用 Ctrl+E 到末尾 + 足量退格(行首退格是空操作，多打无害，跨折行/换行也清得净)；
+    // 重打走 term.paste(括号粘贴)，多行也不会误提交。单行/折行稳，多段落兜底。
+    const editSelection = (cut: boolean): boolean => {
+      if (!term.hasSelection()) return false;
+      const reg = detectInputRegion();
+      if (!reg) return false;
+      const id = ptyIdRef.current;
+      if (!id) return false;
+      const pos = term.getSelectionPosition?.();
+      if (!pos) return false;
+      const sx1 = pos.start.x;
+      const sy1 = pos.start.y;
+      const sx2 = pos.end.x;
+      const sy2 = pos.end.y; // end.x 为排他(最后一个选中格之后)
+      const inSel = (absRow: number, col: number) =>
+        (absRow > sy1 || (absRow === sy1 && col >= sx1)) && (absRow < sy2 || (absRow === sy2 && col < sx2));
+      const cells: { ch: string; absRow: number; col: number }[] = [];
+      for (let r = reg.startRow; r <= reg.endRow; r++) {
+        const line = reg.buf.getLine(reg.top + r);
+        if (!line) continue;
+        let col = r === reg.startRow ? reg.startCol : 0;
+        while (col < term.cols) {
+          const cell = line.getCell(col);
+          if (!cell) break;
+          const w = cell.getWidth();
+          if (w === 0) {
+            col += 1;
+            continue;
+          }
+          cells.push({ ch: cell.getChars() || " ", absRow: reg.top + r, col });
+          col += w;
+        }
+      }
+      while (cells.length && !(cells[cells.length - 1]?.ch ?? "").trim()) cells.pop(); // 去尾随空白(含光标块)
+      if (!cells.length) return false;
+      const sel = cells.filter((c) => inSel(c.absRow, c.col));
+      if (!sel.length) return false;
+      const remaining = cells
+        .filter((c) => !inSel(c.absRow, c.col))
+        .map((c) => c.ch)
+        .join("");
+      if (cut) navigator.clipboard.writeText(sel.map((c) => c.ch).join("")).catch(() => {});
+      let data = "\x05"; // Ctrl+E → 行尾
+      const n = cells.length + (reg.endRow - reg.startRow) + 3; // 足量退格，行首多打无害
+      for (let i = 0; i < n; i++) data += "\x7f";
+      void invoke("pty_write", { id, data });
+      term.clearSelection();
+      if (remaining) window.setTimeout(() => term.paste(remaining), 0);
+      return true;
     };
 
     term.attachCustomKeyEventHandler((e) => {
@@ -293,6 +353,22 @@ function TerminalView({
       if (ctrl && e.shiftKey && (e.key === "c" || e.key === "C")) {
         doCopy();
         return false;
+      }
+      // Ctrl+X：剪切输入框选区(复制 + 删除)；无选区或识别不到则放行
+      if (ctrl && !e.shiftKey && (e.key === "x" || e.key === "X")) {
+        if (term.hasSelection() && editSelection(true)) {
+          e.preventDefault();
+          return false;
+        }
+        return true;
+      }
+      // Delete / Backspace：有选区时删除选区(否则放行给 claude 正常逐字符编辑)
+      if (!ctrl && !e.altKey && (e.key === "Delete" || e.key === "Backspace")) {
+        if (term.hasSelection() && editSelection(false)) {
+          e.preventDefault();
+          return false;
+        }
+        return true;
       }
       // Shift+Enter：直接送 ESC+CR —— 实测(pty_nl)单独这串字节 claude 会插入软换行、不提交。
       // 关键：必须 e.preventDefault() 拦掉这次 Enter 的浏览器默认动作，否则 xterm/textarea 会再补发一个

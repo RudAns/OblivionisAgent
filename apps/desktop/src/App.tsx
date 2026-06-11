@@ -74,6 +74,11 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
     label: "定时任务",
     data: { schedule: "09:00", prompt: "", enabled: true },
   }),
+  soul: () => ({
+    kind: "soul",
+    label: "人格",
+    data: {},
+  }),
   webhook: () => ({
     kind: "webhook",
     label: "Webhook",
@@ -99,6 +104,8 @@ function graphToRf(config: OblivionisConfig, status: Record<string, string>): {
     id: e.id,
     source: e.source,
     target: e.target,
+    sourceHandle: e.sourceHandle ?? null,
+    targetHandle: e.targetHandle ?? null, // 人格连到会话的「原始口/Fork口」靠它区分
     label: e.condition || undefined,
     data: { condition: e.condition },
   }));
@@ -122,6 +129,8 @@ function rfToGraph(nodes: Node[], edges: Edge[]): OblivionisConfig["graph"] {
       id: e.id,
       source: e.source,
       target: e.target,
+      sourceHandle: e.sourceHandle ?? undefined,
+      targetHandle: e.targetHandle ?? undefined,
       condition: ((e.data as { condition?: string } | undefined)?.condition || undefined),
     })),
   };
@@ -718,6 +727,7 @@ function Inner() {
             <button onClick={() => addNode("claude-session")}>+ Claude 会话</button>
             <button onClick={() => addNode("cron")}>+ 定时任务</button>
             <button onClick={() => addNode("webhook")}>+ Webhook</button>
+            <button onClick={() => addNode("soul")}>+ 人格</button>
           </div>
           </div>
           )}
@@ -896,6 +906,24 @@ function Inspector({
             />
           </label>
           {field("前缀", d.prefix, "prefix")}
+        </>
+      )}
+      {node.type === "soul" && (
+        <>
+          <div className="hint" style={{ marginBottom: 6 }}>
+            人格 (SOUL.md)。把本节点右侧 ● 连到「Claude 会话」的连接口；一个人格可连给多个会话。
+            <br />· <b>Fork口</b>(飞书分身) — 已生效，所有飞书消息按此人格回复。
+            <br />· <b>原始口</b>(开发终端) — 连线会保存，终端注入正在做（下一步）。
+            <br />未连任何会话则不生效。
+          </div>
+          <div className="fs-actions">
+            <button
+              title="编辑这份人格文件 SOUL.md（首次自动生成模板，保存即生效）。人格只影响表达风格，访客安全护栏始终优先。"
+              onClick={() => node && onEditSoul(node.id)}
+            >
+              🎭 编辑灵魂 (SOUL.md)
+            </button>
+          </div>
         </>
       )}
       {node.type === "webhook" && (

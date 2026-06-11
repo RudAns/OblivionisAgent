@@ -135,6 +135,15 @@ export const WebhookData = z.object({
 });
 export type WebhookData = z.infer<typeof WebhookData>;
 
+/**
+ * 人格(Soul)节点：把 SOUL.md 人格做成可连线的节点。
+ * 内容存在 `~/.oblivionis/souls/<本 soul 节点 id>.md`（不进配置，hackable）；
+ * 连到会话节点的「Fork口」(targetHandle="fork")=作用于飞书脱敏分身；
+ * 连到「原始口」(targetHandle="base")=作用于软件里的开发终端会话。
+ */
+export const SoulData = z.object({});
+export type SoulData = z.infer<typeof SoulData>;
+
 const BaseNode = z.object({
   id: z.string(),
   position: XY,
@@ -148,6 +157,7 @@ export const GraphNode = z.discriminatedUnion("kind", [
   BaseNode.extend({ kind: z.literal("claude-session"), data: ClaudeSessionData }),
   BaseNode.extend({ kind: z.literal("cron"), data: CronData }),
   BaseNode.extend({ kind: z.literal("webhook"), data: WebhookData }),
+  BaseNode.extend({ kind: z.literal("soul"), data: SoulData }),
 ]);
 export type GraphNode = z.infer<typeof GraphNode>;
 
@@ -157,11 +167,15 @@ export type IntentSwitchNode = Extract<GraphNode, { kind: "intent-switch" }>;
 export type ClaudeSessionNode = Extract<GraphNode, { kind: "claude-session" }>;
 export type CronNode = Extract<GraphNode, { kind: "cron" }>;
 export type WebhookNode = Extract<GraphNode, { kind: "webhook" }>;
+export type SoulNode = Extract<GraphNode, { kind: "soul" }>;
 
 export const GraphEdge = z.object({
   id: z.string(),
   source: z.string(),
   target: z.string(),
+  /** React Flow 多连接点：用于 Soul 节点连到会话节点的「原始口」(="base")或「Fork口」(="fork") */
+  sourceHandle: z.string().optional(),
+  targetHandle: z.string().optional(),
   /**
    * 条件分流：该连线的触发"意图描述"(自然语言，如"用户想触发打包/角色管线CI/构建")。
    * 当一个节点有多条带 condition 的出边时，引擎用 LLM 判断消息命中哪条；

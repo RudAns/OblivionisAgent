@@ -86,10 +86,19 @@ GUI 收到 config 广播时**只在首次**重建画布，之后只合并 sessio
   **用 unicode11**（VS Code 同款组合）——emoji 宽度照样修正(✅=2列)，稳定性久经考验。
   代价：✏️ 这类 VS16 变体序列宽度仍可能差 1 列，可接受。
 
-### C7b. 绝不给 xterm 内部元素设不透明背景
-xterm 的 .xterm-screen/.xterm-viewport/canvas 是**叠放的渲染图层**（文字层/装饰层/链接层），
-给它们设不透明 background 会把下层文字整个盖住 → 终端全黑什么都不显示（实际事故）。
-消"整数字符格余量黑边"只能刷**外层容器**（.term-view/.terms-body/.terminal-host）的背景色。
+### C7b. 终端底部黑带的真正根因 = .xterm-viewport 默认 #000（2026-06-11 查实）
+**别再刷外层容器了**——刷 .term-view/.terms-body/.terminal-host/.xterm 都没用，因为黑带不在它们身上。
+机制（用 xterm 5.5.0 源码+css 查实，非猜）：
+- `xterm.css` 把 `.xterm-viewport` 默认 `background-color:#000`（纯黑）。
+- DOM 追加顺序：`.xterm-viewport` 先 append 到 `.xterm`，`.xterm-screen`(WebGL 画布)**后** append
+  → screen 是后一个兄弟节点，绘制在 viewport **之上**。
+- 画布只覆盖 `rows*cellHeight`。fit 后终端比容器矮一两行时，画布下方露出黑色 viewport = **底部黑带**（只有终端栏有）。
+**正确修法**：`.terminal-host .xterm-viewport { background-color:#1b1e24 !important }`。
+viewport 在画布**之下**，刷它绝不会盖住文字——这正是和下面"全黑事故"的区别。
+
+绝不能刷的是 **.xterm-screen / canvas / 装饰层**（它们在最上层，不透明 bg 会盖住文字 → 终端全黑，实际事故）。
+一句话：**viewport=底层，可刷；screen/canvas=顶层，碰不得。**
+另：曾给 `.xterm-screen` 加 `height:100%!important` 强撑——WebGL 把多出来那截清成纯黑，是另一种黑带源，已删。
 
 ### C3a. 不要用 clear-before-resize 消除"缩放后历史重复"
 ConPTY/Ink 在 resize 时会重打一部分内容 → 缩放后历史多一份。曾试图在发 pty_resize 前

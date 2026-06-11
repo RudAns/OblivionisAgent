@@ -60,10 +60,20 @@ export class KnowledgeStore {
 
   add(input: Omit<KnowledgeItem, "id" | "ts" | "status">): KnowledgeItem {
     const item: KnowledgeItem = { ...input, id: randomUUID(), ts: Date.now(), status: "pending" };
-    // 简单去重：同节点下规则文本高度相同的 pending 不重复入箱
-    const dup = this.items.some(
-      (x) => x.status === "pending" && x.nodeId === item.nodeId && x.rule.trim() === item.rule.trim(),
-    );
+    // 去重：同节点下"语义高度重复"的规则不重复入箱。
+    // 之前只比 pending + 完全相等，于是「CI 结果用简短的中文回复」绕过了已采纳的「CI 结果用简短中文回复打包」。
+    // 现在：① 比对所有状态(pending/accepted/dismissed)——已裁决过的别再骚扰；
+    //       ② 归一化(去标点空白大小写)后互为子串即判重——抓住措辞微调的近义重复。
+    const norm = (s: string) =>
+      s.replace(/[\s，。、,.!！?？:：;；"'""''`()（）【】[\]{}—\-_~·…]/g, "").toLowerCase();
+    const nNew = norm(item.rule);
+    if (!nNew) return item;
+    const dup = this.items.some((x) => {
+      if (x.nodeId !== item.nodeId) return false;
+      const nx = norm(x.rule);
+      if (!nx) return false;
+      return nx === nNew || nx.includes(nNew) || nNew.includes(nx);
+    });
     if (dup) return item;
     this.items.push(item);
     this.save();

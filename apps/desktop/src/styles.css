@@ -356,6 +356,10 @@ button.primary {
 .canvas-palette button {
   padding: 4px 9px;
   font-size: 12px;
+  /* 区域变窄时绝不竖排换行：CJK 可在任意字间断行，按钮会被压成一列竖字(很丑)。
+     nowrap 锁单行、flex-shrink:0 不被挤扁——保持固定尺寸，不随窗口缩放变形 */
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ---- 折叠态：左侧 Claude 会话卡片窄菜单 ---- */
@@ -700,10 +704,74 @@ button.primary {
 }
 .xnode-claude {
   --nc: #4f8cff;
-  min-width: 196px;
+  min-width: 210px;
 }
 .xnode-claude .xnode-head {
   background: color-mix(in srgb, var(--nc) 20%, #1d2128);
+}
+.xnode-soul {
+  --nc: #b083f0;
+  min-width: 150px;
+}
+.xnode-soul-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--nc) 70%, #8a93a0);
+}
+.xnode-soul-hint b {
+  color: color-mix(in srgb, var(--nc) 85%, #fff);
+}
+.xnode-soul-hint .dim {
+  margin-top: 3px;
+  color: #6b7686;
+}
+
+/* 会话节点上的两个人格连接口（顶边）：原始口 / Fork口 */
+.xnode-claude .soul-port {
+  width: 9px;
+  height: 9px;
+  background: #b083f0;
+  border: 1.5px solid #1b1e24;
+  top: -5px;
+}
+.xnode-claude .soul-port-label {
+  position: absolute;
+  top: -17px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 1;
+  color: #c9a8f5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* Fork 脱敏分身条：与"原始"行区分，强调"飞书走这条" */
+.session-fork-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--nc) 12%, #161a20);
+  border: 1px dashed color-mix(in srgb, var(--nc) 40%, #2a2f37);
+  font-size: 10.5px;
+}
+.session-fork-strip .sfs-tag {
+  color: #c9a8f5;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.session-fork-strip .sfs-sid {
+  color: #8a93a0;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-fork-strip .sfs-note {
+  margin-left: auto;
+  color: #6cb6ff;
+  flex-shrink: 0;
 }
 
 /* 连线上的条件(意图)标签 chip */
@@ -1203,20 +1271,25 @@ button.primary {
 .terminal-host {
   flex: 1;
   min-height: 0;
-  padding: 6px 4px 6px 8px;
+  /* 左右各留 ~10px(半个多字符)，长行文字不贴边；fit 会据此少算一列、提前折行 */
+  padding: 6px 10px 6px 10px;
   overflow: hidden;
   background: #1b1e24;
 }
-.terminal-host .xterm,
-.terminal-host .xterm-viewport,
-.terminal-host .xterm-screen {
+/* 只让 .xterm 根填满容器；绝不强撑 .xterm-screen——它被拉高后，
+   WebGL 画布只绘 rows*cellHeight 的格子，多出来那截被清成【纯黑】=底部黑带。
+   让整数行 fit 后的不足一行余量落回 .xterm/.terminal-host 的 #1b1e24 底色即可。 */
+.terminal-host .xterm {
   height: 100% !important;
 }
 /* 画布是整数字符格，窗口放大后的余量露底——只给【外层容器】刷主题色消黑边。
    ⚠️ 绝不能给 xterm 内部元素(canvas/.xterm-screen/.xterm-viewport)设不透明背景：
    它们是叠放的渲染图层，上层一旦不透明会把文字层整个盖住（终端全黑事故，见 pitfalls） */
+/* 终端标签栏激活时，把右侧整列所有非 xterm 内部容器统一刷成终端色，
+   余量(整数行 fit 后的底部缝隙)落在哪一层都与终端融为一体，消掉黑带 */
 .term-view,
 .terms-body,
+.terms-wrap,
 .term-pane {
   background-color: #1b1e24;
 }
@@ -1233,6 +1306,13 @@ button.primary {
 /* xterm 根元素是普通容器(非叠放图层)，刷主题色兜住底部整数格余量的黑边 */
 .terminal-host .xterm {
   background-color: #1b1e24;
+}
+/* ★ 真正的黑带根因：xterm.css 把 .xterm-viewport 默认刷成 #000(纯黑)，而 .xterm-screen
+   (WebGL 画布)在 DOM 里是 viewport 之后的兄弟节点=绘制在其【之上】。画布只覆盖 rows*cellHeight，
+   fit 后终端比容器矮一两行时，画布下方就露出黑色 viewport=底部黑带(只有终端栏有)。
+   把 viewport 底色刷成主题色即可——它在画布【之下】，绝不会盖住文字(全黑事故是改画布/screen 层，不是这层)。 */
+.terminal-host .xterm-viewport {
+  background-color: #1b1e24 !important;
 }
 
 /* ---- 知识收件箱 ---- */

@@ -16,7 +16,7 @@ import { collectSecrets, redactText } from "./secrets.js";
 import { classifyIntent } from "./claude/classify-intent.js";
 import { TranscriptStore } from "./transcript-store.js";
 import { UsageMonitor } from "./usage-monitor.js";
-import { readSoul, ensureSoul } from "./soul-store.js";
+import { ensureSoul, resolveSessionSoul } from "./soul-store.js";
 import { KnowledgeStore } from "./knowledge-store.js";
 import { extractKnowledge } from "./claude/extract-knowledge.js";
 import { CronScheduler } from "./cron-scheduler.js";
@@ -281,7 +281,8 @@ async function main() {
     //   1. 人格 SOUL.md —— slot #1，原文注入（有则注入，纯文件驱动）
     //   2. 节点 appendSystemPrompt（操作性指令）
     //   3. 访客护栏 —— 永远压轴，并声明优先级（人格只影响表达，不得越权）
-    const soul = readSoul(node.id);
+    // 人格：飞书走 Fork 口——找连到该会话「Fork口」的 soul 节点，无则回退旧的一会话一人格文件
+    const soul = resolveSessionSoul(cfg, node.id, "fork")?.content;
     // 群记忆：注入该群的 GROUP.md，让机器人"记得这个群"（成员称呼、约定、关注点）
     const groupMem = readGroupMemory(inbound.chatId);
     const memBlock = groupMem
@@ -337,7 +338,7 @@ async function main() {
       }
       // 群记忆提炼（异步、绝不影响主链路）：把这轮里值得长期记住的群信息写进 GROUP.md
       if (inbound.chatId) {
-        void distillGroupMemory(readGroupMemory(inbound.chatId) ?? "", resolved.text, reply, inbound.senderName, {
+        void distillGroupMemory(readGroupMemory(inbound.chatId) ?? "", resolved.userText, reply, inbound.senderName, {
           binPath: cfg.claude.binPath,
           cwd: cfg.claude.defaultCwd || process.cwd(),
           log: (m) => log.info(m),
@@ -349,7 +350,8 @@ async function main() {
       }
 
       // 知识提取（异步、绝不影响主链路）：从这轮问答提取规则候选 → 收件箱 → 推送 GUI
-      void extractKnowledge(resolved.text, reply, {
+      // ★ 只喂 userText(用户原话)，不喂 resolved.text——后者含路由前缀，会把"我自己设的前缀/系统提示词"误当成规则
+      void extractKnowledge(resolved.userText, reply, {
         binPath: cfg.claude.binPath,
         cwd: cfg.claude.defaultCwd || process.cwd(),
         log: (m) => log.info(m),
@@ -364,7 +366,7 @@ async function main() {
               chatId: inbound.chatId,
               sender: inbound.senderName,
               rule,
-              source: resolved.text.slice(0, 120),
+              source: resolved.userText.slice(0, 120),
             });
           }
           hub.broadcast({ type: "knowledge-inbox", items: knowledge.all() });
@@ -413,7 +415,7 @@ async function main() {
       const c = store.get();
       const n = c.graph.nodes.find((x) => x.id === sessionNodeId);
       const isSession = n?.kind === "claude-session";
-      const soul = readSoul(sessionNodeId);
+      const soul = resolveSessionSoul(c, sessionNodeId, "fork")?.content;
       const append =
         [soul, isSession ? n.data.appendSystemPrompt : undefined].filter(Boolean).join("\n\n") ||
         undefined;
@@ -438,7 +440,7 @@ async function main() {
     const c = store.get();
     const n = c.graph.nodes.find((x) => x.id === sessionNodeId);
     const isSession = n?.kind === "claude-session";
-    const soul = readSoul(sessionNodeId);
+    const soul = resolveSessionSoul(c, sessionNodeId, "fork")?.content;
     const append =
       [soul, isSession ? n.data.appendSystemPrompt : undefined].filter(Boolean).join("\n\n") || undefined;
     return sessions.send(sessionNodeId, prompt, isSession ? n.data.permissionMode : undefined, append, {
@@ -464,12 +466,14 @@ async function main() {
     const cfg = store.get();
     for (const n of cfg.graph.nodes) {
       if (n.kind !== "claude-session") continue;
-      const soul = readSoul(n.id);
-      if (!soul) continue; // 没播种过人格的节点不迭代
+      // 只演化飞书 Fork 口的人格（终端/原始口没有群聊素材）。sr.key=要写回的人格文件 key(soul 节点 id 或 legacy 会话 id)
+      const sr = resolveSessionSoul(cfg, n.id, "fork");
+      if (!sr) continue; // 没挂人格的节点不迭代
+      const soul = sr.content;
       const chats = readRecentChats(n.id, 24 * 3600_000);
       if (chats.length < 3) continue; // 聊得太少，没有演化素材
       // 已有未处理的人格提案就不再堆
-      if (knowledge.all().some((k) => k.status === "pending" && k.kind === "soul" && k.nodeId === n.id)) continue;
+      if (knowledge.all().some((k) => k.status === "pending" && k.kind === "soul" && k.nodeId === sr.key)) continue;
       log.info(`人格反思: ${n.label}（近24h ${chats.length} 条对话）…`);
       const proposal = await reflectSoul(soul, chats.join("\n"), {
         binPath: cfg.claude.binPath,
@@ -478,7 +482,7 @@ async function main() {
       });
       if (proposal && proposal.trim() !== soul.trim()) {
         knowledge.add({
-          nodeId: n.id,
+          nodeId: sr.key, // 采纳时 writeSoul(sr.key) 写回正确的人格文件
           nodeLabel: n.label,
           cwd: n.data.cwd || "",
           chatId: "",

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import type { OblivionisConfig } from "@oblivionis/shared";
 
 /**
  * 人格(SOUL.md)存取 —— 设计照抄 Hermes/OpenClaw 的成熟约定：
@@ -62,6 +63,36 @@ export function writeSoul(nodeId: string, content: string): void {
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * 解析某会话节点在指定端口上挂的人格（两端口模型）：
+ *   port="fork" → 飞书脱敏分身；port="base" → 软件里的开发终端会话。
+ * 优先按连线找「连到该端口的 soul 节点」；找不到且是 fork 端口时，回退旧的"按会话节点 id 存"的人格文件
+ * （所以老配置里已有的人格一行不动照常生效）。
+ * 返回 { key, content }：key 用于人格反思/写回（soul 节点 id 或 legacy 会话 id），content 为注入原文。
+ */
+export function resolveSessionSoul(
+  config: Pick<OblivionisConfig, "graph">,
+  sessionNodeId: string,
+  port: "fork" | "base",
+): { key: string; content: string } | undefined {
+  const { nodes, edges } = config.graph;
+  const edge = edges.find((e) => {
+    if (e.target !== sessionNodeId) return false;
+    if ((e.targetHandle ?? "fork") !== port) return false;
+    const src = nodes.find((n) => n.id === e.source);
+    return src?.kind === "soul";
+  });
+  if (edge) {
+    const content = readSoul(edge.source);
+    return content ? { key: edge.source, content } : undefined;
+  }
+  if (port === "fork") {
+    const content = readSoul(sessionNodeId); // legacy 兜底：旧的一会话一人格
+    if (content) return { key: sessionNodeId, content };
+  }
+  return undefined;
 }
 
 /** 确保人格文件存在（无则播种 starter，绝不覆盖已有）。返回 { path, created } */

@@ -7,8 +7,10 @@ import type { InboundMessage } from "./transport/transport.js";
 
 export interface RouteResult {
   sessionNode: ClaudeSessionNode;
-  /** 经路由节点转换后的、最终发给 Claude 的文本 */
+  /** 经路由节点转换后的、最终发给 Claude 的文本（含路由前缀） */
   text: string;
+  /** 用户原始消息（去 @、不含任何路由前缀/系统注入）——知识提取/群记忆只看它，避免把前缀/系统提示词当成规则 */
+  userText: string;
 }
 
 /** 意图分类器：给定消息和候选意图，返回命中第几个(1..N)或 0(都不命中) */
@@ -73,7 +75,7 @@ export async function route(
     if (!next) break;
 
     if (next.kind === "claude-session") {
-      return { sessionNode: next, text: text.trim() };
+      return { sessionNode: next, text: text.trim(), userText: intentText };
     }
     cursor = next;
   }
