@@ -23,16 +23,23 @@ import {
   type ClaudeStreamEvent,
   type SessionInfo,
   type Owner,
+  type UsageSnapshot,
+  type KnowledgeItem,
 } from "@oblivionis/shared";
+import { invoke } from "@tauri-apps/api/core";
 import { BridgeClient } from "./bridge-client.js";
 import { FlowCanvas } from "./canvas/FlowCanvas.js";
 import { TranscriptPanel } from "./panels/TranscriptPanel.js";
 import { TerminalsHost, type TermInfo } from "./panels/TerminalsHost.js";
-import { type LogLine } from "./panels/LogPanel.js";
+import { LogPanel, type LogLine } from "./panels/LogPanel.js";
 import { AuditPanel, type AuditItem } from "./panels/AuditPanel.js";
+import { InboxPanel } from "./panels/InboxPanel.js";
 import { FeishuPanel, FeishuStatusDot, type FeishuState } from "./panels/FeishuPanel.js";
+import { IconRail, type RailKey } from "./layout/IconRail.js";
+import { SessionSidebar } from "./layout/SessionSidebar.js";
+import { StatusBar } from "./layout/StatusBar.js";
 
-type Tab = "transcript" | "terminal" | "audit" | "feishu";
+type Tab = "transcript" | "terminal" | "audit" | "logs" | "inbox";
 
 const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">> = {
   "feishu-group": () => ({
@@ -60,6 +67,11 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
       includePartialMessages: true,
       extraArgs: [],
     },
+  }),
+  cron: () => ({
+    kind: "cron",
+    label: "定时任务",
+    data: { schedule: "09:00", prompt: "", enabled: true },
   }),
 };
 
@@ -144,6 +156,9 @@ function Inner() {
   }, []);
   const [openedTerminals, setOpenedTerminals] = useState<string[]>([]); // 已打开(保活)的会话节点 id
   const [activeTerminal, setActiveTerminal] = useState<string | null>(null); // 当前显示的终端(独立状态)
+  const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
+  const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
+  const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
   const eventsRef = useRef<Record<string, ClaudeStreamEvent[]>>({});
   const [, forceRender] = useState(0);
   const statusRef = useRef<Record<string, string>>({});
@@ -155,6 +170,7 @@ function Inner() {
 
   useEffect(() => {
     client.connect();
+    const offConn = client.onConnection(setBridgeUp);
     const off = client.on((msg) => {
       switch (msg.type) {
         case "config": {
@@ -237,10 +253,28 @@ function Inner() {
         case "audit-history":
           setInbox(msg.items);
           break;
+        case "usage-status":
+          setUsage(msg);
+          break;
+        case "soul-path":
+          // 人格文件已就绪（必要时刚播种了 starter）→ 用 VSCode 打开让用户编辑，保存即生效
+          void invoke("open_path", { path: msg.path, base: "" }).catch(() => {});
+          break;
+        case "knowledge-inbox":
+          setKnowledge(msg.items);
+          break;
+        case "transcript-history":
+          // 连接(含重连)时引擎回放近 3 天转录：整包替换（实时事件已被引擎持久化，不会丢/重）
+          eventsRef.current = Object.fromEntries(
+            Object.entries(msg.histories).map(([k, v]) => [k, [...v]]),
+          );
+          forceRender((x) => x + 1);
+          break;
       }
     });
     return () => {
       off();
+      offConn();
       client.dispose();
     };
   }, [client, setNodes, setEdges]);
@@ -288,6 +322,21 @@ function Inner() {
     setSelectedEdge(null);
     setInspectorOpen(false);
     setFeishuOpen(false);
+  }, []);
+
+  // Esc 关闭浮窗（商业软件惯例）。不抢输入框/终端里的 Esc：终端有自己的 handler，
+  // 这里只在事件冒泡到 document 且确有浮窗开着时处理。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "TEXTAREA" || el.closest(".xterm"))) return;
+      setFeishuOpen(false);
+      setInspectorOpen(false);
+      setSelectedEdge(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, []);
 
   // 打开(保活)某会话节点的终端并切到终端标签（画布双击 / 折叠菜单双击共用）
@@ -365,6 +414,17 @@ function Inner() {
     client.send({ type: "set-config", config: next });
   };
 
+  /** 设置 Home Chat（运维群），立即存盘 */
+  const setHomeChat = (chatId: string) => {
+    if (!config) return;
+    const graph = rfToGraph(nodes, edges);
+    const next = { ...config, homeChatId: chatId, graph };
+    setConfig(next);
+    configRef.current = next;
+    lastSavedSig.current = JSON.stringify(graph);
+    client.send({ type: "set-config", config: next });
+  };
+
   /** 用某个 chatId 一键新建飞书群节点（联调/onboarding 用） */
   const addGroupForChat = (chatId: string) => {
     const id = crypto.randomUUID();
@@ -394,9 +454,12 @@ function Inner() {
     );
   };
 
-  /** 删除选中的节点及其连线（记得点保存才会同步给引擎） */
+  /** 删除选中的节点及其连线（二次确认防误删；自动保存会同步引擎） */
   const deleteSelected = () => {
     if (!selected) return;
+    const label =
+      ((nodes.find((n) => n.id === selected)?.data as { label?: string })?.label as string) ?? "该节点";
+    if (!window.confirm(`确定删除「${label}」及其全部连线？`)) return;
     setNodes((ns) => ns.filter((n) => n.id !== selected));
     setEdges((es) => es.filter((e) => e.source !== selected && e.target !== selected));
     setSelected(null);
@@ -446,24 +509,69 @@ function Inner() {
     }
   };
 
+  /** 左侧图标竖栏动作分发 */
+  const onRailAction = (key: RailKey) => {
+    switch (key) {
+      case "canvas":
+        setCanvasCollapsed(!canvasCollapsed);
+        break;
+      case "feishu":
+        setFeishuOpen((o) => !o);
+        break;
+      default:
+        setTab(key);
+    }
+  };
+
+  // 面板标题：转录/终端跟随当前会话名，让"左侧选了谁→右侧看的是谁"一目了然
+  const selectedLabel =
+    (selectedNode?.data as { label?: string } | undefined)?.label ?? null;
+  const activeTermLabel = activeTerminalId
+    ? ((nodes.find((n) => n.id === activeTerminalId)?.data as { label?: string })?.label ?? null)
+    : null;
+  const pendingKnowledge = knowledge.filter((k) => k.status === "pending").length;
+  const TAB_TITLE: Record<Tab, string> = {
+    transcript: selectedIsClaude && selectedLabel ? `转录 · ${selectedLabel} 的访客会话` : "转录 · 访客会话（左侧选择一个会话）",
+    terminal: activeTermLabel ? `终端 · ${activeTermLabel}` : "终端 · 开发会话",
+    audit: "审计 · 谁问了什么",
+    logs: "服务日志",
+    inbox: `知识收件箱${pendingKnowledge ? ` · ${pendingKnowledge} 条待裁决` : ""}`,
+  };
+
   return (
     <div className="app">
       <header className="toolbar">
-        <strong>OblivionisAgent</strong>
+        <strong className="brand">
+          Oblivionis<span className="brand-accent">Agent</span>
+        </strong>
         <button
           className={`fs-chip ${feishuOpen ? "on" : ""}`}
           onClick={() => setFeishuOpen((o) => !o)}
-          title="飞书连接（点开/收起）"
+          title="飞书连接（点开/收起设置）"
         >
           <FeishuStatusDot status={feishu.status} />
           飞书{feishu.bot?.name ? `：${feishu.bot.name}` : ""}
         </button>
-        {selectedNode && !inspectorOpen && (
+        {!canvasCollapsed && selectedNode && !inspectorOpen && (
           <button onClick={() => setInspectorOpen(true)} title="显示节点编辑">
             ✎ 编辑节点
           </button>
         )}
         <div className="spacer" />
+        {usage?.sessionPct != null && (
+          <span
+            className={`usage-chip ${usage.sessionPct >= 85 ? "hot" : usage.sessionPct >= 60 ? "warm" : ""}`}
+            title={`Claude 订阅用量\n5小时窗口: ${usage.sessionPct}%${usage.sessionResets ? ` · ${usage.sessionResets}重置` : ""}${
+              usage.weekPct != null ? `\n本周(全模型): ${usage.weekPct}%${usage.weekResets ? ` · ${usage.weekResets}重置` : ""}` : ""
+            }\n每 5 分钟自动刷新`}
+          >
+            <span className="usage-bar">
+              <span style={{ width: `${Math.min(100, usage.sessionPct)}%` }} />
+            </span>
+            5h {Math.round(usage.sessionPct)}%
+            {usage.weekPct != null && <span className="usage-week">周 {Math.round(usage.weekPct)}%</span>}
+          </span>
+        )}
       </header>
 
       {unroutedActive && (
@@ -476,55 +584,29 @@ function Inner() {
         </div>
       )}
 
-      <div className={`main ${canvasCollapsed ? "collapsed" : ""}`}>
-        {canvasCollapsed ? (
-          <div className="rail">
-            <div className="rail-head">
-              <span className="rail-title">会话</span>
-              <button
-                className="rail-toggle"
-                title="展开连线画布"
-                onClick={() => setCanvasCollapsed(false)}
-              >
-                »
-              </button>
-            </div>
-            <div className="rail-list">
-              {claudeNodes.length === 0 && (
-                <div className="rail-empty">还没有 Claude 会话节点</div>
-              )}
-              {claudeNodes.map((n) => {
-                const d = n.data as { label?: string; cwd?: string; status?: string };
-                const open = openedTerminals.includes(n.id);
-                return (
-                  <div
-                    key={n.id}
-                    className={`rail-card ${selected === n.id ? "sel" : ""} ${
-                      activeTerminalId === n.id ? "active" : ""
-                    }`}
-                    title={`${d.cwd || ""}\n单击=选择(看转录·访客会话) · 双击=打开开发终端`}
-                    onClick={() => {
-                      setSelected(n.id);
-                      setTab("transcript");
-                    }}
-                    onDoubleClick={() => openTerminalForNode(n.id)}
-                  >
-                    <div className="rail-card-top">
-                      <span className={`rail-dot status-${d.status ?? "idle"}`} />
-                      <span className="rail-label">{d.label || "会话"}</span>
-                      {open && (
-                        <span className="rail-open" title="终端已打开">
-                          ▮
-                        </span>
-                      )}
-                    </div>
-                    <div className="rail-cwd">{d.cwd || "(未设置工作区)"}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
+      <div className="shell">
+        <IconRail
+          canvasOpen={!canvasCollapsed}
+          tab={tab}
+          feishuOpen={feishuOpen}
+          inboxBadge={pendingKnowledge}
+          onAction={onRailAction}
+        />
+        <SessionSidebar
+          claudeNodes={claudeNodes}
+          selected={selected}
+          activeTerminalId={activeTerminalId}
+          openedTerminals={openedTerminals}
+          onSelect={(id) => {
+            setSelected(id);
+            setTab("transcript");
+          }}
+          onOpenTerminal={openTerminalForNode}
+          onAddSession={() => addNode("claude-session")}
+        />
+
+        <div className={`main ${canvasCollapsed ? "collapsed" : ""}`}>
+          {!canvasCollapsed && (
           <div className="canvas">
           <FlowCanvas
             nodes={nodes}
@@ -597,6 +679,7 @@ function Inner() {
                   sessions={sessions}
                   onListSessions={(cwd) => client.send({ type: "list-sessions", cwd })}
                   onRefreshSnapshot={(nodeId) => client.send({ type: "prepare-fork", nodeId })}
+                  onEditSoul={(nodeId) => client.send({ type: "ensure-soul", nodeId })}
                 />
                 {selectedIsClaude && (
                   <div className="test-box">
@@ -613,65 +696,50 @@ function Inner() {
             </div>
           )}
 
-          {/* 浮窗：飞书连接（可隐藏，不常用） */}
-          {feishuOpen && (
-            <div className="popup popup-feishu">
-              <div className="popup-head">
-                <span>飞书连接</span>
-                <button className="popup-x" onClick={() => setFeishuOpen(false)} title="隐藏">
-                  ×
-                </button>
-              </div>
-              <div className="popup-body">
-                <FeishuPanel
-                  client={client}
-                  config={config}
-                  state={feishu}
-                  owners={config?.owners ?? []}
-                  onSetOwners={setOwners}
-                  lookupResult={openidResult}
-                  onLookup={(mobile, email) => {
-                    setOpenidResult(null);
-                    client.send({ type: "lookup-openid", mobile, email });
-                  }}
-                />
-              </div>
-            </div>
-          )}
-          {/* 画板浮动工具条：加节点（从顶栏移入；画板折叠时自然隐藏） */}
+          {/* 画板浮动工具条：加节点（画板收起时自然隐藏） */}
           <div className="canvas-palette">
-            <span className="hint">改动自动保存</span>
             <button onClick={() => addNode("feishu-group")}>+ 飞书群</button>
             <button onClick={() => addNode("route")}>+ 路由</button>
             <button onClick={() => addNode("intent-switch")}>+ 意图分流</button>
             <button onClick={() => addNode("claude-session")}>+ Claude 会话</button>
+            <button onClick={() => addNode("cron")}>+ 定时任务</button>
           </div>
-          <button
-            className="canvas-collapse"
-            title="收起连线画布（左侧保留会话卡片菜单）"
-            onClick={() => setCanvasCollapsed(true)}
-          >
-            «
-          </button>
           </div>
-        )}
+          )}
 
         {!canvasCollapsed && (
           <div className="resizer" onMouseDown={startResize} title="拖动调整宽度" />
         )}
 
-        <aside className="side" style={canvasCollapsed ? { flex: 1, minWidth: 0 } : { width: panelWidth }}>
-          <div className="tabs">
-            <button className={tab === "transcript" ? "on" : ""} onClick={() => setTab("transcript")}>
-              转录·访客会话
-            </button>
-            <button className={tab === "terminal" ? "on" : ""} onClick={() => setTab("terminal")}>
-              终端·开发会话
-            </button>
-            <button className={tab === "audit" ? "on" : ""} onClick={() => setTab("audit")}>
-              审计
-            </button>
+        {/* 浮窗：飞书连接（挂在 main 层级，画布收起时也能用） */}
+        {feishuOpen && (
+          <div className="popup popup-feishu">
+            <div className="popup-head">
+              <span>飞书连接</span>
+              <button className="popup-x" onClick={() => setFeishuOpen(false)} title="隐藏">
+                ×
+              </button>
+            </div>
+            <div className="popup-body">
+              <FeishuPanel
+                client={client}
+                config={config}
+                state={feishu}
+                owners={config?.owners ?? []}
+                onSetOwners={setOwners}
+                lookupResult={openidResult}
+                onLookup={(mobile, email) => {
+                  setOpenidResult(null);
+                  client.send({ type: "lookup-openid", mobile, email });
+                }}
+                onSetHomeChat={setHomeChat}
+              />
+            </div>
           </div>
+        )}
+
+        <aside className="side" style={canvasCollapsed ? { flex: 1, minWidth: 0 } : { width: panelWidth }}>
+          <div className="panel-title">{TAB_TITLE[tab]}</div>
 
           <div className="panel">
             {tab === "transcript" && (
@@ -710,9 +778,30 @@ function Inner() {
                 }}
               />
             )}
+            {tab === "logs" && <LogPanel lines={logs} />}
+            {tab === "inbox" && (
+              <InboxPanel
+                items={knowledge}
+                onDecide={(id, action, editedRule) =>
+                  client.send({ type: "knowledge-decide", id, action, editedRule })
+                }
+              />
+            )}
           </div>
         </aside>
+        </div>
       </div>
+
+      <StatusBar
+        bridgeUp={bridgeUp}
+        sessionCount={claudeNodes.length}
+        openTerminals={openedTerminals.length}
+        activeLabel={
+          activeTerminalId
+            ? ((nodes.find((n) => n.id === activeTerminalId)?.data as { label?: string })?.label ?? null)
+            : null
+        }
+      />
     </div>
   );
 }
@@ -724,6 +813,7 @@ function Inspector({
   sessions,
   onListSessions,
   onRefreshSnapshot,
+  onEditSoul,
 }: {
   node: Node | null;
   onPatch: (patch: Record<string, unknown>) => void;
@@ -731,6 +821,7 @@ function Inspector({
   sessions: SessionInfo[];
   onListSessions: (cwd: string) => void;
   onRefreshSnapshot: (nodeId: string) => void;
+  onEditSoul: (nodeId: string) => void;
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [pickFilter, setPickFilter] = useState("");
@@ -781,6 +872,27 @@ function Inspector({
           {field("前缀", d.prefix, "prefix")}
         </>
       )}
+      {node.type === "cron" && (
+        <>
+          {field("触发时刻", d.schedule, "schedule")}
+          <div className="hint" style={{ marginBottom: 6 }}>
+            支持：<code>09:00</code>(每天) · <code>every 30m</code> / <code>every 2h</code>(间隔)
+          </div>
+          {field("指令 prompt", d.prompt, "prompt")}
+          {field("投递群 chatId", d.chatId, "chatId")}
+          <div className="hint" style={{ marginBottom: 6 }}>
+            留空 = 发到 Home Chat（在「飞书连接」面板设置）；连线到一个「Claude 会话」节点即生效
+          </div>
+          <label className="field">
+            <span>启用</span>
+            <input
+              type="checkbox"
+              checked={d.enabled !== false}
+              onChange={(e) => onPatch({ enabled: e.target.checked })}
+            />
+          </label>
+        </>
+      )}
       {node.type === "intent-switch" && (
         <>
           {field("分类模型(可空=haiku)", d.model, "model")}
@@ -827,6 +939,15 @@ function Inspector({
             </select>
           </label>
           {field("追加 system prompt", d.appendSystemPrompt, "appendSystemPrompt")}
+
+          <div className="fs-actions">
+            <button
+              title="编辑该会话的人格文件 SOUL.md（首次自动生成模板，保存即生效）。人格只影响表达风格，访客安全护栏始终优先。"
+              onClick={() => node && onEditSoul(node.id)}
+            >
+              🎭 编辑灵魂 (SOUL.md)
+            </button>
+          </div>
 
           <div className="base-session">
             <div className="base-session-title">基础会话 (fork 来源，如「角色管线」会话)</div>

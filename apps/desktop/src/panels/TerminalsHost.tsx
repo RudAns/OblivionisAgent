@@ -2,9 +2,22 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal, type ILink } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
+import { SearchAddon } from "@xterm/addon-search";
+import { WebLinksAddon } from "@xterm/addon-web-links";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
 import "@xterm/xterm/css/xterm.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+
+/** 搜索命中高亮（与主题强调色一致） */
+const SEARCH_DECORATIONS = {
+  matchBackground: "#3a4d2f",
+  matchBorder: "#57ab5a",
+  matchOverviewRuler: "#57ab5a",
+  activeMatchBackground: "#6e5524",
+  activeMatchBorder: "#ffb84d",
+  activeMatchColorOverviewRuler: "#ffb84d",
+};
 
 export interface TermInfo {
   nodeId: string;
@@ -35,6 +48,16 @@ function TerminalView({
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const ptyIdRef = useRef<string | null>(null);
+  const searchRef = useRef<SearchAddon | null>(null);
+  /** PTY resize 的统一入口（带尺寸比对 + 清缓冲迎接 ConPTY 重放），供激活/重绘 effect 使用 */
+  const ptySizeRef = useRef<{ send: (c: number, r: number) => void; seed: (c: number, r: number) => void } | null>(
+    null,
+  );
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const activeRef = useRef(active);
+  activeRef.current = active;
 
   useEffect(() => {
     if (!hostRef.current || !inTauri()) return;
@@ -42,20 +65,41 @@ function TerminalView({
 
     const term = new Terminal({
       fontSize: 14,
-      // 英文等宽用 Cascadia Mono；中文优先 Noto Sans SC(思源黑体，Windows 上最接近 macOS 苹方)，回退微软雅黑
+      // 英文等宽 Cascadia Mono；符号(◇✻→等)优先 Segoe UI Symbol(与拉丁字形基线协调，
+      // 避免从中文字体取形显得漂浮)；中文 Noto Sans SC(最接近 macOS 苹方)，回退雅黑
       fontFamily:
-        "'Cascadia Mono', 'Cascadia Code', Consolas, 'Noto Sans SC', 'Microsoft YaHei', 'Courier New', monospace",
+        "'Cascadia Mono', 'Cascadia Code', Consolas, 'Segoe UI Symbol', 'Noto Sans SC', 'Microsoft YaHei', 'Courier New', monospace",
       fontWeight: 400,
       // 行高全局统一（xterm 无法只调某些行）；1.05 让相邻文字行更透气
       lineHeight: 1.05,
       letterSpacing: 0,
       cursorBlink: true,
       scrollback: 8000,
+      // unicode-graphemes 插件走 xterm 的 proposed API，必须显式允许（VS Code 同款做法）
+      allowProposedApi: true,
+      // 专业 CLI 配色：16 色 ANSI 精修（GitHub Dark Dimmed 系），重点信息(错误红/警告橙/成功绿/链接蓝)对比拉开
       theme: {
         background: "#1b1e24",
-        foreground: "#e6e6e6",
+        foreground: "#dce3ec",
         cursor: "#4f8cff",
-        selectionBackground: "#33558855",
+        cursorAccent: "#1b1e24",
+        selectionBackground: "#2e4f8855",
+        black: "#21262e",
+        red: "#f47067",
+        green: "#57ab5a",
+        yellow: "#e0b13e",
+        blue: "#539bf5",
+        magenta: "#b083f0",
+        cyan: "#39c5cf",
+        white: "#adbac7",
+        brightBlack: "#636e7b",
+        brightRed: "#ff938a",
+        brightGreen: "#6bc46d",
+        brightYellow: "#f0cd58",
+        brightBlue: "#6cb6ff",
+        brightMagenta: "#dcbdfb",
+        brightCyan: "#56d4dd",
+        brightWhite: "#cdd9e5",
       },
     });
     termRef.current = term;
@@ -84,6 +128,22 @@ function TerminalView({
     } catch {
       webgl = null; // WebGL 不可用则回退默认 DOM 渲染器
     }
+    // Unicode 宽度对齐：xterm 默认 Unicode 6 宽度表把 ✅ 等 emoji 算 1 列，而 claude 按
+    // 现代宽度(emoji=2列)排版表格 → 每个 emoji 差 1 列、表格右边框漂移。
+    // 用 unicode11（VS Code 同款，与 WebGL 渲染器久经考验）；不用 unicode-graphemes——
+    // 它在 beta 里与 WebGL 组合会黑屏/滚动重复渲染（实测翻车，见 pitfalls）。
+    term.loadAddon(new Unicode11Addon());
+    term.unicode.activeVersion = "11";
+    // 搜索(Ctrl+F)：命中高亮 + 概览标尺
+    const search = new SearchAddon();
+    searchRef.current = search;
+    term.loadAddon(search);
+    // URL 可点击：交给系统默认浏览器打开（复用 open_path：非 md 路径走 start）
+    term.loadAddon(
+      new WebLinksAddon((_e, uri) => {
+        void invoke("open_path", { path: uri, base: "" }).catch(() => {});
+      }),
+    );
     fit.fit();
     term.writeln(
       "\x1b[90m交互式 Claude 终端（Ctrl+V 粘贴 · Ctrl+A 选中输入框 · Ctrl+C 复制选区/否则中断 · Shift+Enter 换行 · 右键复制或粘贴）\x1b[0m",
@@ -169,13 +229,33 @@ function TerminalView({
           botRule = r;
           break;
         }
-      const startRow = topRule + 1;
+      // 输入框顶部滚出可视区时 topRule=-1，startRow 退到 0 行会把历史也选进去——夹到 promptRow
+      const startRow = Math.max(topRule + 1, 0) <= promptRow ? topRule + 1 : promptRow;
       let endRow = Math.min(botRule - 1, term.rows - 1);
       while (endRow > promptRow && !(texts[endRow] ?? "").trim()) endRow--;
-      const promptIdx = (texts[promptRow] ?? "").search(/[❯>]/);
+      // 行的"真实列宽"（去尾随空白）：中文等宽字符占 2 列，不能用字符串长度当列数，
+      // 否则选区差几个字符（Ctrl+A 选不全的根因）。逐 cell 累计宽度。
+      const lineColWidth = (row: number): number => {
+        const line = buf.getLine(top + row);
+        if (!line) return 0;
+        let lastNonSpace = 0;
+        let col = 0;
+        while (col < line.length) {
+          const cell = line.getCell(col);
+          if (!cell) break;
+          const w = cell.getWidth();
+          if (w === 0) {
+            col += 1;
+            continue;
+          }
+          if ((cell.getChars() || " ").trim()) lastNonSpace = col + w;
+          col += w;
+        }
+        return lastNonSpace;
+      };
+      const promptIdx = (texts[promptRow] ?? "").search(/[❯>]/); // 提示符前缀是 ASCII，索引==列号
       const startCol = startRow === promptRow ? promptIdx + 2 : 0;
-      const lastLen = (texts[endRow] ?? "").replace(/\s+$/, "").length;
-      const length = (endRow - startRow) * term.cols + lastLen - startCol;
+      const length = (endRow - startRow) * term.cols + lineColWidth(endRow) - startCol;
       if (length <= 0) return false;
       term.select(startCol, top + startRow, length);
       return term.hasSelection();
@@ -184,6 +264,13 @@ function TerminalView({
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
       const ctrl = e.ctrlKey || e.metaKey;
+      // Ctrl+F → 打开搜索条（专业 CLI 标配）
+      if (ctrl && !e.shiftKey && (e.key === "f" || e.key === "F")) {
+        e.preventDefault();
+        setSearchOpen(true);
+        window.setTimeout(() => searchInputRef.current?.select(), 0);
+        return false;
+      }
       // Ctrl+A → 选中输入框内容(可接 Ctrl+C 复制)；识别不到则放行 ^A(claude 里=光标回行首)
       if (ctrl && !e.shiftKey && (e.key === "a" || e.key === "A")) {
         e.preventDefault();
@@ -232,6 +319,41 @@ function TerminalView({
       });
     };
     host.addEventListener("contextmenu", onContextMenu);
+
+    // 输入法候选框兜底：xterm 用隐藏 textarea 贴光标处给 IME 定位，但只在光标移动/resize/
+    // compositionstart 时同步；窗口失焦再回来时锚点可能陈旧 → Windows IME 拿不到光标坐标
+    // 就退回屏幕右下角(xterm #5734 / WebView2Feedback #2241)。这里在重获焦点/可见、以及
+    // IME 按键(keyCode 229, 先于 compositionstart)时强制重新锚定，并对激活终端重建焦点上下文。
+    const syncImeAnchor = () => {
+      try {
+        (term as unknown as { _core?: { _syncTextArea?: () => void } })._core?._syncTextArea?.();
+      } catch {
+        /* 私有 API 变动则静默退化 */
+      }
+    };
+    const onWinFocus = () => {
+      requestAnimationFrame(() => {
+        syncImeAnchor();
+        if (activeRef.current) {
+          const ta = term.textarea;
+          if (ta && document.activeElement === ta) {
+            ta.blur(); // blur/focus 一轮让 Chromium 重发光标矩形给系统输入法
+            ta.focus();
+          } else if (ta) {
+            term.focus();
+          }
+        }
+      });
+    };
+    const onVisibility = () => {
+      if (!document.hidden) onWinFocus();
+    };
+    window.addEventListener("focus", onWinFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    const onImeKeydown = (ev: KeyboardEvent) => {
+      if (ev.keyCode === 229) syncImeAnchor();
+    };
+    term.textarea?.addEventListener("keydown", onImeKeydown, true);
 
     // 可点击路径：.md 点击→VSCode 打开、.html 点击→浏览器打开（仅点击时打开，不自动打开）
     term.registerLinkProvider({
@@ -321,6 +443,7 @@ function TerminalView({
           rows: openedRows,
         });
         ptyIdRef.current = ptyId;
+        ptySizeRef.current?.seed(openedCols, openedRows);
         // 回放拿到 id 之前缓存的输出（--resume 的历史就在这一批里）
         if (!exited) {
           for (const p of earlyBuffer) if (p.id === ptyId) term.write(p.data);
@@ -328,9 +451,7 @@ function TerminalView({
         earlyBuffer.length = 0;
         // 补发竞态期间丢失的尺寸：pty_open 进行中 ResizeObserver 触发的 onResize 会因 ptyId===null
         // 跳过 pty_resize，claude 就一直按打开时的旧列数渲染(输入框画在 2/3 宽度处)。这里对账一次。
-        if (term.cols !== openedCols || term.rows !== openedRows) {
-          invoke("pty_resize", { id: ptyId, cols: term.cols, rows: term.rows }).catch(() => {});
-        }
+        ptySizeRef.current?.send(term.cols, term.rows);
       } catch (err) {
         term.writeln(`\r\n\x1b[31m打开终端失败: ${String(err)}\x1b[0m`);
       }
@@ -339,6 +460,24 @@ function TerminalView({
     const inputDisp = term.onData((data) => {
       if (ptyId) invoke("pty_write", { id: ptyId, data }).catch(() => {});
     });
+    // 给 PTY 发 resize 的唯一入口：尺寸没变就不发（防冗余重绘）。
+    // ⚠️ 不要在这里 term.clear()：曾试图用"清旧缓冲迎接 ConPTY 重放"消除缩放后历史重复，
+    // 结果重放并不包含完整历史 → scrollback 被清空、无法滚动（实测翻车）。
+    // 缩放后历史重复一份是 ConPTY/Ink 的固有行为，防抖已把 N 份降为 1 份，先接受。
+    const lastPty = { cols: 0, rows: 0 };
+    const sendPtyResize = (cols: number, rows: number) => {
+      const id = ptyIdRef.current;
+      if (!id) return;
+      if (cols === lastPty.cols && rows === lastPty.rows) return;
+      lastPty.cols = cols;
+      lastPty.rows = rows;
+      invoke("pty_resize", { id, cols, rows }).catch(() => {});
+    };
+    ptySizeRef.current = { send: sendPtyResize, seed: (c: number, r: number) => ((lastPty.cols = c), (lastPty.rows = r)) };
+
+    // resize 防抖：拖动窗口时 ResizeObserver 每帧触发，若每次都通知 PTY，claude 会整屏重绘
+    // 几十次。本地 fit 即时做(视觉跟手)，pty_resize 在拖动停止 250ms 后只发最后一次。
+    let resizeTimer: number | undefined;
     const onResize = () => {
       // 隐藏(display:none)时容器为 0 尺寸——别 fit/resize，否则会把 PTY 缩成极小、切回来时 claude TUI 错乱重影
       if (!host.clientWidth || !host.clientHeight) return;
@@ -347,7 +486,11 @@ function TerminalView({
       } catch {
         /* ignore */
       }
-      if (ptyId) invoke("pty_resize", { id: ptyId, cols: term.cols, rows: term.rows }).catch(() => {});
+      if (resizeTimer !== undefined) window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        resizeTimer = undefined;
+        if (host.clientWidth && host.clientHeight) sendPtyResize(term.cols, term.rows);
+      }, 250);
     };
     window.addEventListener("resize", onResize);
     const ro = new ResizeObserver(() => onResize());
@@ -356,7 +499,11 @@ function TerminalView({
     // 只有真正卸载(从父组件移除=显式关闭)才会跑到这里：关 PTY + 销毁
     return () => {
       disposed = true;
+      if (resizeTimer !== undefined) window.clearTimeout(resizeTimer);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("focus", onWinFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      term.textarea?.removeEventListener("keydown", onImeKeydown, true);
       host.removeEventListener("contextmenu", onContextMenu);
       try {
         ro.disconnect();
@@ -404,17 +551,13 @@ function TerminalView({
       const f = fitRef.current;
       const h = hostRef.current;
       if (!t || !f || !h || !h.clientWidth || !h.clientHeight) return;
-      const prevCols = t.cols;
-      const prevRows = t.rows;
       try {
         f.fit();
       } catch {
         /* ignore */
       }
-      const id2 = ptyIdRef.current;
-      if (id2 && (t.cols !== prevCols || t.rows !== prevRows)) {
-        invoke("pty_resize", { id: id2, cols: t.cols, rows: t.rows }).catch(() => {});
-      }
+      // 统一入口：尺寸真变了才会发(内部比对)，且发前清缓冲迎接 ConPTY 重放
+      ptySizeRef.current?.send(t.cols, t.rows);
       try {
         t.refresh(0, t.rows - 1);
       } catch {
@@ -426,19 +569,84 @@ function TerminalView({
   }, [active]);
 
   // 手动「重绘」：一次性高度抖动(行数-1→恢复)逼 claude 整屏重画，清掉直播输出时偶发的叠印残影。
-  // 用高度而非宽度：高度变化不触发长行重折行，不会往滚动缓冲塞残行。自动抖动禁止(见 pitfalls C3/C9)。
+  // 用高度而非宽度：高度变化不触发长行重折行。自动抖动禁止(见 pitfalls C3/C9)。
   useEffect(() => {
     if (!active || repaintTick === 0) return;
     const t = termRef.current;
-    const id = ptyIdRef.current;
-    if (!t || !id) return;
-    invoke("pty_resize", { id, cols: t.cols, rows: Math.max(2, t.rows - 1) })
-      .then(() => invoke("pty_resize", { id, cols: t.cols, rows: t.rows }))
-      .catch(() => {});
+    const ps = ptySizeRef.current;
+    if (!t || !ps) return;
+    ps.send(t.cols, Math.max(2, t.rows - 1));
+    window.setTimeout(() => ps.send(t.cols, t.rows), 120);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repaintTick]);
 
-  return <div className="terminal-host" style={{ display: active ? "block" : "none" }} ref={hostRef} />;
+  const doSearch = (text: string, dir: "next" | "prev" = "next") => {
+    const s = searchRef.current;
+    if (!s) return;
+    if (!text) {
+      s.clearDecorations();
+      return;
+    }
+    const opts = { decorations: SEARCH_DECORATIONS, incremental: dir === "next" };
+    if (dir === "next") s.findNext(text, opts);
+    else s.findPrevious(text, { decorations: SEARCH_DECORATIONS });
+  };
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchText("");
+    try {
+      searchRef.current?.clearDecorations();
+    } catch {
+      /* ignore */
+    }
+    termRef.current?.focus();
+  };
+
+  return (
+    <div className="term-view" style={{ display: active ? "flex" : "none" }}>
+      <div className="term-info">
+        <span className="ti-label" title={info.label}>
+          {info.label}
+        </span>
+        <span className="ti-cwd" title={info.cwd}>
+          {info.cwd || "(默认目录)"}
+        </span>
+        {info.sid && (
+          <span className="ti-sid" title={`会话 ${info.sid}`}>
+            {info.sid.slice(0, 8)}
+          </span>
+        )}
+      </div>
+      {searchOpen && (
+        <div className="term-search">
+          <input
+            ref={searchInputRef}
+            value={searchText}
+            placeholder="搜索终端内容…  Enter=下一个  Shift+Enter=上一个  Esc=关闭"
+            onChange={(e) => {
+              setSearchText(e.target.value);
+              doSearch(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") doSearch(searchText, e.shiftKey ? "prev" : "next");
+              else if (e.key === "Escape") closeSearch();
+            }}
+            autoFocus
+          />
+          <button title="上一个 (Shift+Enter)" onClick={() => doSearch(searchText, "prev")}>
+            ↑
+          </button>
+          <button title="下一个 (Enter)" onClick={() => doSearch(searchText, "next")}>
+            ↓
+          </button>
+          <button title="关闭 (Esc)" onClick={closeSearch}>
+            ×
+          </button>
+        </div>
+      )}
+      <div className="terminal-host" ref={hostRef} />
+    </div>
+  );
 }
 
 /**

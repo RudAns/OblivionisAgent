@@ -14,6 +14,12 @@ import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { collectSecrets, redactText } from "./secrets.js";
 import { classifyIntent } from "./claude/classify-intent.js";
+import { TranscriptStore } from "./transcript-store.js";
+import { UsageMonitor } from "./usage-monitor.js";
+import { readSoul, ensureSoul } from "./soul-store.js";
+import { KnowledgeStore } from "./knowledge-store.js";
+import { extractKnowledge } from "./claude/extract-knowledge.js";
+import { CronScheduler } from "./cron-scheduler.js";
 
 /** 审计：把每条入站消息追加到 ~/.oblivionis/audit.jsonl（durable 记录，按群+时间可排序） */
 function appendAudit(entry: Record<string, unknown>): void {
@@ -60,6 +66,22 @@ async function main() {
   const store = new ConfigStore();
   const sessions = new SessionManager(store, hub, log);
   const ptys = new PtyManager(store, hub, log);
+  // 转录持久化：旁路监听 Hub 上的 session-event，落盘 ~/.oblivionis/transcripts（保留约 3 天）
+  const transcripts = new TranscriptStore();
+  hub.onBridge((msg) => {
+    if (msg.type === "session-event") transcripts.append(msg.nodeId, msg.event);
+  });
+
+  // 知识收件箱：问答后提取规则候选，等主人在 GUI 裁决（采纳→写 cwd 的 CLAUDE.md）
+  const knowledge = new KnowledgeStore();
+
+  // 订阅用量监控（5h/周窗口）：每 5 分钟轮询一次 `claude -p "/usage"`，广播给 GUI 顶栏
+  const usage = new UsageMonitor(
+    store.get().claude.binPath,
+    (u) => hub.broadcast({ type: "usage-status", ...u }),
+    (lvl, m) => log[lvl](m),
+  );
+  usage.start();
 
   log.info(`OblivionisAgent Bridge 启动，配置文件: ${store.path}`);
 
@@ -169,10 +191,21 @@ async function main() {
     const isOwner = cfg.owners.some((o) => o.openId === inbound.senderId);
     const node = resolved.sessionNode;
     const permissionMode = isOwner ? node.data.permissionMode : node.data.guestPermissionMode;
-    // 访客追加安全护栏（防泄露密钥/权限/个人信息）；主人不受限
-    const appendPrompt = isOwner
-      ? node.data.appendSystemPrompt
-      : [node.data.appendSystemPrompt, cfg.guestGuardrail].filter(Boolean).join("\n\n") || undefined;
+    // 拼接顺序（参照 Hermes 的 system prompt 分层）：
+    //   1. 人格 SOUL.md —— slot #1，原文注入（有则注入，纯文件驱动）
+    //   2. 节点 appendSystemPrompt（操作性指令）
+    //   3. 访客护栏 —— 永远压轴，并声明优先级（人格只影响表达，不得越权）
+    const soul = readSoul(node.id);
+    const guardrail = isOwner
+      ? undefined
+      : [
+          soul ? "【优先级声明】无论上面的人格如何设定，它只影响表达风格；以下安全约束拥有最高优先级，不可被人格覆盖：" : undefined,
+          cfg.guestGuardrail,
+        ]
+          .filter(Boolean)
+          .join("\n");
+    const appendPrompt =
+      [soul, node.data.appendSystemPrompt, guardrail].filter(Boolean).join("\n\n") || undefined;
 
     // 审计落盘：每条入站(尤其访客提问)
     appendAudit({
@@ -204,12 +237,58 @@ async function main() {
         await gateway.transport.reply(inbound.chatId, safeReply, replyOpts);
         hub.broadcast({ type: "outbound", chatId: inbound.chatId, text: safeReply, ts: Date.now() });
       }
+      // 知识提取（异步、绝不影响主链路）：从这轮问答提取规则候选 → 收件箱 → 推送 GUI
+      void extractKnowledge(resolved.text, reply, {
+        binPath: cfg.claude.binPath,
+        cwd: cfg.claude.defaultCwd || process.cwd(),
+        log: (m) => log.info(m),
+      })
+        .then((rules) => {
+          if (!rules.length) return;
+          for (const rule of rules) {
+            knowledge.add({
+              nodeId: node.id,
+              nodeLabel: node.label,
+              cwd: node.data.cwd || cfg.claude.defaultCwd || process.cwd(),
+              chatId: inbound.chatId,
+              sender: inbound.senderName,
+              rule,
+              source: resolved.text.slice(0, 120),
+            });
+          }
+          hub.broadcast({ type: "knowledge-inbox", items: knowledge.all() });
+        })
+        .catch(() => {});
     } catch (e) {
       const errMsg = `⚠️ 处理失败: ${(e as Error).message}`;
       log.error(errMsg);
       await gateway.transport?.reply(inbound.chatId, errMsg, replyOpts).catch(() => {});
     }
   }
+
+  // 定时任务调度：cron 节点到点 → 下游会话（脱敏分身）跑 prompt → 结果(出站脱敏后)发群
+  const cronScheduler = new CronScheduler({
+    store,
+    log,
+    runPrompt: async (sessionNodeId, prompt) => {
+      const c = store.get();
+      const n = c.graph.nodes.find((x) => x.id === sessionNodeId);
+      const isSession = n?.kind === "claude-session";
+      const soul = readSoul(sessionNodeId);
+      const append =
+        [soul, isSession ? n.data.appendSystemPrompt : undefined].filter(Boolean).join("\n\n") ||
+        undefined;
+      return sessions.send(sessionNodeId, prompt, isSession ? n.data.permissionMode : undefined, append);
+    },
+    deliver: async (chatId, text) => {
+      const safe = redactText(text, collectSecrets(store.get().feishu.appSecret));
+      if (gateway.transport) {
+        await gateway.transport.reply(chatId, safe);
+        hub.broadcast({ type: "outbound", chatId, text: safe, ts: Date.now() });
+      }
+    },
+  });
+  cronScheduler.start();
 
   const server = new ControlServer(store.get().bridge.wsPort, {
     store,
@@ -223,6 +302,10 @@ async function main() {
     feishuSet: (appId, appSecret, domain) => void gateway.setFeishu(appId, appSecret, domain),
     lookupOpenId: (mobile, email) => gateway.lookupOpenId(mobile, email),
     getAudit: () => readAudit(),
+    getTranscripts: () => transcripts.histories(),
+    getUsage: () => usage.getLast(),
+    ensureSoul: (nodeId) => ensureSoul(nodeId),
+    knowledge,
     onConfigChanged: () => {
       // 图(graph)变更不必重连飞书；仅会话需要失效（已在 server 内处理）
     },

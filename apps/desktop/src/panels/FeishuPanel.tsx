@@ -30,6 +30,8 @@ interface Props {
   /** open_id 查询结果 */
   lookupResult: { items: Array<{ label: string; openId: string }>; error?: string } | null;
   onLookup: (mobile?: string, email?: string) => void;
+  /** 设置 Home Chat（运维群：定时任务结果/服务通知的默认投递地） */
+  onSetHomeChat: (chatId: string) => void;
 }
 
 /**
@@ -44,7 +46,12 @@ export function FeishuPanel({
   onSetOwners,
   lookupResult,
   onLookup,
+  onSetHomeChat,
 }: Props) {
+  const [homeChat, setHomeChat] = useState("");
+  useEffect(() => {
+    setHomeChat(config?.homeChatId ?? "");
+  }, [config?.homeChatId]);
   const [appId, setAppId] = useState("");
   const [secret, setSecret] = useState("");
   const [domain, setDomain] = useState<"feishu" | "lark">("feishu");
@@ -189,6 +196,18 @@ export function FeishuPanel({
         <div className="fs-detail">
           主人只能在本机刻意设置（飞书里的人无法自助成为主人）。手机号/邮箱查询用于直接查到你自己的
           open_id；日志里也会显示发送者 open_id 作参考。
+        </div>
+      </div>
+
+      <div className="owners-box">
+        <div className="base-session-title">Home Chat（运维群：定时任务结果/服务通知默认发这里）</div>
+        <div className="fs-actions">
+          <input
+            value={homeChat}
+            placeholder="chatId (oc_...)，可从画布上的群节点复制"
+            onChange={(e) => setHomeChat(e.target.value)}
+          />
+          <button onClick={() => onSetHomeChat(homeChat.trim())}>保存</button>
         </div>
       </div>
 

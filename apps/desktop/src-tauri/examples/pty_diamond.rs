@@ -77,11 +77,21 @@ fn main() {
         }
     }
 
-    // 3) 其它可疑装饰字符
-    for (name, pat) in [("U+25CA ◊", b"\xe2\x97\x8a".as_slice()), ("U+2756 ❖", b"\xe2\x9d\x96".as_slice())] {
-        let n = data.windows(3).filter(|w| *w == pat).count();
-        if n > 0 {
-            println!("{} 出现 {} 次", name, n);
+    // 3) 全量统计：输出里所有非 ASCII、非 CJK、非全角标点的码点（找出会被字体缺字渲染成 ◇ 的真凶）
+    let s2 = String::from_utf8_lossy(&data);
+    let mut counts: std::collections::HashMap<char, usize> = std::collections::HashMap::new();
+    for c in s2.chars() {
+        let cp = c as u32;
+        let is_ascii = cp < 0x80;
+        let is_cjk = (0x4e00..=0x9fff).contains(&cp) || (0x3000..=0x303f).contains(&cp) || (0xff00..=0xffef).contains(&cp);
+        if !is_ascii && !is_cjk {
+            *counts.entry(c).or_insert(0) += 1;
         }
+    }
+    let mut list: Vec<(char, usize)> = counts.into_iter().collect();
+    list.sort_by(|a, b| b.1.cmp(&a.1));
+    println!("\n=== 非 ASCII/CJK 码点统计(按频次) ===");
+    for (c, n) in list.iter().take(40) {
+        println!("  U+{:04X} {:?} × {}", *c as u32, c, n);
     }
 }

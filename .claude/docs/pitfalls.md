@@ -79,6 +79,32 @@ GUI 收到 config 广播时**只在首次**重建画布，之后只合并 sessio
 + `@xterm/addon-fit@0.12.0-beta.285`（VS Code 同渠道）。**等 7.0 stable 切回**。
 注意 6.x 变更：`customGlyphs` 从 Terminal 选项移到了 `new WebglAddon({customGlyphs})`。
 
+### C7a. xterm 插件的运行时雷区（tsc 查不出）
+- **proposed API**：unicode 系列插件 activate 时校验 `allowProposedApi`，没开就抛错白屏。
+  新加任何 xterm 插件先查它是否要求 proposed API，Terminal 构造参数加 `allowProposedApi: true`。
+- **unicode-graphemes + WebGL = 翻车**（beta.285 实测）：缩放窗口黑屏、向上滚动历史重复渲染。
+  **用 unicode11**（VS Code 同款组合）——emoji 宽度照样修正(✅=2列)，稳定性久经考验。
+  代价：✏️ 这类 VS16 变体序列宽度仍可能差 1 列，可接受。
+
+### C7b. 绝不给 xterm 内部元素设不透明背景
+xterm 的 .xterm-screen/.xterm-viewport/canvas 是**叠放的渲染图层**（文字层/装饰层/链接层），
+给它们设不透明 background 会把下层文字整个盖住 → 终端全黑什么都不显示（实际事故）。
+消"整数字符格余量黑边"只能刷**外层容器**（.term-view/.terms-body/.terminal-host）的背景色。
+
+### C3a. 不要用 clear-before-resize 消除"缩放后历史重复"
+ConPTY/Ink 在 resize 时会重打一部分内容 → 缩放后历史多一份。曾试图在发 pty_resize 前
+term.clear() 让"重放成为唯一一份"——实测重放**不含完整历史**，结果 scrollback 被清空、
+无法滚动，比重复更糟。结论：resize 防抖(250ms 尾沿)把 N 份降为 1 份后**接受现状**；
+谁再想消那一份重复，先证明重放范围覆盖完整 scrollback。
+
+### C8a. "─── ◇ ◇ ◇ ───" 真凶=PTY 逐块解码切断 UTF-8（已根治）
+菱形其实是 **U+FFFD 替换字符**（字形=菱形）：lib.rs 读 PTY 按 4096 字节块逐块
+`from_utf8_lossy`，分隔线是一长串 3 字节的 `─`，块边界必然切中某个 `─` → 残缺字节
+→ 1-3 个 FFFD 连排"漂"在线上。**修法：跨块保留残缺尾字节(error_len()==None 分支)，
+拼到下一块再解码**。教训：①探针拼完整 buffer 再解码所以抓不到（诊断工具的解码路径
+必须和生产一致）②"乱码"先怀疑自己的解码链，再怀疑渲染器/字体。
+（曾两次误判：customGlyphs 矢量画歪→关了没用；markdown hr 装饰→实测 hr 只用 ─。）
+
 ### C8. 分隔线上漂浮的 ◇ 菱形
 实测（examples/pty_diamond.rs）claude 输出里 0 个菱形字符、0 次 DEC 字符集切换 →
 是渲染层把制表符画歪（矢量自定义字形 × 非整数行高 1.05 × WebGL）。
@@ -88,6 +114,15 @@ GUI 收到 config 广播时**只在首次**重建画布，之后只合并 sessio
 Ink TUI 用相对光标重绘，xterm/ConPTY 下行映射偶发漂移一行就会叠印。无法 100% 根除
 （Windows Terminal 跑 Ink 应用也偶发）。缓解：提供手动「重绘」（一次性 resize 抖动）；
 自动抖动禁止（见 C3）。
+
+### C10a. 输入法候选框弹到屏幕右下角
+xterm 用隐藏 textarea 贴在光标处给 IME 定位，但只在光标移动/resize/compositionstart 时
+同步位置；窗口失焦再回来后锚点陈旧 → Windows IME 拿不到光标坐标 → 候选框退回
+屏幕右下角（上游 xterm #5734 已修 compositionstart 路径，我们的 beta 已含；
+WebView2Feedback #2241 仍 open）。
+**app 层兜底**：window focus / visibilitychange / keyCode 229 时调私有 API
+`term._core._syncTextArea()` 重新锚定，并对激活终端 blur/focus 一轮让 Chromium
+重发光标矩形。升级 xterm 后注意私有 API 是否还在（代码里已做静默退化）。
 
 ### C10. 多终端保活的正确姿势
 TerminalView 空依赖 `[]` 只创建一次；切换用 display:none 不卸载；

@@ -96,6 +96,25 @@ export const ClaudeSessionData = z.object({
 });
 export type ClaudeSessionData = z.infer<typeof ClaudeSessionData>;
 
+/**
+ * 定时任务节点：到点对下游「Claude 会话」节点跑一次 prompt，结果发到指定群。
+ * 安全栅栏（参照 Hermes）：每次触发 = 普通脱敏分身上的一次消息；定时会话内不暴露建任务能力。
+ */
+export const CronData = z.object({
+  /**
+   * 触发时刻，支持两种语法：
+   * - "HH:MM"            每天该时刻（本机时区），如 "09:00"
+   * - "every 30m"/"every 2h"  每隔 N 分钟/小时
+   */
+  schedule: z.string().default("09:00"),
+  /** 到点发给下游会话的指令 */
+  prompt: z.string().default(""),
+  /** 结果发到的飞书群 chatId；留空 = 全局 homeChatId；都没有则只记日志 */
+  chatId: z.string().optional(),
+  enabled: z.boolean().default(true),
+});
+export type CronData = z.infer<typeof CronData>;
+
 const BaseNode = z.object({
   id: z.string(),
   position: XY,
@@ -107,6 +126,7 @@ export const GraphNode = z.discriminatedUnion("kind", [
   BaseNode.extend({ kind: z.literal("route"), data: RouteData }),
   BaseNode.extend({ kind: z.literal("intent-switch"), data: IntentSwitchData }),
   BaseNode.extend({ kind: z.literal("claude-session"), data: ClaudeSessionData }),
+  BaseNode.extend({ kind: z.literal("cron"), data: CronData }),
 ]);
 export type GraphNode = z.infer<typeof GraphNode>;
 
@@ -114,6 +134,7 @@ export type FeishuGroupNode = Extract<GraphNode, { kind: "feishu-group" }>;
 export type RouteNode = Extract<GraphNode, { kind: "route" }>;
 export type IntentSwitchNode = Extract<GraphNode, { kind: "intent-switch" }>;
 export type ClaudeSessionNode = Extract<GraphNode, { kind: "claude-session" }>;
+export type CronNode = Extract<GraphNode, { kind: "cron" }>;
 
 export const GraphEdge = z.object({
   id: z.string(),
@@ -162,6 +183,11 @@ export const OblivionisConfig = z.object({
       ),
     )
     .default([]),
+  /**
+   * Home Chat：运维群 chatId。定时任务结果(未指定群时)、服务通知等都发这里。
+   * 空 = 不发。
+   */
+  homeChatId: z.string().default(""),
   /** 访客安全护栏：仅在访客 @机器人时追加到 system prompt，防泄露密钥/权限/个人信息 */
   guestGuardrail: z.string().default(DEFAULT_GUEST_GUARDRAIL),
   graph: z

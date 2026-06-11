@@ -152,12 +152,43 @@ fn pty_open(
     let id2 = id.clone();
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
+        // ⚠️ 不能逐块 from_utf8_lossy：多字节 UTF-8(中文3字节/─线3字节)跨块被切断会变 U+FFFD，
+        // 字形是菱形——曾被当成"乱码◇"追了很久。残缺尾字节留到下一块拼上再解码。
+        let mut pending: Vec<u8> = Vec::new();
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    let s = String::from_utf8_lossy(&buf[..n]).to_string();
-                    let _ = app2.emit("pty-data", PtyData { id: id2.clone(), data: s });
+                    pending.extend_from_slice(&buf[..n]);
+                    let mut out = String::new();
+                    loop {
+                        match std::str::from_utf8(&pending) {
+                            Ok(s) => {
+                                out.push_str(s);
+                                pending.clear();
+                                break;
+                            }
+                            Err(e) => {
+                                let valid = e.valid_up_to();
+                                out.push_str(std::str::from_utf8(&pending[..valid]).unwrap());
+                                match e.error_len() {
+                                    // 尾部字节不完整：保留，等下一块补齐
+                                    None => {
+                                        pending.drain(..valid);
+                                        break;
+                                    }
+                                    // 真·非法字节：吐替换符并跳过，继续解码剩余
+                                    Some(len) => {
+                                        out.push('\u{FFFD}');
+                                        pending.drain(..valid + len);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !out.is_empty() {
+                        let _ = app2.emit("pty-data", PtyData { id: id2.clone(), data: out });
+                    }
                 }
                 Err(_) => break,
             }

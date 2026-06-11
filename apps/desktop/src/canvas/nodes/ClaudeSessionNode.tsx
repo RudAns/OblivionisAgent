@@ -1,10 +1,5 @@
-import { Handle, Position, type NodeProps } from "@xyflow/react";
-
-const STATUS_LABEL: Record<string, string> = {
-  idle: "● 空闲",
-  running: "● 运行中",
-  error: "● 出错",
-};
+import type { NodeProps } from "@xyflow/react";
+import { NodeShell, Row, tailTruncate } from "./NodeShell.js";
 
 export function ClaudeSessionNode({ data, selected }: NodeProps) {
   const d = data as {
@@ -12,25 +7,29 @@ export function ClaudeSessionNode({ data, selected }: NodeProps) {
     cwd: string;
     model?: string;
     permissionMode: string;
+    guestPermissionMode?: string;
     sessionId?: string;
+    baseSessionId?: string;
     status?: string;
   };
-  const status = d.status ?? "idle";
   return (
-    <div className={`node node-claude ${selected ? "selected" : ""}`}>
-      <Handle type="target" position={Position.Left} />
-      <div className="node-title">
-        🤖 Claude 会话 <span className={`status status-${status}`}>{STATUS_LABEL[status]}</span>
-      </div>
-      <div className="node-label">{d.label}</div>
-      <div className="node-field">cwd: {d.cwd || "(未设置)"}</div>
-      <div className="node-field">模型: {d.model || "默认"}</div>
-      <div className="node-field">权限: {d.permissionMode}</div>
+    <NodeShell
+      kind="claude"
+      icon="🤖"
+      label={d.label || "Claude 会话"}
+      selected={selected}
+      status={d.status ?? "idle"}
+      hasSource={false}
+    >
+      <Row k="cwd" v={tailTruncate(d.cwd) || "(未设置)"} dim={!d.cwd} />
+      <Row k="模型" v={d.model || "默认"} />
+      <Row k="权限" v={`${d.permissionMode} / ${d.guestPermissionMode ?? "default"}`} />
+      {d.baseSessionId ? <Row k="base" v={d.baseSessionId.slice(0, 8) + "…"} /> : null}
       {d.sessionId ? (
-        <div className="node-field">sid: {d.sessionId.slice(0, 8)}…</div>
+        <Row k="fork" v={d.sessionId.slice(0, 8) + "…"} />
       ) : (
-        <div className="node-field dim">sid: 首次运行时生成</div>
+        <Row k="fork" v={d.baseSessionId ? "首次访客消息时生成" : "首次运行生成"} dim />
       )}
-    </div>
+    </NodeShell>
   );
 }

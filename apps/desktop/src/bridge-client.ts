@@ -8,6 +8,7 @@ type Handler = (msg: BridgeMessage) => void;
 export class BridgeClient {
   private ws: WebSocket | null = null;
   private handlers = new Set<Handler>();
+  private connHandlers = new Set<(up: boolean) => void>();
   private queue: ClientMessage[] = [];
   private closed = false;
 
@@ -17,7 +18,10 @@ export class BridgeClient {
     this.closed = false;
     const ws = new WebSocket(this.url);
     this.ws = ws;
-    ws.onopen = () => this.flush();
+    ws.onopen = () => {
+      this.connHandlers.forEach((h) => h(true));
+      this.flush();
+    };
     ws.onmessage = (ev) => {
       let msg: BridgeMessage;
       try {
@@ -28,9 +32,16 @@ export class BridgeClient {
       this.handlers.forEach((h) => h(msg));
     };
     ws.onclose = () => {
+      this.connHandlers.forEach((h) => h(false));
       if (!this.closed) setTimeout(() => this.connect(), 1500);
     };
     ws.onerror = () => ws.close();
+  }
+
+  /** 订阅与 Bridge 的连接状态（状态栏指示用） */
+  onConnection(h: (up: boolean) => void): () => void {
+    this.connHandlers.add(h);
+    return () => this.connHandlers.delete(h);
   }
 
   on(h: Handler): () => void {

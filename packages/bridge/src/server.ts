@@ -35,6 +35,14 @@ export interface ServerDeps {
   ) => Promise<Array<{ label: string; openId: string }>>;
   /** 读取审计历史 */
   getAudit: () => AuditEntry[];
+  /** 各会话节点的近期转录（连接时回放给 GUI） */
+  getTranscripts: () => Record<string, import("@oblivionis/shared").ClaudeStreamEvent[]>;
+  /** 最近一次订阅用量快照（连接时下发） */
+  getUsage: () => import("@oblivionis/shared").UsageSnapshot | null;
+  /** 确保节点人格文件存在（无则播种），返回路径 */
+  ensureSoul: (nodeId: string) => { path: string; created: boolean };
+  /** 知识收件箱 */
+  knowledge: import("./knowledge-store.js").KnowledgeStore;
   /** 配置(graph)被 GUI 改写后回调 */
   onConfigChanged: () => void;
 }
@@ -57,6 +65,10 @@ export class ControlServer {
       this.send(ws, { type: "config", config: this.deps.store.get() });
       this.send(ws, this.deps.getFeishuStatus());
       this.send(ws, { type: "audit-history", items: this.deps.getAudit() });
+      this.send(ws, { type: "transcript-history", histories: this.deps.getTranscripts() });
+      const u = this.deps.getUsage();
+      if (u) this.send(ws, { type: "usage-status", ...u });
+      this.send(ws, { type: "knowledge-inbox", items: this.deps.knowledge.all() });
       ws.on("message", (raw) => this.onClientMessage(raw.toString()));
       ws.on("close", () => this.clients.delete(ws));
       ws.on("error", () => this.clients.delete(ws));
@@ -108,6 +120,23 @@ export class ControlServer {
       case "get-audit":
         hub.broadcast({ type: "audit-history", items: this.deps.getAudit() });
         break;
+      case "ensure-soul": {
+        const r = this.deps.ensureSoul(msg.nodeId);
+        hub.broadcast({ type: "soul-path", nodeId: msg.nodeId, path: r.path, created: r.created });
+        break;
+      }
+      case "knowledge-decide": {
+        const item = this.deps.knowledge.decide(msg.id, msg.action, msg.editedRule);
+        if (item) {
+          log.info(
+            `知识收件箱: ${msg.action === "accept" ? "采纳" : "抛弃"}「${item.rule.slice(0, 40)}」${
+              msg.action === "accept" ? ` → ${item.cwd}\\CLAUDE.md` : ""
+            }`,
+          );
+        }
+        hub.broadcast({ type: "knowledge-inbox", items: this.deps.knowledge.all() });
+        break;
+      }
       case "prepare-fork":
         void sessions
           .prepareGuestFork(msg.nodeId)

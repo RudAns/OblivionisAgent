@@ -6,6 +6,7 @@ import {
   Controls,
   MiniMap,
   ConnectionLineType,
+  MarkerType,
   type Node,
   type Edge,
   type OnNodesChange,
@@ -20,6 +21,7 @@ import { FeishuGroupNode } from "./nodes/FeishuGroupNode.js";
 import { RouteNode } from "./nodes/RouteNode.js";
 import { IntentSwitchNode } from "./nodes/IntentSwitchNode.js";
 import { ClaudeSessionNode } from "./nodes/ClaudeSessionNode.js";
+import { CronNode } from "./nodes/CronNode.js";
 
 interface Props {
   nodes: Node[];
@@ -33,11 +35,14 @@ interface Props {
   onPaneClick: () => void;
 }
 
-// 柔性贝塞尔曲线（"default" = bezier），比 smoothstep 的直角折线更顺眼
-const defaultEdgeOptions: DefaultEdgeOptions = {
+// 劲道连线：贝塞尔曲线但收紧曲率(0.5)——出入口方向感强、中段绷直不软塌，配箭头收尾。
+// pathOptions 会被 ReactFlow 浅合并进每条边、由 BezierEdge 读取；类型定义没收录故断言。
+const defaultEdgeOptions = {
   type: "default",
-  style: { stroke: "#5a6b8c", strokeWidth: 2 },
-};
+  pathOptions: { curvature: 0.5 },
+  style: { stroke: "#5d7290", strokeWidth: 2 },
+  markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15, color: "#5d7290" },
+} as unknown as DefaultEdgeOptions;
 
 // 各类节点的代表色（与节点卡左侧色条一致），用于右下角缩略图上色
 const NODE_COLORS: Record<string, string> = {
@@ -45,6 +50,7 @@ const NODE_COLORS: Record<string, string> = {
   route: "#c08cff",
   "intent-switch": "#ffb84d",
   "claude-session": "#4f8cff",
+  cron: "#39c5cf",
 };
 const miniMapNodeColor = (node: Node) => NODE_COLORS[node.type ?? ""] ?? "#3a4250";
 
@@ -55,6 +61,7 @@ export function FlowCanvas(props: Props) {
       route: RouteNode,
       "intent-switch": IntentSwitchNode,
       "claude-session": ClaudeSessionNode,
+      cron: CronNode,
     }),
     [],
   );

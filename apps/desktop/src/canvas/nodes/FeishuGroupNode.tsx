@@ -1,14 +1,12 @@
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import type { NodeProps } from "@xyflow/react";
+import { NodeShell, Row } from "./NodeShell.js";
 
 export function FeishuGroupNode({ data, selected }: NodeProps) {
   const d = data as { label: string; chatId: string; triggerMode: string };
   return (
-    <div className={`node node-feishu ${selected ? "selected" : ""}`}>
-      <div className="node-title">💬 飞书群</div>
-      <div className="node-label">{d.label}</div>
-      <div className="node-field">chatId: {d.chatId || "(未设置)"}</div>
-      <div className="node-field">触发: {d.triggerMode}</div>
-      <Handle type="source" position={Position.Right} />
-    </div>
+    <NodeShell kind="feishu" icon="💬" label={d.label || "飞书群"} selected={selected} hasTarget={false}>
+      <Row k="chatId" v={d.chatId ? `…${d.chatId.slice(-12)}` : "(未设置)"} dim={!d.chatId} />
+      <Row k="触发" v={d.triggerMode === "all" ? "全部消息" : "@机器人"} />
+    </NodeShell>
   );
 }

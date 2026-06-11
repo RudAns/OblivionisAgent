@@ -27,7 +27,11 @@ export type ClientMessage =
   /** 重新从基础会话 fork 出访客会话并脱敏（刷新快照） */
   | { type: "prepare-fork"; nodeId: string }
   /** 请求审计历史（从 ~/.oblivionis/audit.jsonl 读取） */
-  | { type: "get-audit" };
+  | { type: "get-audit" }
+  /** 确保节点人格文件(SOUL.md)存在（无则播种 starter），回 soul-path */
+  | { type: "ensure-soul"; nodeId: string }
+  /** 知识收件箱裁决：accept(可带编辑后规则)→写 cwd 的 CLAUDE.md；dismiss=抛弃 */
+  | { type: "knowledge-decide"; id: string; action: "accept" | "dismiss"; editedRule?: string };
 
 export interface AuditEntry {
   chatId: string;
@@ -35,6 +39,37 @@ export interface AuditEntry {
   sender: string;
   text: string;
   ts: number;
+}
+
+/** 知识收件箱条目：从群聊问答中提取的"规则性指令"候选，等主人裁决 */
+export interface KnowledgeItem {
+  id: string;
+  ts: number;
+  nodeId: string;
+  nodeLabel: string;
+  /** 采纳时写入该目录的 CLAUDE.md */
+  cwd: string;
+  chatId: string;
+  sender: string;
+  /** 规则文本（采纳前可编辑） */
+  rule: string;
+  /** 来源提问摘要 */
+  source: string;
+  status: "pending" | "accepted" | "dismissed";
+}
+
+/** Claude 订阅用量快照（5 小时滚动窗口 / 周窗口） */
+export interface UsageSnapshot {
+  ts: number;
+  /** 5 小时窗口已用百分比(0-100) */
+  sessionPct?: number;
+  /** 5 小时窗口重置时间（人类可读，CLI 原文） */
+  sessionResets?: string;
+  /** 周窗口(全模型)已用百分比 */
+  weekPct?: number;
+  weekResets?: string;
+  /** CLI 原始文本（解析失败/悬停详情兜底） */
+  raw?: string;
 }
 
 export interface SessionInfo {
@@ -82,7 +117,15 @@ export type BridgeMessage =
   /** open_id 查询结果（响应 lookup-openid） */
   | { type: "openid-result"; items: Array<{ label: string; openId: string }>; error?: string }
   /** 审计历史（响应 get-audit） */
-  | { type: "audit-history"; items: AuditEntry[] };
+  | { type: "audit-history"; items: AuditEntry[] }
+  /** 各会话节点的近期转录回放（连接时下发；保留约 3 天） */
+  | { type: "transcript-history"; histories: Record<string, ClaudeStreamEvent[]> }
+  /** 订阅用量（5h/周窗口，定时轮询 + 连接时下发） */
+  | ({ type: "usage-status" } & UsageSnapshot)
+  /** 人格文件路径（响应 ensure-soul；created=本次播种了 starter） */
+  | { type: "soul-path"; nodeId: string; path: string; created: boolean }
+  /** 知识收件箱全量（连接时 + 每次变更后推送） */
+  | { type: "knowledge-inbox"; items: KnowledgeItem[] };
 
 export type FeishuStatus = "disconnected" | "connecting" | "connected" | "error" | "mock";
 

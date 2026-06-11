@@ -40,6 +40,8 @@ export class LarkTransport implements FeishuTransport {
   private wsClient: any = null;
   /** 机器人自身的 open_id，用于在群里判断是否被 @（启动后异步获取） */
   private botOpenId: string | null = null;
+  /** openId -> 真实姓名缓存（通讯录接口结果；失败缓存 null 避免每条消息都打 API） */
+  private nameCache = new Map<string, string | null>();
 
   constructor(private opts: LarkOptions) {}
 
@@ -136,16 +138,41 @@ export class LarkTransport implements FeishuTransport {
       quoted = await this.fetchMessageText(message.parent_id);
     }
 
+    const senderId: string = sender?.sender_id?.open_id ?? sender?.sender_id?.union_id ?? "unknown";
+    // 真实姓名：通讯录接口按 open_id 查（带缓存）；拿不到再退回 user_id
+    const senderName =
+      (await this.getUserName(senderId)) ?? sender?.sender_id?.user_id ?? "unknown";
+
     this.cb?.({
       chatId,
       messageId: message.message_id,
-      senderId: sender?.sender_id?.open_id ?? sender?.sender_id?.union_id ?? "unknown",
-      senderName: sender?.sender_id?.user_id ?? "unknown",
+      senderId,
+      senderName,
       text,
       isMention,
       quoted,
       raw: data,
     });
+  }
+
+  /** open_id -> 真实姓名（contact/v3/users/:id，需通讯录读权限；结果含失败都缓存） */
+  private async getUserName(openId: string): Promise<string | undefined> {
+    if (!openId || openId === "unknown" || !this.client) return undefined;
+    if (this.nameCache.has(openId)) return this.nameCache.get(openId) ?? undefined;
+    try {
+      const resp: any = await this.client.contact.user.get({
+        path: { user_id: openId },
+        params: { user_id_type: "open_id" },
+      });
+      const u = resp?.data?.user ?? resp?.user ?? {};
+      const name: string | undefined = u.name || u.nickname || undefined;
+      this.nameCache.set(openId, name ?? null);
+      return name;
+    } catch (e) {
+      this.opts.log("warn", `查用户姓名失败(${openId.slice(0, 12)}…): ${(e as Error).message}`);
+      this.nameCache.set(openId, null); // 失败也缓存，避免每条消息都打一次 API
+      return undefined;
+    }
   }
 
   /** 通过消息 id 读取文本内容（用于读取被引用消息） */
