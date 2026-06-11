@@ -11,8 +11,7 @@ export function SoulNode({ data, selected }: NodeProps) {
   return (
     <NodeShell kind="soul" icon="🎭" label={d.label || "人格"} selected={selected} hasTarget={false}>
       <div className="xnode-soul-hint">
-        拖右侧 ● 到会话的<br />
-        <b>原始口</b>(终端) 或 <b>Fork口</b>(飞书)
+        拖右侧 ● 到会话的 <b>🎭人格口</b>
         <div className="dim">选中后在右侧面板编辑灵魂</div>
       </div>
     </NodeShell>

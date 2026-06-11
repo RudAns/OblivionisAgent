@@ -390,13 +390,23 @@ function Inner() {
     );
   };
 
+  // 面板宽度跟随窗口收缩：换小屏/缩窗口/跨不同 DPI 屏幕时，把侧栏夹进当前可用宽度，
+  // 避免它越出外框(=外框/内部不匹配)、也让终端跟着窗口变窄。留 ~364px 给图标栏+会话栏+最小画布。
+  const maxPanelWidth = () => Math.max(280, window.innerWidth - 364);
+  useEffect(() => {
+    const clamp = () => setPanelWidth((w) => Math.min(w, maxPanelWidth()));
+    clamp();
+    window.addEventListener("resize", clamp);
+    return () => window.removeEventListener("resize", clamp);
+  }, []);
+
   // 拖动右侧分隔条调整面板宽度（让终端可拉宽）
   const startResize = (e: ReactMouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
     const startW = panelWidth;
     const onMove = (ev: globalThis.MouseEvent) =>
-      setPanelWidth(Math.min(1100, Math.max(280, startW + (startX - ev.clientX))));
+      setPanelWidth(Math.min(maxPanelWidth(), Math.max(280, startW + (startX - ev.clientX))));
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
@@ -911,10 +921,8 @@ function Inspector({
       {node.type === "soul" && (
         <>
           <div className="hint" style={{ marginBottom: 6 }}>
-            人格 (SOUL.md)。把本节点右侧 ● 连到「Claude 会话」的连接口；一个人格可连给多个会话。
-            <br />· <b>Fork口</b>(飞书分身) — 已生效，所有飞书消息按此人格回复。
-            <br />· <b>原始口</b>(开发终端) — 连线会保存，终端注入正在做（下一步）。
-            <br />未连任何会话则不生效。
+            人格 (SOUL.md)。把本节点右侧 ● 连到「Claude 会话」的 <b>🎭人格口</b>；连上即作用于该会话的
+            所有飞书回复（fork 脱敏分身）。一个人格可连多个会话；未连任何会话则不生效。
           </div>
           <div className="fs-actions">
             <button

@@ -23,11 +23,10 @@ export function ClaudeSessionNode({ data, selected }: NodeProps) {
       status={d.status ?? "idle"}
       hasSource={false}
     >
-      {/* 两个人格连接口：Soul 节点拖到这里。原始口=终端会话，Fork口=飞书脱敏分身 */}
-      <Handle type="target" id="base" position={Position.Top} className="soul-port" style={{ left: "30%" }} />
-      <span className="soul-port-label" style={{ left: "30%" }}>🎭原始</span>
-      <Handle type="target" id="fork" position={Position.Top} className="soul-port" style={{ left: "70%" }} />
-      <span className="soul-port-label" style={{ left: "70%" }}>🎭Fork</span>
+      {/* 人格连接口：Soul 节点拖到这里，作用于该会话的飞书回复(fork 脱敏分身)。
+          终端(base)注入人格已评估为不需要，故只留单个口 */}
+      <Handle type="target" id="fork" position={Position.Top} className="soul-port" style={{ left: "50%" }} />
+      <span className="soul-port-label" style={{ left: "50%" }}>🎭人格</span>
 
       <Row k="cwd" v={tailTruncate(d.cwd) || "(未设置)"} dim={!d.cwd} />
       <Row k="模型" v={d.model || "默认"} />

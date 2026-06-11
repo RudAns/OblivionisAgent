@@ -27,12 +27,32 @@ claude/claude-session.ts  每条消息 = 一次子进程:
 
 GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）。
 
+## 人格与两会话模型（Soul/Fork）
+
+一个「Claude 会话」节点背后是**两条 claude 会话**，飞书永远只碰 fork：
+
+```
+   飞书群 ─@机器人─┐                 人格节点(SOUL.md) ─┐
+                  │                                  │
+                  ▼  消息入站                         ▼  人格口(连此=作用于飞书回复)
+   ┌──────────────────────────────────────────────────────────┐
+   │ Claude 会话 节点                                         │
+   │   原始(base)      = 你的开发终端会话（只在软件终端里用） │
+   │   脱敏分身(fork)   = 飞书消息一律走这条 · sid 26f5…      │
+   │   护栏/群记忆/人格  都注入到 fork 这条，base 永不被碰    │
+   └──────────────────────────────────────────────────────────┘
+```
+
+- **base（baseSessionId）**：软件里的开发终端会话。飞书永不续接它（避免污染开发上下文），不注入人格/护栏。
+- **fork（脱敏分身 / sessionId）**：从 base fork + 抹密钥而来。**所有飞书消息（主人+访客）都走它**；人格(SOUL.md)、访客护栏、群记忆都注入这条；首次自动 fork，"刷新快照"可重新 fork。
+- **人格(soul) 节点**：把 SOUL.md 做成可连线节点，连到会话的「人格口」即作用于该会话的飞书回复。注入解析见 `soul-store.ts: resolveSessionSoul`（按边找连到 fork 口的 soul 节点，找不到回退旧的"一会话一人格文件"）。一个人格可连多个会话。终端(base)注入人格：评估后认为不需要，未做。
+
 ## 目录与核心文件
 
 ### packages/shared — 两端共享的契约
 | 文件 | 作用 |
 |---|---|
-| `config.ts` | **整个配置的 zod schema**（图/节点/边/owners/护栏）。节点种类: feishu-group / route / intent-switch / claude-session。改配置结构从这里开始 |
+| `config.ts` | **整个配置的 zod schema**（图/节点/边/owners/护栏）。节点种类: feishu-group / route / intent-switch / claude-session / cron / webhook / soul。改配置结构从这里开始 |
 | `protocol.ts` | GUI↔bridge 的 WS 消息类型 |
 | `stream-json.ts` | claude stream-json 事件类型 + 辅助函数(assistantText 等) |
 

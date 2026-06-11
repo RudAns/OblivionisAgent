@@ -53,6 +53,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  overflow: hidden; /* 兜底：任何子项越界都不让整窗出现滚动条(=外框/内部不匹配的表象) */
 }
 
 .toolbar {
@@ -119,6 +120,8 @@ button.primary {
   flex: 1;
   display: flex;
   min-height: 0;
+  min-width: 0; /* 关键：允许 main 在 shell 里收缩，否则窗口变窄时它撑出横向滚动条、且不再重排 */
+  overflow: hidden;
   position: relative; /* 飞书浮窗挂这层 */
 }
 
@@ -1313,6 +1316,92 @@ button.primary {
    把 viewport 底色刷成主题色即可——它在画布【之下】，绝不会盖住文字(全黑事故是改画布/screen 层，不是这层)。 */
 .terminal-host .xterm-viewport {
   background-color: #1b1e24 !important;
+}
+
+/* ---- 贴图缩略图芯片（像 VSCode 插件那样浮在 claude 输入框横杠上方，自然融入终端、不做独立色块）----
+   绝对浮层，bottom 由 JS 按输入框实际位置动态贴上去；底色=终端色(#1b1e24)所以不显眼=自然融入；
+   容器穿透点击，只有芯片本体可点；回车发送后自动清空。 */
+.term-img-chips {
+  position: absolute;
+  left: 12px;
+  z-index: 6;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 24px);
+  pointer-events: none;
+}
+.term-img-chip {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 5px 2px 3px;
+  background: #1b1e24; /* 与终端同色 → 不是独立色块，自然融入 */
+  border: none;
+  border-radius: 5px;
+  cursor: zoom-in;
+  max-width: 240px;
+}
+.term-img-chip:hover {
+  background: #232830;
+}
+.term-img-chip img {
+  width: 30px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: #0d0f13;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.tic-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+  text-align: left;
+}
+.tic-name {
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+.tic-dim {
+  font-size: 10px;
+  color: var(--muted);
+}
+.tic-x {
+  margin-left: 4px;
+  padding: 0 5px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.tic-x:hover {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.12);
+}
+.term-img-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.82);
+  cursor: zoom-out;
+}
+.term-img-zoom img {
+  max-width: 92vw;
+  max-height: 92vh;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
 }
 
 /* ---- 知识收件箱 ---- */

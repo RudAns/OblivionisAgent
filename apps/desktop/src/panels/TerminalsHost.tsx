@@ -8,6 +8,7 @@ import { Unicode11Addon } from "@xterm/addon-unicode11";
 import "@xterm/xterm/css/xterm.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 /** 搜索命中高亮（与主题强调色一致） */
 const SEARCH_DECORATIONS = {
@@ -29,6 +30,15 @@ export interface TermInfo {
 
 function inTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+/** 贴图缩略图芯片（我们自己的 IDE 风格预览：缩略图 + 文件名 + 尺寸，可点击放大/删除） */
+interface ImgChip {
+  url: string; // blob URL（缩略图/放大用）
+  name: string;
+  w: number;
+  h: number;
+  path: string; // 已写进 claude 输入的临时文件路径
 }
 
 /**
@@ -56,6 +66,42 @@ function TerminalView({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [imgChips, setImgChips] = useState<ImgChip[]>([]);
+  const [zoomChip, setZoomChip] = useState<ImgChip | null>(null);
+  const chipsRef = useRef<ImgChip[]>([]); // 给卸载时统一 revoke blob URL
+  const addChip = (c: ImgChip) =>
+    setImgChips((cs) => {
+      const n = [...cs, c];
+      chipsRef.current = n;
+      return n;
+    });
+  const removeChip = (i: number) =>
+    setImgChips((cs) => {
+      const c = cs[i];
+      if (c) URL.revokeObjectURL(c.url);
+      const n = cs.filter((_, j) => j !== i);
+      chipsRef.current = n;
+      return n;
+    });
+  const clearChips = () => {
+    chipsRef.current.forEach((c) => URL.revokeObjectURL(c.url));
+    chipsRef.current = [];
+    setImgChips([]);
+  };
+  const clearChipsRef = useRef(clearChips);
+  clearChipsRef.current = clearChips;
+  // 缩略图芯片浮层"贴着 claude 输入框上方"的底部偏移(px)，由 measureRef 按输入框实际位置动态算
+  const [chipBottom, setChipBottom] = useState(64);
+  const measureRef = useRef<() => number>(() => 64);
+  // 卸载时统一释放所有缩略图 blob URL
+  useEffect(() => () => chipsRef.current.forEach((c) => URL.revokeObjectURL(c.url)), []);
+  // 有芯片时轻量轮询输入框位置，让浮层跟着输入框走(claude 重绘/多行输入时也对得上)
+  useEffect(() => {
+    if (!imgChips.length) return;
+    setChipBottom(measureRef.current());
+    const id = window.setInterval(() => setChipBottom(measureRef.current()), 140);
+    return () => window.clearInterval(id);
+  }, [imgChips.length]);
   const activeRef = useRef(active);
   activeRef.current = active;
 
@@ -165,6 +211,10 @@ function TerminalView({
     };
     // 贴图：剪贴板里若是图片，存成临时文件并把路径插入输入框（claude 用 Read 工具读图）。
     // 返回 true=确实贴了图；false=不是图片(交给文字粘贴)。
+    // 图片粘贴：claude 在本内嵌 PTY 里无法靠 ^V 读系统剪贴板(实测无效，且它也不会把路径渲染成原生芯片)，
+    // 所以我们：①存临时文件并把【路径写进 claude 输入】(它据此读图，功能可用)；
+    //          ②在终端上方挂一个【我们自己的缩略图芯片】(可点击放大、可删除)，就是 IDE 那种预览。
+    // 返回 true=已按图片处理。
     const tryPasteImage = async (): Promise<boolean> => {
       try {
         if (!navigator.clipboard?.read) return false;
@@ -172,7 +222,8 @@ function TerminalView({
         for (const it of items) {
           const type = it.types.find((t) => t.startsWith("image/"));
           if (!type) continue;
-          const bytes = new Uint8Array(await (await it.getType(type)).arrayBuffer());
+          const blob = await it.getType(type);
+          const bytes = new Uint8Array(await blob.arrayBuffer());
           let bin = "";
           const CH = 0x8000;
           for (let i = 0; i < bytes.length; i += CH)
@@ -183,6 +234,15 @@ function TerminalView({
           const path = await invoke<string>("save_paste_image", { b64: btoa(bin), ext });
           const id = ptyIdRef.current;
           if (id && path) await invoke("pty_write", { id, data: path + " " });
+          // 缩略图芯片：blob URL 直接显示，量取自然尺寸
+          const url = URL.createObjectURL(blob);
+          const dim = await new Promise<{ w: number; h: number }>((res) => {
+            const im = new Image();
+            im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight });
+            im.onerror = () => res({ w: 0, h: 0 });
+            im.src = url;
+          });
+          addChip({ url, name: path.split(/[\\/]/).pop() || `image.${ext}`, w: dim.w, h: dim.h, path });
           return true;
         }
       } catch {
@@ -237,6 +297,20 @@ function TerminalView({
       const promptIdx = (texts[promptRow] ?? "").search(/[❯>]/); // 提示符前缀是 ASCII，索引==列号
       const startCol = startRow === promptRow ? promptIdx + 2 : 0;
       return { buf, top, startRow, endRow, promptRow, startCol };
+    };
+
+    // 量取"贴着输入框上方"应有的底部偏移(px)：从面板底到输入框顶的距离。识别不到则给个稳妥默认值。
+    measureRef.current = (): number => {
+      try {
+        const reg = detectInputRegion();
+        const host = hostRef.current;
+        if (!reg || !host || !term.rows) return 64;
+        const cellH = (host.clientHeight - 12) / term.rows; // 减去 terminal-host 上下 padding(6+6)
+        const rowsBelowTop = term.rows - reg.startRow + 1; // +1：落在输入框顶部横杠的上方
+        return Math.max(26, Math.round(rowsBelowTop * cellH) + 4);
+      } catch {
+        return 64;
+      }
     };
 
     const selectInputBox = (): boolean => {
@@ -379,6 +453,12 @@ function TerminalView({
         if (id) invoke("pty_write", { id, data: "\x1b\r" }).catch(() => {});
         return false;
       }
+      // 普通回车=提交：路径已随消息发给 claude，缩略图芯片已完成使命 → 清空（仍放行回车给 claude）
+      // 排除输入法组词中的回车(确认候选，不是提交)
+      if (e.key === "Enter" && !e.shiftKey && !ctrl && !e.isComposing) {
+        if (chipsRef.current.length) clearChipsRef.current();
+        return true;
+      }
       return true;
     });
 
@@ -407,25 +487,42 @@ function TerminalView({
         /* 私有 API 变动则静默退化 */
       }
     };
+    // 失焦/最小化回来后重新锚定 IME：blur/focus 一轮逼 Chromium 把光标矩形重发给系统输入法
+    // （否则它退回屏幕角落，候选框跑到外面）。只在本终端激活、且没有别的输入框抢焦点时做，避免抢焦。
+    const reanchorIme = () => {
+      if (!activeRef.current) return;
+      const ta = term.textarea;
+      if (!ta) return;
+      const ae = document.activeElement;
+      if (ae && ae !== ta && ae !== document.body) return; // 别从 Inspector 等输入框抢焦点
+      syncImeAnchor();
+      ta.blur();
+      ta.focus();
+      syncImeAnchor();
+    };
+    // 重获焦点后焦点/布局/IME 上下文需要时间稳定 → 多打几拍兜住（单次 rAF 常常太早）
     const onWinFocus = () => {
-      requestAnimationFrame(() => {
-        syncImeAnchor();
-        if (activeRef.current) {
-          const ta = term.textarea;
-          if (ta && document.activeElement === ta) {
-            ta.blur(); // blur/focus 一轮让 Chromium 重发光标矩形给系统输入法
-            ta.focus();
-          } else if (ta) {
-            term.focus();
-          }
-        }
-      });
+      if (!activeRef.current) return;
+      requestAnimationFrame(reanchorIme);
+      window.setTimeout(reanchorIme, 90);
+      window.setTimeout(reanchorIme, 300);
     };
     const onVisibility = () => {
       if (!document.hidden) onWinFocus();
     };
     window.addEventListener("focus", onWinFocus);
     document.addEventListener("visibilitychange", onVisibility);
+    // Tauri 窗口焦点事件：WebView2 在最小化/还原、跨窗口切换时 DOM 的 focus 不一定可靠，这条更稳
+    let unlistenTauriFocus: UnlistenFn | undefined;
+    void getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (focused) onWinFocus();
+      })
+      .then((un) => {
+        if (disposed) un();
+        else unlistenTauriFocus = un;
+      })
+      .catch(() => {});
     const onImeKeydown = (ev: KeyboardEvent) => {
       if (ev.keyCode === 229) syncImeAnchor();
     };
@@ -579,6 +676,7 @@ function TerminalView({
       window.removeEventListener("resize", onResize);
       window.removeEventListener("focus", onWinFocus);
       document.removeEventListener("visibilitychange", onVisibility);
+      unlistenTauriFocus?.();
       term.textarea?.removeEventListener("keydown", onImeKeydown, true);
       host.removeEventListener("contextmenu", onContextMenu);
       try {
@@ -721,6 +819,41 @@ function TerminalView({
         </div>
       )}
       <div className="terminal-host" ref={hostRef} />
+      {imgChips.length > 0 && (
+        <div className="term-img-chips" style={{ bottom: chipBottom }}>
+          {imgChips.map((c, i) => (
+            <button
+              className="term-img-chip"
+              key={i}
+              title={`${c.name}  ${c.w}×${c.h} · 点击放大`}
+              onClick={() => setZoomChip(c)}
+            >
+              <img src={c.url} alt="" />
+              <span className="tic-meta">
+                <span className="tic-name">{c.name}</span>
+                <span className="tic-dim">
+                  {c.w}×{c.h}
+                </span>
+              </span>
+              <span
+                className="tic-x"
+                title="移除预览（不影响已粘进输入的路径）"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeChip(i);
+                }}
+              >
+                ×
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {zoomChip && (
+        <div className="term-img-zoom" onClick={() => setZoomChip(null)} title="点击任意处关闭">
+          <img src={zoomChip.url} alt={zoomChip.name} />
+        </div>
+      )}
     </div>
   );
 }
