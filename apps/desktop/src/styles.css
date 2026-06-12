@@ -212,6 +212,10 @@ button.primary {
   gap: 5px;
   white-space: nowrap;
 }
+.sb-saved {
+  color: #57c66a !important; /* 自动保存后短暂变绿"已保存 ✓" */
+  transition: color 0.2s;
+}
 .sb-item.dim {
   opacity: 0.55;
 }

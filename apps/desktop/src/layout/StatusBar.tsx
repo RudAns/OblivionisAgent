@@ -3,10 +3,12 @@ interface Props {
   sessionCount: number;
   openTerminals: number;
   activeLabel: string | null;
+  /** 刚自动保存过 → 短暂显示"已保存 ✓" */
+  saved?: boolean;
 }
 
 /** 底部状态栏（参考专业 IDE）：后台服务状态、会话统计、当前终端、自动保存提示 */
-export function StatusBar({ bridgeUp, sessionCount, openTerminals, activeLabel }: Props) {
+export function StatusBar({ bridgeUp, sessionCount, openTerminals, activeLabel, saved }: Props) {
   return (
     <footer className="statusbar">
       <span
@@ -25,7 +27,7 @@ export function StatusBar({ bridgeUp, sessionCount, openTerminals, activeLabel }
       <span className="sb-item" title="画布上的 Claude 会话节点数 / 已打开的终端数">
         会话 {sessionCount} · 终端 {openTerminals}
       </span>
-      <span className="sb-item dim">改动自动保存</span>
+      <span className={`sb-item dim ${saved ? "sb-saved" : ""}`}>{saved ? "已保存 ✓" : "改动自动保存"}</span>
       <span className="sb-item dim">v0.1.0</span>
     </footer>
   );

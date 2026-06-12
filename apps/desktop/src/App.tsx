@@ -192,6 +192,13 @@ function Inner() {
   const graphInit = useRef(false);
   const configRef = useRef<OblivionisConfig | null>(null);
   const lastSavedSig = useRef<string | null>(null);
+  const [savedFlash, setSavedFlash] = useState(false); // 自动保存后状态栏闪一下"已保存 ✓"
+  const savedTimer = useRef<number | undefined>(undefined);
+  const flashSaved = useCallback(() => {
+    setSavedFlash(true);
+    window.clearTimeout(savedTimer.current);
+    savedTimer.current = window.setTimeout(() => setSavedFlash(false), 1600);
+  }, []);
   // 每个会话节点的"专属终端会话 id"：避免去 resume 正在用的开发/访客会话(否则报 already in use)
   const termIds = useRef<Map<string, string>>(new Map());
 
@@ -325,6 +332,7 @@ function Inner() {
     const t = window.setTimeout(() => {
       lastSavedSig.current = sig;
       client.send({ type: "set-config", config: { ...configRef.current!, graph } });
+      flashSaved();
     }, 800);
     return () => window.clearTimeout(t);
   }, [nodes, edges, client]);
@@ -850,6 +858,7 @@ function Inner() {
             ? ((nodes.find((n) => n.id === activeTerminalId)?.data as { label?: string })?.label ?? null)
             : null
         }
+        saved={savedFlash}
       />
     </div>
   );
