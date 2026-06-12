@@ -178,7 +178,7 @@ export function FlowCanvas(props: Props) {
         variant={BackgroundVariant.Dots}
         gap={22}
         size={1.4}
-        color={props.theme === "light" ? "#d9d6cb" : "#2c323d"}
+        color={props.theme === "light" ? "#e4e0d8" : "#2c323d"}
       />
       <HelperLines horizontal={props.helperLines?.horizontal} vertical={props.helperLines?.vertical} />
       <ZoomIndicator />

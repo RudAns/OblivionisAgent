@@ -24,21 +24,22 @@
   --st-link: #6aa6ff;
 }
 :root[data-theme="light"] {
-  /* 浅色：按美术规范的四层表面层级(app/侧栏/工作区/卡片)，避免相邻几乎同色的米白堆叠 */
-  --bg: #f6f3ec; /* ① 应用背景 */
-  --frame: #f1eee6; /* ② 侧栏(图标栏/会话栏)/状态栏 */
-  --panel: #fbfaf7; /* ③ 主工作区(顶栏/面板/弹窗容器) */
+  /* 浅色：以参考图实测像素为准——整套表面去黄、调亮、向近白靠(品牌/节点色不动)。
+     旧值是用户书面规范的米黄(#F6F3EC 等)，但其参考图实际更白更冷，故按图重调。 */
+  --bg: #f2f0eb; /* ① 应用背景(图实测 ~#F4F2EE，略压一档留层次) */
+  --frame: #f5f3ef; /* ② 侧栏(图标栏/会话栏)/状态栏(图实测 #F7F6F3) */
+  --panel: #fbfaf7; /* ③ 主工作区(顶栏/面板/弹窗容器)(图实测 #FBFAF7，原样) */
   --card: #ffffff; /* ④ 卡片 */
   --input: #ffffff; /* ④ 输入框 */
-  --surface-2: #f1eee6; /* 抬升/recessed 面(节点头/标签页) */
-  --hover: #ece8de; /* hover 底(只改底色，不位移) */
-  --border: #ddd8cd;
+  --surface-2: #f1efea; /* 抬升/recessed 面(节点头/标签页)，去黄 */
+  --hover: #ebe8e2; /* hover 底(只改底色，不位移)，去黄 */
+  --border: #e4e0da; /* 更淡更冷的边框 */
   --text: #25231f; /* 主文字 */
   --muted: #777268; /* 次要文字 */
-  --accent: #d96745; /* 品牌色 */
+  --accent: #d96745; /* 品牌色(不动) */
   --term-bg: #f5f2ea; /* 终端暖纸色(用户说忽略) */
-  --scrollbar: #d6d1c5;
-  --scrollbar-hover: #c2bcae;
+  --scrollbar: #dad5cc;
+  --scrollbar-hover: #c6c0b6;
   --accent-rgb: 217, 103, 69; /* #d96745 */
   --overlay-rgb: 255, 255, 255;
   /* 浅色语义状态色(美术规范)：成功#2F8F5B / 警告#B7791F / 链接#4169C1，外加偏稳的红 */
@@ -65,15 +66,32 @@
   background: #ffe9a8;
   color: #5a4300;
 }
-/* 浅色画布底：比应用背景再亮一点点(美术稿 #F8F6F0) */
+/* 浅色画布底：按参考图实测近白(#FCFBF9) */
 :root[data-theme="light"] .react-flow {
-  background-color: #f8f6f0;
+  background-color: #fcfbf9;
 }
-/* 浅色下连线上的意图标签:橙字太淡、"＋意图"太隐——压深、提清晰 */
+/* 浅色：节点阴影压薄，贴近参考图扁平通透观感(深色那套黑重阴影在近白底会发灰发脏) */
+:root[data-theme="light"] .xnode {
+  box-shadow: 0 1px 2px rgba(60, 55, 45, 0.05);
+}
+:root[data-theme="light"] .xnode:hover {
+  box-shadow: 0 2px 7px rgba(60, 55, 45, 0.09);
+}
+:root[data-theme="light"] .xnode.selected {
+  box-shadow:
+    0 0 0 2px rgba(var(--accent-rgb), 0.22),
+    0 2px 7px rgba(60, 55, 45, 0.08);
+}
+/* 浅色下连线上的意图标签：用户要求去掉浅色底，做成无底/纯深字(跟参考图一致) */
 :root[data-theme="light"] .edge-badge.has-cond {
-  background: rgba(217, 119, 6, 0.13);
-  border-color: rgba(217, 119, 6, 0.5);
-  color: #9a5b00;
+  background: transparent;
+  border-color: transparent;
+  color: #25231f;
+}
+:root[data-theme="light"] .edge-badge.has-cond:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
 }
 :root[data-theme="light"] .edge-badge.no-cond {
   color: #8a8680;

@@ -1,4 +1,4 @@
-import { Handle, Position, useStore, useNodeId } from "@xyflow/react";
+import { Handle, Position, useNodeId } from "@xyflow/react";
 import { useContext, type ReactNode } from "react";
 import { NodeActionContext } from "../node-action-context.js";
 
@@ -26,20 +26,13 @@ export function NodeShell({
   hasSource?: boolean;
   children?: ReactNode;
 }) {
-  // LOD：缩小到 <70% 时只留标题/状态条，不再画元数据(否则文字糊成一片)
-  const zoom = useStore((s) => s.transform[2]);
-  const lod = zoom < 0.7;
-  // hover 快捷操作：复制 / 删除，缩太小(LOD)时不画，免得糊成一团
+  // hover 快捷操作：复制 / 删除
   const id = useNodeId();
   const { copyNode, deleteNode } = useContext(NodeActionContext);
   return (
-    <div
-      className={`xnode xnode-${kind} ${selected ? "selected" : ""} ${status ? `xn-${status}` : ""} ${
-        lod ? "xn-lod" : ""
-      }`}
-    >
+    <div className={`xnode xnode-${kind} ${selected ? "selected" : ""} ${status ? `xn-${status}` : ""}`}>
       {hasTarget && <Handle type="target" position={Position.Left} />}
-      {!lod && id && (
+      {id && (
         <div className="xnode-actions">
           <button
             className="xn-act"
@@ -70,7 +63,7 @@ export function NodeShell({
         </span>
         {status && <span className={`xnode-dot status-${status}`} title={status} />}
       </div>
-      {!lod && children && <div className="xnode-body">{children}</div>}
+      {children && <div className="xnode-body">{children}</div>}
       {hasSource && <Handle type="source" position={Position.Right} />}
     </div>
   );
