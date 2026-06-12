@@ -5,6 +5,10 @@ interface Props {
   selected: string | null;
   activeTerminalId: string | null;
   openedTerminals: string[];
+  /** 各会话终端是否在跑（输出活动）→ 绿色扫光 */
+  termRunning: Record<string, boolean>;
+  /** 完成但还没切过去看的会话 → 小旗红点 */
+  unseenDone: Record<string, boolean>;
   onSelect: (nodeId: string) => void;
   onOpenTerminal: (nodeId: string) => void;
   onAddSession: () => void;
@@ -22,6 +26,8 @@ export function SessionSidebar({
   selected,
   activeTerminalId,
   openedTerminals,
+  termRunning,
+  unseenDone,
   onSelect,
   onOpenTerminal,
   onAddSession,
@@ -39,18 +45,24 @@ export function SessionSidebar({
         {claudeNodes.map((n) => {
           const d = n.data as { label?: string; cwd?: string; status?: string };
           const open = openedTerminals.includes(n.id);
+          const forkRun = d.status === "running"; // 飞书 fork 正在处理
+          const termRun = !!termRunning[n.id]; // 终端正在跑
+          // 扫光：两个都跑=彩色光，仅 fork=蓝，仅终端=绿
+          const sweep = forkRun && termRun ? "sweep-rainbow" : forkRun ? "sweep-fork" : termRun ? "sweep-term" : "";
+          const done = !!unseenDone[n.id];
           return (
             <div
               key={n.id}
               className={`rail-card ${activeTerminalId === n.id ? "active" : ""} ${
                 selected === n.id && activeTerminalId !== n.id ? "sel" : ""
-              }`}
+              } ${sweep}`}
               title={`${d.cwd || ""}\n单击=打开/聚焦开发终端 · 💬=看访客转录`}
               onClick={() => onOpenTerminal(n.id)}
             >
               <div className="rail-card-top">
                 <span className={`rail-dot status-${d.status ?? "idle"}`} />
                 <span className="rail-label">{d.label || "会话"}</span>
+                {done && <span className="rail-flag" title="有已完成的回复，还没查看" />}
                 {open && (
                   <span className="rail-open" title="终端已打开">
                     ▮

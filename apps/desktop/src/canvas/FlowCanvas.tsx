@@ -30,6 +30,7 @@ import { ConditionEdge } from "./edges/ConditionEdge.js";
 import { HelperLines } from "./HelperLines.js";
 import { ZoomIndicator } from "./ZoomIndicator.js";
 import { EdgeActionContext } from "./edge-context.js";
+import { EdgeRuntimeContext } from "./edge-runtime-context.js";
 
 interface Props {
   nodes: Node[];
@@ -50,6 +51,8 @@ interface Props {
   onPaneContextMenu: (e: MouseEvent | ReactMouseEvent) => void;
   /** 拖动时的对齐参考线坐标（画布坐标系），无对齐则两者为 undefined */
   helperLines?: { horizontal?: number; vertical?: number };
+  /** 运行时高亮的连线 id 集合（流线动画） */
+  activeEdges: Set<string>;
 }
 
 const edgeTypes = { default: ConditionEdge };
@@ -115,8 +118,11 @@ export function FlowCanvas(props: Props) {
     [kindById],
   );
 
+  const runtimeValue = useMemo(() => ({ activeEdges: props.activeEdges }), [props.activeEdges]);
+
   return (
     <EdgeActionContext.Provider value={{ editEdge: props.onEditEdge, deleteEdge: props.onDeleteEdge }}>
+    <EdgeRuntimeContext.Provider value={runtimeValue}>
     <ReactFlow
       nodes={props.nodes}
       edges={props.edges}
@@ -169,6 +175,7 @@ export function FlowCanvas(props: Props) {
         </div>
       )}
     </ReactFlow>
+    </EdgeRuntimeContext.Provider>
     </EdgeActionContext.Provider>
   );
 }

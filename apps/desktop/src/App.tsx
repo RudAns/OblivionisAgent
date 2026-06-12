@@ -227,12 +227,15 @@ function Inner() {
   }, []);
   const [openedTerminals, setOpenedTerminals] = useState<string[]>([]); // 已打开(保活)的会话节点 id
   const [activeTerminal, setActiveTerminal] = useState<string | null>(null); // 当前显示的终端(独立状态)
+  const [termRunning, setTermRunning] = useState<Record<string, boolean>>({}); // 各会话终端是否在跑(输出活动)
+  const [unseenDone, setUnseenDone] = useState<Record<string, boolean>>({}); // 完成但用户还没切过去看 → 红点
   const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
   const eventsRef = useRef<Record<string, ClaudeStreamEvent[]>>({});
   const [, forceRender] = useState(0);
   const statusRef = useRef<Record<string, string>>({});
+  const activeTermRef = useRef<string | null>(null); // 当前在看的终端(供 WS 回调判断要不要点红点)
   const graphInit = useRef(false);
   const configRef = useRef<OblivionisConfig | null>(null);
   const lastSavedSig = useRef<string | null>(null);
@@ -297,7 +300,12 @@ function Inner() {
           break;
         }
         case "session-status": {
+          const prev = statusRef.current[msg.nodeId];
           statusRef.current[msg.nodeId] = msg.status;
+          // 飞书 fork 跑完(running→非running)而我没在看这个会话 → 点完成红点
+          if (prev === "running" && msg.status !== "running" && activeTermRef.current !== msg.nodeId) {
+            setUnseenDone((m) => (m[msg.nodeId] ? m : { ...m, [msg.nodeId]: true }));
+          }
           setNodes((cur) =>
             cur.map((nd) =>
               nd.id === msg.nodeId ? { ...nd, data: { ...nd.data, status: msg.status } } : nd,
@@ -725,6 +733,12 @@ function Inner() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  // 切到某会话(显示其终端)时：记录"在看谁"，并清掉它的完成红点
+  useEffect(() => {
+    activeTermRef.current = activeTerminal;
+    if (activeTerminal) setUnseenDone((m) => (m[activeTerminal] ? { ...m, [activeTerminal]: false } : m));
+  }, [activeTerminal]);
+
   // 打开(保活)某会话节点的终端并切到终端标签（画布双击 / 折叠菜单双击共用）
   const openTerminalForNode = useCallback((nodeId: string) => {
     if (!termIds.current.has(nodeId)) termIds.current.set(nodeId, crypto.randomUUID());
@@ -864,6 +878,34 @@ function Inner() {
   const selectedNode = nodes.find((n) => n.id === selected) ?? null;
   const selectedIsClaude = selectedNode?.type === "claude-session";
   const multiSelectCount = nodes.reduce((a, n) => a + (n.selected ? 1 : 0), 0);
+
+  // 运行时高亮：从所有 running 节点沿入边回溯，标记整条上游链路上的连线 → 放流线动画
+  const activeEdgeIds = useMemo(() => {
+    const runningIds = nodes
+      .filter((n) => (n.data as { status?: string } | undefined)?.status === "running")
+      .map((n) => n.id);
+    if (runningIds.length === 0) return new Set<string>();
+    const incoming = new Map<string, Edge[]>();
+    for (const e of edges) {
+      const arr = incoming.get(e.target);
+      if (arr) arr.push(e);
+      else incoming.set(e.target, [e]);
+    }
+    const active = new Set<string>();
+    const visited = new Set<string>(runningIds);
+    const frontier = [...runningIds];
+    while (frontier.length) {
+      const cur = frontier.pop()!;
+      for (const e of incoming.get(cur) ?? []) {
+        active.add(e.id);
+        if (!visited.has(e.source)) {
+          visited.add(e.source);
+          frontier.push(e.source);
+        }
+      }
+    }
+    return active;
+  }, [nodes, edges]);
 
   // 折叠菜单用：画布上所有 Claude 会话节点（单击选择看转录·访客会话 / 双击打开开发终端）
   const claudeNodes = nodes.filter((n) => n.type === "claude-session");
@@ -1014,6 +1056,8 @@ function Inner() {
           selected={selected}
           activeTerminalId={activeTerminalId}
           openedTerminals={openedTerminals}
+          termRunning={termRunning}
+          unseenDone={unseenDone}
           onSelect={(id) => {
             setSelected(id);
             setTab("transcript");
@@ -1047,6 +1091,7 @@ function Inner() {
             onEdgeContextMenu={onEdgeContextMenu}
             onPaneContextMenu={onPaneContextMenu}
             helperLines={helperLines}
+            activeEdges={activeEdgeIds}
           />
 
           {/* 多选(≥2)时浮出对齐/分布工具条 */}
@@ -1232,6 +1277,9 @@ function Inner() {
                   setOpenedTerminals((o) => o.filter((x) => x !== id));
                   setActiveTerminal((a) => (a === id ? null : a));
                 }}
+                onActivity={(id, r) =>
+                  setTermRunning((m) => (m[id] === r ? m : { ...m, [id]: r }))
+                }
               />
             </div>
             {tab === "audit" && (

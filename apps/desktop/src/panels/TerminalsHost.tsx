@@ -49,15 +49,22 @@ function TerminalView({
   info,
   active,
   repaintTick,
+  onActivity,
 }: {
   info: TermInfo;
   active: boolean;
   repaintTick: number;
+  /** 终端有输出=正在运行，停 700ms=空闲。用于侧栏「扫光」与完成红点 */
+  onActivity?: (running: boolean) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const ptyIdRef = useRef<string | null>(null);
+  const onActivityRef = useRef(onActivity);
+  onActivityRef.current = onActivity;
+  const actReportRef = useRef(false);
+  const actTimerRef = useRef<number | undefined>(undefined);
   const searchRef = useRef<SearchAddon | null>(null);
   /** PTY resize 的统一入口（带尺寸比对 + 清缓冲迎接 ConPTY 重放），供激活/重绘 effect 使用 */
   const ptySizeRef = useRef<{ send: (c: number, r: number) => void; seed: (c: number, r: number) => void } | null>(
@@ -597,6 +604,18 @@ function TerminalView({
       },
     });
 
+    // 输出活动 → running：有数据就标记运行中，停 700ms 判定空闲（只在状态翻转时上报）
+    const reportActive = (v: boolean) => {
+      if (actReportRef.current === v) return;
+      actReportRef.current = v;
+      onActivityRef.current?.(v);
+    };
+    const bumpActivity = () => {
+      reportActive(true);
+      if (actTimerRef.current) window.clearTimeout(actTimerRef.current);
+      actTimerRef.current = window.setTimeout(() => reportActive(false), 700);
+    };
+
     (async () => {
       // 关键：pty_open 返回前 ptyId 还是 null，而 --resume 时 claude 一启动就猛吐历史。
       // 这些早到的输出先缓存，拿到 ptyId 后再回放，否则历史会被直接丢弃（=终端只剩头部那行）。
@@ -608,7 +627,10 @@ function TerminalView({
             earlyBuffer.push(e.payload);
             return;
           }
-          if (e.payload.id === ptyId) term.write(e.payload.data);
+          if (e.payload.id === ptyId) {
+            term.write(e.payload.data);
+            bumpActivity();
+          }
         }),
       );
       unlisteners.push(
@@ -616,6 +638,7 @@ function TerminalView({
           // ptyId 已知就按 id 匹配；还没拿到 id 就退出=秒退，也照样提示
           if (ptyId === null || e.payload.id === ptyId) {
             exited = true;
+            reportActive(false);
             term.writeln("\r\n\x1b[90m[进程已退出]\x1b[0m");
           }
         }),
@@ -699,6 +722,8 @@ function TerminalView({
     return () => {
       disposed = true;
       if (resizeTimer !== undefined) window.clearTimeout(resizeTimer);
+      if (actTimerRef.current) window.clearTimeout(actTimerRef.current);
+      onActivityRef.current?.(false);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("focus", onWinFocus);
       document.removeEventListener("visibilitychange", onVisibility);
@@ -892,14 +917,19 @@ export function TerminalsHost({
   activeId,
   onActivate,
   onClose,
+  onActivity,
 }: {
   terminals: TermInfo[];
   activeId: string | null;
   onActivate: (nodeId: string) => void;
   onClose: (nodeId: string) => void;
+  /** 某终端运行/空闲变化 → 上抛给 App 驱动侧栏扫光与完成红点 */
+  onActivity?: (nodeId: string, running: boolean) => void;
 }) {
   // 手动重绘信号：点按钮 +1，当前激活的终端做一次高度抖动让 claude 整屏重画
   const [repaintTick, setRepaintTick] = useState(0);
+  // 各终端是否正在运行（输出活动），用于给标签页加扫光
+  const [running, setRunning] = useState<Record<string, boolean>>({});
   if (!inTauri()) return <div className="panel-empty">真实终端仅在桌面应用中可用（浏览器开发版不支持）。</div>;
   if (terminals.length === 0)
     return (
@@ -913,7 +943,7 @@ export function TerminalsHost({
         {terminals.map((t) => (
           <div
             key={t.nodeId}
-            className={`term-tab ${t.nodeId === activeId ? "on" : ""}`}
+            className={`term-tab ${t.nodeId === activeId ? "on" : ""} ${running[t.nodeId] ? "term-busy" : ""}`}
             onClick={() => onActivate(t.nodeId)}
             title={t.cwd || t.nodeId}
           >
@@ -945,6 +975,10 @@ export function TerminalsHost({
             info={t}
             active={t.nodeId === activeId}
             repaintTick={t.nodeId === activeId ? repaintTick : 0}
+            onActivity={(r) => {
+              setRunning((m) => (m[t.nodeId] === r ? m : { ...m, [t.nodeId]: r }));
+              onActivity?.(t.nodeId, r);
+            }}
           />
         ))}
       </div>

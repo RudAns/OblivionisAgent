@@ -1,6 +1,7 @@
 import { useContext, useRef, useState } from "react";
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, useStore, type EdgeProps } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from "@xyflow/react";
 import { EdgeActionContext } from "../edge-context.js";
+import { EdgeRuntimeContext } from "../edge-runtime-context.js";
 
 /**
  * 带「意图条件徽标」+ hover 工具的连线：
@@ -16,7 +17,6 @@ export function ConditionEdge({
   targetY,
   sourcePosition,
   targetPosition,
-  target,
   markerEnd,
   style,
   data,
@@ -47,18 +47,16 @@ export function ConditionEdge({
     clearT.current = window.setTimeout(() => setHovered(false), 60);
   };
 
-  // 目标会话正在处理(running)时，让这条入边流动起来，直观看到"消息正流向哪个会话"
-  const targetRunning = useStore((s) => {
-    const n = s.nodeLookup.get(target);
-    return (n?.data as { status?: string } | undefined)?.status === "running";
-  });
+  // 运行时：该连线在"正被处理的链路"上时整条流动起来（上游回溯，见 EdgeRuntimeContext）
+  const { activeEdges } = useContext(EdgeRuntimeContext);
+  const flowing = activeEdges.has(id);
 
   const active = hovered || selected;
   const showBadge = !!cond || conditional;
   const mergedStyle = active
     ? { ...style, stroke: "#7aa2ff", strokeWidth: 2.6 }
-    : targetRunning
-      ? { ...style, stroke: "#4f8cff" }
+    : flowing
+      ? { ...style, stroke: "#4f8cff", strokeWidth: 2.4 }
       : style;
 
   return (
@@ -69,7 +67,7 @@ export function ConditionEdge({
         markerEnd={markerEnd}
         style={mergedStyle}
         interactionWidth={0}
-        className={targetRunning ? "edge-flow" : undefined}
+        className={flowing ? "edge-flow" : undefined}
       />
       {/* 透明加宽路径：扩大 hover/点击命中区 */}
       <path

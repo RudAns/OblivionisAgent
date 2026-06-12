@@ -778,6 +778,101 @@ button.primary {
   font-size: 10px;
   flex-shrink: 0;
 }
+
+/* ===== 运行时扫光（会话卡片）：fork 跑=蓝，终端跑=绿，两个都跑=彩色 ===== */
+.rail-card.sweep-fork,
+.rail-card.sweep-term,
+.rail-card.sweep-rainbow {
+  position: relative;
+  overflow: hidden;
+}
+.rail-card.sweep-fork {
+  border-color: rgba(79, 140, 255, 0.65);
+}
+.rail-card.sweep-term {
+  border-color: rgba(87, 198, 106, 0.6);
+  border-left-color: #57c66a;
+}
+.rail-card.sweep-rainbow {
+  border-color: rgba(180, 130, 240, 0.7);
+}
+.rail-card.sweep-fork::after,
+.rail-card.sweep-term::after,
+.rail-card.sweep-rainbow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  animation: rail-sweep 1.9s linear infinite;
+  background: linear-gradient(100deg, transparent 40%, rgba(120, 170, 255, 0.5) 50%, transparent 60%);
+}
+.rail-card.sweep-term::after {
+  background: linear-gradient(100deg, transparent 40%, rgba(120, 230, 150, 0.45) 50%, transparent 60%);
+}
+.rail-card.sweep-rainbow::after {
+  background: linear-gradient(
+    100deg,
+    transparent 34%,
+    rgba(255, 90, 90, 0.5) 44%,
+    rgba(255, 210, 90, 0.5) 50%,
+    rgba(90, 200, 120, 0.5) 56%,
+    rgba(90, 160, 255, 0.5) 62%,
+    transparent 72%
+  );
+}
+@keyframes rail-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* 完成红点（小旗）：跑完但还没切过去看 */
+.rail-flag {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  flex-shrink: 0;
+  animation: flag-pulse 1.6s ease-in-out infinite;
+}
+@keyframes flag-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 77, 79, 0);
+  }
+}
+
+/* 终端标签运行时扫光（绿） */
+.term-tab.term-busy {
+  position: relative;
+  overflow: hidden;
+}
+.term-tab.term-busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  animation: rail-sweep 1.6s linear infinite;
+  background: linear-gradient(100deg, transparent 42%, rgba(120, 230, 150, 0.38) 50%, transparent 58%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-card.sweep-fork::after,
+  .rail-card.sweep-term::after,
+  .rail-card.sweep-rainbow::after,
+  .term-tab.term-busy::after {
+    animation: none;
+    opacity: 0.25;
+  }
+  .rail-flag {
+    animation: none;
+  }
+}
 /* 访客转录小按钮（少用功能，常态淡显、悬停高亮）。单击卡片本身=打开终端，这个只在想看访客转录时点 */
 .rail-transcript {
   padding: 1px 5px;
@@ -869,6 +964,38 @@ button.primary {
   box-shadow:
     0 0 0 2px color-mix(in srgb, var(--nc) 45%, transparent),
     0 7px 22px rgba(0, 0, 0, 0.5);
+}
+/* 运行时：running 节点呼吸光晕(蓝)，error 节点红描边 —— 运行调试视图既视感 */
+.xnode.xn-running {
+  border-color: #4f8cff;
+  animation: xn-pulse 1.4s ease-in-out infinite;
+}
+@keyframes xn-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(79, 140, 255, 0.55),
+      0 0 8px rgba(79, 140, 255, 0.28),
+      0 7px 22px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(79, 140, 255, 0.85),
+      0 0 22px rgba(79, 140, 255, 0.55),
+      0 7px 22px rgba(0, 0, 0, 0.5);
+  }
+}
+.xnode.xn-error {
+  border-color: #e5544b;
+  box-shadow:
+    0 0 0 1.5px rgba(229, 84, 75, 0.6),
+    0 0 14px rgba(229, 84, 75, 0.35),
+    0 7px 22px rgba(0, 0, 0, 0.5);
+}
+@media (prefers-reduced-motion: reduce) {
+  .xnode.xn-running {
+    animation: none;
+  }
 }
 .xnode-head {
   display: flex;

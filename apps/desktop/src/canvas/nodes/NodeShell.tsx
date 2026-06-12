@@ -26,7 +26,7 @@ export function NodeShell({
   children?: ReactNode;
 }) {
   return (
-    <div className={`xnode xnode-${kind} ${selected ? "selected" : ""}`}>
+    <div className={`xnode xnode-${kind} ${selected ? "selected" : ""} ${status ? `xn-${status}` : ""}`}>
       {hasTarget && <Handle type="target" position={Position.Left} />}
       <div className="xnode-head">
         <span className="xnode-icon">{icon}</span>
