@@ -1061,6 +1061,37 @@ button.primary {
 .react-flow__connection-path {
   stroke: var(--accent);
   stroke-width: 2.4;
+  stroke-dasharray: 7 4;
+}
+
+/* ---- 控件 / 小地图：统一到暗色面板风格（专业软件的一致感）---- */
+.react-flow__controls {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.42);
+}
+.react-flow__controls-button {
+  width: 26px;
+  height: 26px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+.react-flow__controls-button:hover {
+  background: #262b33;
+  color: var(--text);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+  max-width: 13px;
+  max-height: 13px;
+}
+.react-flow__minimap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.42);
 }
 
 /* 空画布引导（专业软件该有的空状态） */
