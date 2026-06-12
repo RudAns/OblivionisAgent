@@ -823,11 +823,13 @@ function TerminalView({
       });
       if (ptyId) invoke("pty_close", { id: ptyId }).catch(() => {});
       try {
-        webgl?.dispose();
+        // 销毁当前渲染器（可能已被 reloadWebgl 换过，以 ref 为准）
+        (webglRef.current ?? webgl)?.dispose();
       } catch {
         /* ignore */
       }
       webgl = null;
+      webglRef.current = null;
       try {
         term.dispose();
       } catch {
@@ -838,22 +840,49 @@ function TerminalView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 切换深/浅主题：整套替换 xterm 配色。WebGL 渲染器会缓存旧底色的字形图集，必须
-  // clearTextureAtlas() 再 refresh，否则残留旧色/花屏。
-  // ⚠️ 但对【隐藏(display:none，0 尺寸)】的终端 clearTextureAtlas 会把图集搞坏，切回来就乱码——
-  // 所以隐藏的只更新 theme 并记"脏"，等它变可见时(下面的可见 effect)再清图集重画。
+  // 重载 WebGL 渲染器：dispose 旧的 + 新建一个。锁定的 xterm/webgl beta 里，单改 options.theme
+  // 不会让 WebGL 整屏按新主题重画(底色/已绘内容还是旧的)，重载渲染器才彻底生效——等价于"重开终端"。
+  const reloadWebgl = () => {
+    const t = termRef.current;
+    if (!t) return;
+    try {
+      webglRef.current?.dispose();
+    } catch {
+      /* ignore */
+    }
+    webglRef.current = null;
+    try {
+      const wgl = new WebglAddon({ customGlyphs: false });
+      wgl.onContextLoss(() => {
+        try {
+          wgl.dispose();
+        } catch {
+          /* ignore */
+        }
+        webglRef.current = null;
+      });
+      t.loadAddon(wgl);
+      webglRef.current = wgl;
+    } catch {
+      webglRef.current = null; // WebGL 不可用 → DOM 渲染器(options.theme 已直接生效)
+    }
+    try {
+      t.refresh(0, t.rows - 1);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // 切换深/浅主题：替换 xterm 配色 + 重载渲染器整屏重画。
+  // ⚠️ 对【隐藏(display:none，0 尺寸)】的终端不能重载(会花屏)——只更新 theme 并记"脏"，
+  // 等它变可见时(下面的可见 effect)再重载。
   const themeDirtyRef = useRef(false);
   useEffect(() => {
     const t = termRef.current;
     if (!t) return;
     t.options.theme = termTheme(theme);
     if (active) {
-      try {
-        webglRef.current?.clearTextureAtlas();
-        t.refresh(0, t.rows - 1);
-      } catch {
-        /* ignore */
-      }
+      reloadWebgl();
       themeDirtyRef.current = false;
     } else {
       themeDirtyRef.current = true;
@@ -880,19 +909,16 @@ function TerminalView({
       }
       // 统一入口：尺寸真变了才会发(内部比对)，且发前清缓冲迎接 ConPTY 重放
       ptySizeRef.current?.send(t.cols, t.rows);
-      // 隐藏期间切过主题(themeDirty)：此刻可见了，安全地清图集再重画，避免乱码
+      // 隐藏期间切过主题(themeDirty)：此刻可见了，重载渲染器整屏按新主题重画(避免残留旧色/花屏)
       if (themeDirtyRef.current) {
+        themeDirtyRef.current = false;
+        reloadWebgl();
+      } else {
         try {
-          webglRef.current?.clearTextureAtlas();
+          t.refresh(0, t.rows - 1);
         } catch {
           /* ignore */
         }
-        themeDirtyRef.current = false;
-      }
-      try {
-        t.refresh(0, t.rows - 1);
-      } catch {
-        /* ignore */
       }
       t.focus();
     }, 30);
