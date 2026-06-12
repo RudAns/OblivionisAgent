@@ -26,6 +26,8 @@ import { ClaudeSessionNode } from "./nodes/ClaudeSessionNode.js";
 import { CronNode } from "./nodes/CronNode.js";
 import { WebhookNode } from "./nodes/WebhookNode.js";
 import { SoulNode } from "./nodes/SoulNode.js";
+import { ConditionEdge } from "./edges/ConditionEdge.js";
+import { EdgeActionContext } from "./edge-context.js";
 
 interface Props {
   nodes: Node[];
@@ -36,8 +38,12 @@ interface Props {
   onNodeClick: NodeMouseHandler;
   onNodeDoubleClick: NodeMouseHandler;
   onEdgeClick: EdgeMouseHandler;
+  /** 点连线上的"意图徽标"时打开条件编辑 */
+  onEditEdge: (id: string) => void;
   onPaneClick: () => void;
 }
+
+const edgeTypes = { default: ConditionEdge };
 
 // 劲道连线：贝塞尔曲线但收紧曲率(0.5)——出入口方向感强、中段绷直不软塌，配箭头收尾。
 // pathOptions 会被 ReactFlow 浅合并进每条边、由 BezierEdge 读取；类型定义没收录故断言。
@@ -101,10 +107,12 @@ export function FlowCanvas(props: Props) {
   );
 
   return (
+    <EdgeActionContext.Provider value={{ editEdge: props.onEditEdge }}>
     <ReactFlow
       nodes={props.nodes}
       edges={props.edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodesChange={props.onNodesChange}
       onEdgesChange={props.onEdgesChange}
       onConnect={props.onConnect}
@@ -147,5 +155,6 @@ export function FlowCanvas(props: Props) {
         </div>
       )}
     </ReactFlow>
+    </EdgeActionContext.Provider>
   );
 }

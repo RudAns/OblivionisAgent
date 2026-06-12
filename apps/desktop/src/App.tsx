@@ -100,14 +100,15 @@ function graphToRf(config: OblivionisConfig, status: Record<string, string>): {
     position: n.position,
     data: { ...n.data, label: n.label, status: status[n.id] ?? "idle" },
   }));
+  const kindOf = new Map(config.graph.nodes.map((n) => [n.id, n.kind] as const));
   const edges: Edge[] = config.graph.edges.map((e) => ({
     id: e.id,
     source: e.source,
     target: e.target,
     sourceHandle: e.sourceHandle ?? null,
     targetHandle: e.targetHandle ?? null, // 人格连到会话的「原始口/Fork口」靠它区分
-    label: e.condition || undefined,
-    data: { condition: e.condition },
+    // 条件不再用内置 label（改由 ConditionEdge 的可点徽标显示）；sourceKind 决定空条件时是否提示「＋意图」
+    data: { condition: e.condition, sourceKind: kindOf.get(e.source) },
   }));
   return { nodes, edges };
 }
@@ -656,6 +657,10 @@ function Inner() {
             onNodeClick={onNodeClick}
             onNodeDoubleClick={onNodeDoubleClick}
             onEdgeClick={onEdgeClick}
+            onEditEdge={(id) => {
+              setSelectedEdge(id);
+              setInspectorOpen(true);
+            }}
             onPaneClick={onPaneClick}
           />
 
