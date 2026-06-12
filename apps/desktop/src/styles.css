@@ -1040,9 +1040,10 @@ button.primary {
 }
 .rail-card.active {
   border-color: var(--border);
-  border-left-color: var(--accent); /* 当前会话:3px 品牌色左条 */
-  background: color-mix(in srgb, var(--accent) 9%, var(--card)); /* 浅橙底 */
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border-left-color: var(--accent); /* 当前会话:3px 品牌色左条——「有颜色」的就这一条 */
+  /* 白底为主，只留极淡暖意；不再整卡染橙(美术稿:左侧着色占比要小) */
+  background: color-mix(in srgb, var(--accent) 4%, var(--card));
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.1);
 }
 .rail-dot {
   width: 8px;
@@ -1301,8 +1302,9 @@ button.primary {
   overflow: hidden; /* 让带色头部的圆角跟随浮窗 */
 }
 .popup-inspector .popup-head {
-  background: color-mix(in srgb, var(--nc) 13%, var(--panel));
-  border-bottom: 1px solid color-mix(in srgb, var(--nc) 42%, var(--border));
+  /* 头部本身保持干净(不整条染色)，颜色只落在图标 chip + 一条细底线上，避免与正文配色打架 */
+  background: var(--panel);
+  border-bottom: 2px solid color-mix(in srgb, var(--nc) 45%, var(--border));
   color: var(--text);
   padding: 9px 11px;
 }
@@ -1741,18 +1743,25 @@ button.primary {
 }
 
 /* ---- 控件 / 小地图：统一到暗色面板风格（专业软件的一致感）---- */
+/* 右下角缩略图 + 控制条(参考美术稿)：干净白卡、软阴影；控制条横向 − / + / 适应视图 */
 .react-flow__controls {
+  display: flex;
+  flex-direction: row;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 11px;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.42);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
 }
 .react-flow__controls-button {
-  width: 26px;
-  height: 26px;
+  width: 34px;
+  height: 34px;
   background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  border: none;
+  border-right: 1px solid var(--border);
   color: var(--muted);
+}
+.react-flow__controls-button:last-child {
+  border-right: none;
 }
 .react-flow__controls-button:hover {
   background: var(--hover);
@@ -1760,14 +1769,16 @@ button.primary {
 }
 .react-flow__controls-button svg {
   fill: currentColor;
-  max-width: 13px;
-  max-height: 13px;
+  max-width: 15px;
+  max-height: 15px;
 }
 .react-flow__minimap {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.42);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+  /* 抬高，给下方横向控制条让位(两者都贴右下角) */
+  margin-bottom: 62px !important;
 }
 
 /* 空画布引导（专业软件该有的空状态） */
@@ -2150,34 +2161,39 @@ button.primary {
   height: 100%;
   min-height: 0;
 }
+/* 终端页签：做成浏览器页签样式——条带略凹、页签圆角朝上、活动页签顶部品牌色细条 */
 .term-tabs {
   display: flex;
-  gap: 4px;
-  padding: 5px 6px;
+  gap: 3px;
+  padding: 6px 8px 0;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
   flex-shrink: 0;
+  background: var(--frame);
 }
 .term-tab {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 6px 3px 9px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 11px;
+  gap: 6px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px 9px 0 0;
+  font-size: 11.5px;
   color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
 }
 .term-tab:hover {
-  border-color: var(--accent);
+  background: var(--hover);
+  color: var(--text);
 }
 .term-tab.on {
-  background: color-mix(in srgb, var(--accent) 14%, var(--card));
-  border-color: var(--accent);
+  background: var(--surface-2);
+  border-color: var(--border);
   color: var(--text);
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 .term-tab-label {
   max-width: 140px;

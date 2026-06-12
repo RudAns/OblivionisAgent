@@ -1682,7 +1682,8 @@ function Inner() {
 
         {/* 画布展开时隐藏面板(但保持挂载，终端不掉)；收起时面板占满 */}
         <aside className="side" style={canvasCollapsed ? { flex: 1, minWidth: 0 } : { display: "none" }}>
-          <div className="panel-title">{TAB_TITLE[tab]}</div>
+          {/* 终端有自己的页签条+信息栏，这里的顶部标题就会重复，故终端视图下不显示 */}
+          {tab !== "terminal" && <div className="panel-title">{TAB_TITLE[tab]}</div>}
 
           <div className="panel">
             {tab === "transcript" && (

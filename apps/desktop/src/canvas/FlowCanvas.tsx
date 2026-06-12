@@ -182,8 +182,8 @@ export function FlowCanvas(props: Props) {
       />
       <HelperLines horizontal={props.helperLines?.horizontal} vertical={props.helperLines?.vertical} />
       <ZoomIndicator />
-      {/* 缩放交给右上角带百分比的指示器，这里只保留 适应视图 / 交互锁，避免两处缩放重复 */}
-      <Controls showZoom={false} />
+      {/* 右下角控制条：− / + / 适应视图，做成干净的横向白条(去掉交互锁) */}
+      <Controls position="bottom-right" showInteractive={false} />
       <MiniMap
         pannable
         zoomable
@@ -191,7 +191,9 @@ export function FlowCanvas(props: Props) {
         nodeStrokeColor={miniMapNodeColor}
         nodeStrokeWidth={3}
         nodeBorderRadius={3}
-        maskColor={props.theme === "light" ? "rgba(180,178,166,0.45)" : "rgba(0,0,0,0.6)"}
+        maskColor={props.theme === "light" ? "rgba(214,210,200,0.28)" : "rgba(0,0,0,0.55)"}
+        maskStrokeColor="#d96745"
+        maskStrokeWidth={props.theme === "light" ? 2.5 : 2}
         style={{ backgroundColor: props.theme === "light" ? "#ffffff" : "#1b1e24" }}
       />
       {props.nodes.length === 0 && (
