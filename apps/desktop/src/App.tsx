@@ -1139,7 +1139,6 @@ function Inner() {
         <IconRail
           canvasOpen={!canvasCollapsed}
           tab={tab}
-          feishuOpen={feishuOpen}
           settingsOpen={settingsOpen}
           inboxBadge={pendingKnowledge}
           onAction={onRailAction}

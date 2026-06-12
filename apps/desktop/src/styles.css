@@ -1,6 +1,5 @@
 :root {
-  /* 深色（默认）。浅色见 [data-theme="light"]。Phase① 先让用变量的面切换，
-     硬编码色后续 Phase② 再逐步换成变量。 */
+  /* 深色（默认）。浅色见 [data-theme="light"]。多数面已用变量，切换即生效。 */
   --bg: #14161a;
   --panel: #1b1e24;
   --border: #2a2f37;
@@ -14,6 +13,8 @@
   --term-bg: #1b1e24; /* 终端背景（与 xterm JS 主题对应） */
   --scrollbar: #3a4250;
   --scrollbar-hover: #4a5567;
+  --input: #14171c; /* 输入框/凹陷井底 */
+  --surface-2: #1d2128; /* 抬升面：行 hover / 次级卡片 */
 }
 :root[data-theme="light"] {
   /* 浅色：参考 Claude 主页暖白 + 黏土橙 */
@@ -29,6 +30,21 @@
   --term-bg: #ffffff;
   --scrollbar: #cdcabf;
   --scrollbar-hover: #b5b2a6;
+  --input: #f3f1e8;
+  --surface-2: #f6f4ec;
+}
+/* 浅色下，几处"为深底调的亮色文字"在白底会糊，单独压暗 */
+:root[data-theme="light"] .log-inbound .log-text {
+  color: #0969da;
+}
+:root[data-theme="light"] .log-outbound .log-text {
+  color: #1a7f37;
+}
+:root[data-theme="light"] .lvl-warn .log-text {
+  color: #9a6700;
+}
+:root[data-theme="light"] .lvl-error .log-text {
+  color: #cf222e;
 }
 
 * {
@@ -124,7 +140,7 @@ button.primary {
   font-size: 12px;
 }
 .banner code {
-  background: #14171c;
+  background: var(--input);
   padding: 1px 6px;
   border-radius: 3px;
   color: #6fd3ff;
@@ -289,7 +305,7 @@ button.primary {
   padding: 3px 10px;
   border: 1px solid var(--border);
   border-radius: 7px;
-  background: #14171c;
+  background: var(--input);
   font-size: 11.5px;
   color: var(--muted);
   cursor: default;
@@ -785,7 +801,7 @@ button.primary {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #4a5567;
+  background: var(--scrollbar-hover);
 }
 .rail-dot.status-running {
   background: #ffb84d;
@@ -929,7 +945,7 @@ button.primary {
   flex-direction: column;
   /* 不透明背景（原来 0.97 + blur）：浮窗压在 WebGL 终端上时，backdrop-filter 会逼着
      GPU 每帧重采样终端画面 → 终端一直抖。改纯色去掉 blur，几乎无视觉差别。 */
-  background: #1b1e24;
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
@@ -939,12 +955,14 @@ button.primary {
   top: 12px;
   left: 408px;
 }
-/* 设置浮窗：放在左下角，靠近设置按钮 */
+/* 设置浮窗：固定在左下角设置按钮旁边（rail 宽 46px，紧贴其右） */
 .popup-settings {
+  position: fixed;
   top: auto;
-  bottom: 12px;
-  left: 12px;
+  bottom: 10px;
+  left: 52px;
   width: 280px;
+  z-index: 30;
 }
 .settings-label {
   font-size: 12px;
@@ -1022,7 +1040,7 @@ button.primary {
   transition: box-shadow 0.15s, border-color 0.15s, transform 0.08s;
 }
 .xnode:hover {
-  border-color: color-mix(in srgb, var(--nc) 65%, #2a2f37);
+  border-color: color-mix(in srgb, var(--nc) 65%, var(--border));
   box-shadow:
     0 7px 22px rgba(0, 0, 0, 0.5),
     0 0 14px color-mix(in srgb, var(--nc) 18%, transparent);
@@ -1035,7 +1053,7 @@ button.primary {
 }
 /* 运行时：running 节点呼吸光晕(蓝)，error 节点红描边 —— 运行调试视图既视感 */
 .xnode.xn-running {
-  border-color: #4f8cff;
+  border-color: var(--accent);
   animation: xn-pulse 1.4s ease-in-out infinite;
 }
 @keyframes xn-pulse {
@@ -1071,8 +1089,8 @@ button.primary {
   gap: 7px;
   padding: 7px 10px;
   border-radius: 8px 8px 0 0;
-  background: color-mix(in srgb, var(--nc) 14%, #1d2128);
-  border-bottom: 1px solid color-mix(in srgb, var(--nc) 30%, #2a2f37);
+  background: color-mix(in srgb, var(--nc) 14%, var(--surface-2));
+  border-bottom: 1px solid color-mix(in srgb, var(--nc) 30%, var(--border));
 }
 .xnode-icon {
   font-size: 13px;
@@ -1092,7 +1110,7 @@ button.primary {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #4a5567;
+  background: var(--scrollbar-hover);
   flex-shrink: 0;
 }
 .xnode-dot.status-running {
@@ -1120,7 +1138,7 @@ button.primary {
   opacity: 0.55;
 }
 .xr-k {
-  color: color-mix(in srgb, var(--nc) 75%, #8a93a0);
+  color: color-mix(in srgb, var(--nc) 75%, var(--muted));
   font-size: 10px;
   width: 34px;
   flex-shrink: 0;
@@ -1151,11 +1169,11 @@ button.primary {
   --nc: #e0b13e;
 }
 .xnode-claude {
-  --nc: #4f8cff;
+  --nc: var(--accent);
   min-width: 210px;
 }
 .xnode-claude .xnode-head {
-  background: color-mix(in srgb, var(--nc) 20%, #1d2128);
+  background: color-mix(in srgb, var(--nc) 20%, var(--surface-2));
 }
 .xnode-soul {
   --nc: #b083f0;
@@ -1164,7 +1182,7 @@ button.primary {
 .xnode-soul-hint {
   font-size: 11px;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--nc) 70%, #8a93a0);
+  color: color-mix(in srgb, var(--nc) 70%, var(--muted));
 }
 .xnode-soul-hint b {
   color: color-mix(in srgb, var(--nc) 85%, #fff);
@@ -1179,7 +1197,7 @@ button.primary {
   width: 9px;
   height: 9px;
   background: #b083f0;
-  border: 1.5px solid #1b1e24;
+  border: 1.5px solid var(--panel);
   top: -5px;
 }
 .xnode-claude .soul-port-label {
@@ -1201,7 +1219,7 @@ button.primary {
   padding: 3px 6px;
   border-radius: 5px;
   background: color-mix(in srgb, var(--nc) 12%, #161a20);
-  border: 1px dashed color-mix(in srgb, var(--nc) 40%, #2a2f37);
+  border: 1px dashed color-mix(in srgb, var(--nc) 40%, var(--border));
   font-size: 10.5px;
 }
 .session-fork-strip .sfs-tag {
@@ -1210,7 +1228,7 @@ button.primary {
   flex-shrink: 0;
 }
 .session-fork-strip .sfs-sid {
-  color: #8a93a0;
+  color: var(--muted);
   font-family: "Cascadia Mono", Consolas, monospace;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1297,7 +1315,7 @@ button.primary {
 
 /* ---- nodes ---- */
 .node {
-  background: linear-gradient(180deg, #232830 0%, #1d2128 100%);
+  background: linear-gradient(180deg, #232830 0%, var(--surface-2) 100%);
   border: 1px solid #333a45;
   border-radius: 10px;
   padding: 9px 12px;
@@ -1307,7 +1325,7 @@ button.primary {
   transition: box-shadow 0.15s, border-color 0.15s, transform 0.08s;
 }
 .node:hover {
-  border-color: #4a5567;
+  border-color: var(--scrollbar-hover);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
 }
 .node.selected {
@@ -1321,7 +1339,7 @@ button.primary {
 .react-flow__handle {
   width: 14px;
   height: 14px;
-  border: 2px solid #1b1e24;
+  border: 2px solid var(--panel);
   background: #5a6b8c;
   transition: background 0.12s, box-shadow 0.12s;
 }
@@ -1571,7 +1589,7 @@ button.primary {
 .field input,
 .field select {
   flex: 1;
-  background: #14171c;
+  background: var(--input);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -1625,7 +1643,7 @@ button.primary {
 .pick-filter {
   width: 100%;
   margin-top: 6px;
-  background: #14171c;
+  background: var(--input);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -1645,7 +1663,7 @@ button.primary {
 }
 .session-item {
   text-align: left;
-  background: #14171c;
+  background: var(--input);
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 5px 7px;
@@ -1674,7 +1692,7 @@ button.primary {
 }
 .test-box input {
   flex: 1;
-  background: #14171c;
+  background: var(--input);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -1715,7 +1733,7 @@ button.primary {
 }
 .transcript-search input {
   flex: 1;
-  background: #14171c;
+  background: var(--input);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -1894,7 +1912,7 @@ button.primary {
 }
 .term-search input {
   width: 320px;
-  background: #14171c;
+  background: var(--input);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -1915,11 +1933,11 @@ button.primary {
   /* 左右各留 ~10px(半个多字符)，长行文字不贴边；fit 会据此少算一列、提前折行 */
   padding: 6px 10px 6px 10px;
   overflow: hidden;
-  background: #1b1e24;
+  background: var(--panel);
 }
 /* 只让 .xterm 根填满容器；绝不强撑 .xterm-screen——它被拉高后，
    WebGL 画布只绘 rows*cellHeight 的格子，多出来那截被清成【纯黑】=底部黑带。
-   让整数行 fit 后的不足一行余量落回 .xterm/.terminal-host 的 #1b1e24 底色即可。 */
+   让整数行 fit 后的不足一行余量落回 .xterm/.terminal-host 的 var(--panel) 底色即可。 */
 .terminal-host .xterm {
   height: 100% !important;
 }
@@ -1957,7 +1975,7 @@ button.primary {
 }
 
 /* ---- 贴图缩略图芯片（像 VSCode 插件那样浮在 claude 输入框横杠上方，自然融入终端、不做独立色块）----
-   绝对浮层，bottom 由 JS 按输入框实际位置动态贴上去；底色=终端色(#1b1e24)所以不显眼=自然融入；
+   绝对浮层，bottom 由 JS 按输入框实际位置动态贴上去；底色=终端色(var(--panel))所以不显眼=自然融入；
    容器穿透点击，只有芯片本体可点；回车发送后自动清空。 */
 .term-img-chips {
   position: absolute;
@@ -1975,7 +1993,7 @@ button.primary {
   align-items: center;
   gap: 7px;
   padding: 2px 5px 2px 3px;
-  background: #1b1e24; /* 与终端同色 → 不是独立色块，自然融入 */
+  background: var(--panel); /* 与终端同色 → 不是独立色块，自然融入 */
   border: none;
   border-radius: 5px;
   cursor: zoom-in;
@@ -2083,7 +2101,7 @@ button.primary {
 }
 .inbox-rule {
   width: 100%;
-  background: #14171c;
+  background: var(--input);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -2311,7 +2329,7 @@ button.primary {
 .owners-box input {
   flex: 1;
   min-width: 0;
-  background: #14171c;
+  background: var(--input);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -2332,7 +2350,7 @@ button.primary {
   margin-top: 10px;
 }
 .fs-help code {
-  background: #14171c;
+  background: var(--input);
   padding: 1px 4px;
   border-radius: 3px;
 }
