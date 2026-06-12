@@ -180,12 +180,29 @@ export class ClaudeSession {
       });
       this.active = child;
 
+      // 空闲超时：长时间无任何输出=判定卡死(等鉴权/网络/挂起)，中断报错，避免该节点队列永久 stall。
+      // 用空闲(每次有输出就重置)而非总时长，长但有进度的正常任务不会被误杀。
+      let idleTimer: ReturnType<typeof setTimeout>;
+      const resetIdle = () => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          try {
+            child.kill();
+          } catch {
+            /* ignore */
+          }
+          reject(new Error("claude 长时间无响应(>4min)，已中断"));
+        }, 240_000);
+      };
+      resetIdle();
+
       let finalText: string | undefined;
       let stdoutBuf = "";
       let stderrBuf = "";
 
       child.stdout?.setEncoding("utf8");
       child.stdout?.on("data", (chunk: string) => {
+        resetIdle();
         stdoutBuf += chunk;
         let nl: number;
         while ((nl = stdoutBuf.indexOf("\n")) >= 0) {
@@ -236,11 +253,13 @@ export class ClaudeSession {
       });
 
       child.on("error", (err) => {
+        clearTimeout(idleTimer);
         this.active = null;
         reject(new Error(`spawn claude 失败: ${err.message}（binPath=${o.binPath}）`));
       });
 
       child.on("close", (code) => {
+        clearTimeout(idleTimer);
         this.active = null;
         if (stderrBuf.trim()) o.log("warn", `[${o.nodeId}] stderr: ${stderrBuf.trim().slice(0, 500)}`);
         if (finalText !== undefined) {

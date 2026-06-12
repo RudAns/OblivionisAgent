@@ -39,7 +39,16 @@ export async function route(
   if (!group || group.kind !== "feishu-group") return null;
   if (group.data.triggerMode === "mention" && !inbound.isMention) return null;
 
-  const intentText = stripMentions(inbound.text); // 用于意图分类的干净用户消息
+  // 消息自带的 @ 占位符 key（如 @_user_1），用于精确剔除，避免误删 email/代码里的 @
+  const mentionKeys: string[] = (() => {
+    try {
+      const ms = (inbound.raw as { message?: { mentions?: Array<{ key?: string }> } })?.message?.mentions;
+      return Array.isArray(ms) ? ms.map((m) => String(m?.key ?? "")).filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const intentText = stripMentions(inbound.text, mentionKeys); // 用于意图分类的干净用户消息
   let text = inbound.text;
   const visited = new Set<string>();
   let cursor: GraphNode | undefined = group;
@@ -49,7 +58,7 @@ export async function route(
     visited.add(cursor.id);
 
     if (cursor.kind === "route") {
-      if (cursor.data.stripMention) text = stripMentions(text);
+      if (cursor.data.stripMention) text = stripMentions(text, mentionKeys);
       if (cursor.data.prefix) text = `${cursor.data.prefix}${text}`;
     }
 
@@ -67,7 +76,9 @@ export async function route(
         conditional.map((e) => e.condition!.trim()),
         { model: sw?.data.model, mode: sw?.data.mode },
       );
-      chosen = idx >= 1 && idx <= conditional.length ? conditional[idx - 1]! : (fallback ?? conditional[0]!);
+      if (idx >= 1 && idx <= conditional.length) chosen = conditional[idx - 1]!;
+      else if (idx < 0) chosen = fallback!; // 分类器出错：只走默认边，没有就不路由(下面 !chosen → break)，别瞎猜第一条
+      else chosen = fallback ?? conditional[0]!; // 都不匹配：有默认边走它，否则退到第一条
     }
     if (!chosen) break;
 
@@ -82,7 +93,14 @@ export async function route(
   return null;
 }
 
-/** 去掉飞书富文本里的 @xxx（简化版；真实场景按 mention 列表精确剔除） */
-function stripMentions(text: string): string {
-  return text.replace(/@\S+\s?/g, "").trim();
+/** 去掉飞书 @ 占位符。优先用消息自带的 mention key 精确剔除(不动 user@x.com / @property / @scope/pkg)；
+ *  拿不到 key 时只剔飞书占位符 @_user_1 / @_all，仍不误伤普通 @ 文本。 */
+function stripMentions(text: string, keys?: string[]): string {
+  let t = text;
+  if (keys && keys.length) {
+    for (const k of keys) if (k) t = t.split(k).join(" ");
+  } else {
+    t = t.replace(/@_\w+\s?/g, "");
+  }
+  return t.replace(/\s{2,}/g, " ").trim();
 }

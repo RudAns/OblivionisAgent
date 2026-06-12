@@ -15,6 +15,8 @@ import type { Logger } from "../logger.js";
  */
 export class SessionManager {
   private sessions = new Map<string, ClaudeSession>();
+  /** 正在进行的首次 fork（按 nodeId 去重）：防并发首条消息各 spawn 一个 fork、互相覆盖 sessionId */
+  private forkInFlight = new Map<string, Promise<void>>();
 
   constructor(
     private store: ConfigStore,
@@ -41,7 +43,15 @@ export class SessionManager {
 
     // 有 base：飞书走 fork 出的脱敏分身，绝不续接 base（base 留给终端）。首次先 fork+脱敏。
     if (node.data.baseSessionId) {
-      if (!node.data.sessionId) await this.prepareGuestFork(nodeId);
+      if (!node.data.sessionId) {
+        // 并发去重：同节点多条首条消息只跑一次 fork，其余等同一个 Promise
+        let inflight = this.forkInFlight.get(nodeId);
+        if (!inflight) {
+          inflight = this.prepareGuestFork(nodeId).finally(() => this.forkInFlight.delete(nodeId));
+          this.forkInFlight.set(nodeId, inflight);
+        }
+        await inflight;
+      }
       const fresh = this.findNode(nodeId)!; // sessionId 可能刚被 fork 写入
       const session = this.ensureSession(fresh, nodeId, fresh.data.sessionId, (id) =>
         this.persistSessionId(nodeId, id),

@@ -52,6 +52,15 @@ function runForkInit(o: ForkPrepareOptions): Promise<string> {
     const child = spawn(o.binPath, args, { cwd: o.cwd, stdio: ["pipe", "pipe", "pipe"], env: process.env });
     let forkId: string | undefined;
     let buf = "";
+    // 超时兜底：fork 卡住(等鉴权/网络)会让首条访客消息无限期 stall，180s 后杀掉并报错
+    const timer = setTimeout(() => {
+      try {
+        child.kill();
+      } catch {
+        /* ignore */
+      }
+      reject(new Error("fork 初始化超时(180s)"));
+    }, 180_000);
     child.stdout?.setEncoding("utf8");
     child.stdout?.on("data", (chunk: string) => {
       buf += chunk;
@@ -68,8 +77,12 @@ function runForkInit(o: ForkPrepareOptions): Promise<string> {
         }
       }
     });
-    child.on("error", (err) => reject(new Error(`fork 初始化失败: ${err.message}`)));
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(new Error(`fork 初始化失败: ${err.message}`));
+    });
     child.on("close", () => {
+      clearTimeout(timer);
       if (forkId) resolve(forkId);
       else reject(new Error("fork 初始化未拿到新会话 id"));
     });

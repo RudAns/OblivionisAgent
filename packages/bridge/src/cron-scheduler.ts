@@ -54,7 +54,12 @@ export class CronScheduler {
       if (node.kind !== "cron") continue;
       const cron = node as CronNode;
       if (!cron.data.enabled || !cron.data.prompt.trim()) continue;
-      const st = this.state.get(node.id) ?? { lastFired: 0, running: false };
+      let st = this.state.get(node.id);
+      if (!st) {
+        // 首次见到该 cron：种 lastFired=now，让 "every Nm" 满一个间隔再触发(避免启动即触发)；登记持久化
+        st = { lastFired: now.getTime(), running: false };
+        this.state.set(node.id, st);
+      }
       if (st.running) continue;
       if (!shouldFire(cron.data.schedule, now, st.lastFired)) continue;
 
@@ -107,14 +112,17 @@ export function shouldFire(schedule: string, now: Date, lastFired: number): bool
     return now.getTime() - lastFired >= intervalMs;
   }
 
-  // HH:MM 每天（tick 30s 一次，落在该分钟内且本分钟没触发过）
+  // HH:MM 每天：目标时刻已到、且今天这个点之后还没触发过 → 触发。
+  // 用"目标时刻已过 + 今天未触发"而非"恰好落在这一分钟"：漏过该分钟的 tick 也能补触发，且不重复、不受 DST 影响。
   const hm = /^(\d{1,2}):(\d{2})$/.exec(s);
   if (hm) {
     const h = Number(hm[1]);
     const m = Number(hm[2]);
     if (h > 23 || m > 59) return false;
-    if (now.getHours() !== h || now.getMinutes() !== m) return false;
-    return now.getTime() - lastFired > 90_000; // 同一分钟内不重复
+    const target = new Date(now);
+    target.setHours(h, m, 0, 0);
+    if (now.getTime() < target.getTime()) return false; // 今天还没到点
+    return lastFired < target.getTime(); // 今天这个点之后没触发过
   }
 
   return false;

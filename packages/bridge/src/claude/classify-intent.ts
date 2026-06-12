@@ -31,6 +31,10 @@ export async function classifyIntent(
 
   const model = opts.model || process.env.OBLIVIONIS_INTENT_MODEL || "haiku";
   const out = await runText(prompt, model, opts);
+  if (out === null) {
+    opts.log?.("意图分类失败(分类器出错/超时) -> 交给默认边");
+    return -1; // 出错：和"都不匹配(0)"区分开，让路由只走 fallback、别瞎猜第一条
+  }
   const m = out.match(/-?\d+/);
   const n = m ? parseInt(m[0], 10) : 0;
   const result = n >= 0 && n <= intents.length ? n : 0;
@@ -38,7 +42,7 @@ export async function classifyIntent(
   return result;
 }
 
-function runText(prompt: string, model: string, opts: ClassifyOptions): Promise<string> {
+function runText(prompt: string, model: string, opts: ClassifyOptions): Promise<string | null> {
   const args = [
     "-p",
     "--model",
@@ -51,17 +55,31 @@ function runText(prompt: string, model: string, opts: ClassifyOptions): Promise<
     "--output-format",
     "text",
   ];
-  return new Promise<string>((resolve) => {
+  return new Promise<string | null>((resolve) => {
     const child = spawn(opts.binPath, args, {
       cwd: opts.cwd,
       stdio: ["pipe", "pipe", "pipe"],
       env: process.env,
     });
     let out = "";
+    const timer = setTimeout(() => {
+      try {
+        child.kill();
+      } catch {
+        /* ignore */
+      }
+      resolve(null);
+    }, 30_000);
     child.stdout?.setEncoding("utf8");
     child.stdout?.on("data", (c: string) => (out += c));
-    child.on("error", () => resolve(""));
-    child.on("close", () => resolve(out.trim()));
+    child.on("error", () => {
+      clearTimeout(timer);
+      resolve(null);
+    });
+    child.on("close", () => {
+      clearTimeout(timer);
+      resolve(out.trim());
+    });
     child.stdin?.write(prompt);
     child.stdin?.end();
   });

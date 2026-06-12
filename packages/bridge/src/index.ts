@@ -228,6 +228,8 @@ async function main() {
       ts: Date.now(),
     });
 
+    // 兜底：route/classify/parseSchedule 等任一步抛错都不再静默丢消息——回一条提示
+    try {
     const cfg = store.get();
     const resolved = await route(cfg, inbound, (text, intents, opts) =>
       classifyIntent(text, intents, {
@@ -381,6 +383,16 @@ async function main() {
       const errMsg = `⚠️ 处理失败: ${(e as Error).message}`;
       log.error(errMsg);
       await gateway.transport?.reply(inbound.chatId, errMsg, replyOpts).catch(() => {});
+    }
+    } catch (outerErr) {
+      // 路由/分类/解析等环节出错：别静默吞，回一条兜底提示
+      log.error(`入站处理出错: ${(outerErr as Error).message}`);
+      await gateway.transport
+        ?.reply(inbound.chatId, "⚠️ 处理时出错了，请稍后再试或换种说法。", {
+          replyToMessageId: inbound.messageId,
+          atUserId: inbound.senderId,
+        })
+        .catch(() => {});
     }
   }
 
