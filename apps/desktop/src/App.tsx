@@ -565,6 +565,7 @@ function Inner() {
       const minY = Math.min(...clip.nodes.map((n) => n.position.y));
       dx = at.x - minX;
       dy = at.y - minY;
+      pasteCountRef.current = 0; // 光标粘贴后，下次普通 Ctrl+V 从一个偏移重新计
     } else {
       pasteCountRef.current += 1;
       dx = dy = 28 * pasteCountRef.current;
@@ -634,6 +635,10 @@ function Inner() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
+      // 终端可见时一律不接管：xterm 常把焦点丢回 body，光靠 activeElement 守不住，
+      // Ctrl+A/C/D/K 这些组合得原样交给 claude(行首/中断/EOF/kill-line)。
+      if (tab === "terminal") return;
+      if (cmdkOpen || ctxMenu) return; // 命令面板/右键菜单开着时不接管
       const ae = document.activeElement as HTMLElement | null;
       if (
         ae &&
@@ -668,24 +673,28 @@ function Inner() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, duplicateSelected, copySelected, pasteClipboard, setNodes]);
+  }, [undo, redo, duplicateSelected, copySelected, pasteClipboard, setNodes, tab, cmdkOpen, ctxMenu]);
 
   // 自定义 onNodesChange：单节点拖动时算对齐参考线并吸附；其它变更原样应用。
-  // 用 applyNodeChanges 复刻 useNodesState 内部行为，只在中途插入吸附与画线。
+  // 纯函数写法：不在 setNodes 更新器里改 state、不改入参 change（StrictMode 双调用安全）。
+  const nodesRef = useRef<Node[]>([]);
+  nodesRef.current = nodes;
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      setNodes((ns) => {
-        const ch = changes[0];
-        if (changes.length === 1 && ch?.type === "position" && ch.dragging && ch.position) {
-          const lines = getHelperLines(ch, ns);
-          ch.position.x = lines.snapPosition.x ?? ch.position.x;
-          ch.position.y = lines.snapPosition.y ?? ch.position.y;
-          setHelperLines({ horizontal: lines.horizontal, vertical: lines.vertical });
-        } else {
-          setHelperLines((h) => (h.horizontal === undefined && h.vertical === undefined ? h : {}));
-        }
-        return applyNodeChanges(changes, ns);
-      });
+      // 只在"单个节点正被拖动"时吸附(其余 position/dimensions/select 变更可与之同批)
+      const dragging = changes.filter(
+        (c): c is Extract<NodeChange, { type: "position" }> => c.type === "position" && !!c.dragging,
+      );
+      const ch = dragging.length === 1 ? dragging[0] : undefined;
+      if (ch && ch.position) {
+        const lines = getHelperLines(ch, nodesRef.current);
+        const snapped = { ...ch, position: { x: lines.snapPosition.x ?? ch.position.x, y: lines.snapPosition.y ?? ch.position.y } };
+        setHelperLines({ horizontal: lines.horizontal, vertical: lines.vertical });
+        setNodes((ns) => applyNodeChanges(changes.map((c) => (c === ch ? snapped : c)), ns));
+      } else {
+        setHelperLines((h) => (h.horizontal === undefined && h.vertical === undefined ? h : {}));
+        setNodes((ns) => applyNodeChanges(changes, ns));
+      }
     },
     [setNodes],
   );
@@ -728,6 +737,7 @@ function Inner() {
       setInspectorOpen(false);
       setSelectedEdge(null);
       setCtxMenu(null);
+      setCmdkOpen(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -761,9 +771,7 @@ function Inner() {
   const setEdgeCondition = (edgeId: string, condition: string) => {
     setEdges((eds) =>
       eds.map((e) =>
-        e.id === edgeId
-          ? { ...e, label: condition || undefined, data: { ...e.data, condition: condition || undefined } }
-          : e,
+        e.id === edgeId ? { ...e, data: { ...e.data, condition: condition || undefined } } : e,
       ),
     );
   };

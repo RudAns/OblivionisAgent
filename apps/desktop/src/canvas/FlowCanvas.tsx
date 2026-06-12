@@ -142,7 +142,7 @@ export function FlowCanvas(props: Props) {
       defaultEdgeOptions={defaultEdgeOptions}
       connectionLineType={ConnectionLineType.Bezier}
       colorMode="dark"
-      deleteKeyCode={["Delete", "Backspace"]}
+      deleteKeyCode={["Delete"]}
       fitView
       proOptions={{ hideAttribution: true }}
     >
