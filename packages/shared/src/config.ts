@@ -41,8 +41,7 @@ export const FeishuGroupData = z.object({
 export type FeishuGroupData = z.infer<typeof FeishuGroupData>;
 
 export const RouteData = z.object({
-  /** 转发给 Claude 前去掉 @机器人 文本 */
-  stripMention: z.boolean().default(true),
+  // 注：发给 Claude 前永远自动去飞书 @ 占位符（在 bridge/router.ts 统一处理），不再做成可选项
   /** 给每条消息加的前缀（例如固定指令/上下文） */
   prefix: z.string().optional(),
 });

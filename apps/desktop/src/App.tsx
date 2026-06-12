@@ -56,7 +56,7 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
   route: () => ({
     kind: "route",
     label: "路由",
-    data: { stripMention: true },
+    data: {},
   }),
   "intent-switch": () => ({
     kind: "intent-switch",
@@ -1649,14 +1649,9 @@ function Inspector({
       )}
       {node.type === "route" && (
         <>
-          <label className="field">
-            <span>去除 @</span>
-            <input
-              type="checkbox"
-              checked={!!d.stripMention}
-              onChange={(e) => onPatch({ stripMention: e.target.checked })}
-            />
-          </label>
+          <div className="hint" style={{ marginBottom: 6 }}>
+            发给 Claude 前会自动去掉飞书 @ 占位符（无需配置）。这里只设可选「前缀」。
+          </div>
           {field("前缀", d.prefix, "prefix")}
         </>
       )}

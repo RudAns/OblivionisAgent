@@ -23,8 +23,8 @@
         "id": "rt-demo",
         "kind": "route",
         "position": { "x": 320, "y": 140 },
-        "label": "去@并加前缀",
-        "data": { "stripMention": true }
+        "label": "加前缀",
+        "data": { "prefix": "" }
       },
       {
         "id": "ses-demo",

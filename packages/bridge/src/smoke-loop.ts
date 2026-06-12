@@ -37,7 +37,7 @@ async function main() {
           kind: "route",
           position: { x: 0, y: 0 },
           label: "路由",
-          data: { stripMention: true },
+          data: {},
         },
         {
           id: "s",

@@ -50,8 +50,10 @@ export async function route(
       return [];
     }
   })();
-  const intentText = stripMentions(inbound.text, mentionKeys); // 用于意图分类的干净用户消息
-  let text = inbound.text;
+  // 永远去掉飞书 @ 占位符（@_user_1 之类对 Claude 是纯噪音）：意图分类和 prompt 都用这份干净文本
+  const cleaned = stripMentions(inbound.text, mentionKeys);
+  const intentText = cleaned;
+  let text = cleaned;
   const visited = new Set<string>();
   const pathEdgeIds: string[] = []; // 累计实际走过的连线
   let cursor: GraphNode | undefined = group;
@@ -61,7 +63,6 @@ export async function route(
     visited.add(cursor.id);
 
     if (cursor.kind === "route") {
-      if (cursor.data.stripMention) text = stripMentions(text, mentionKeys);
       if (cursor.data.prefix) text = `${cursor.data.prefix}${text}`;
     }
 
