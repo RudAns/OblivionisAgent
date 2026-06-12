@@ -1371,6 +1371,8 @@ function Inner() {
               setEdges((es) => es.filter((x) => x.id !== id));
               setSelectedEdge((s) => (s === id ? null : s));
             }}
+            onCopyNode={(id) => copySelected(id)}
+            onDeleteNode={(id) => deleteNodeById(id)}
             onPaneClick={onPaneClick}
             onNodeContextMenu={onNodeContextMenu}
             onEdgeContextMenu={onEdgeContextMenu}

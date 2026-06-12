@@ -32,6 +32,7 @@ import { ZoomIndicator } from "./ZoomIndicator.js";
 import { EdgeActionContext } from "./edge-context.js";
 import { EdgeRuntimeContext } from "./edge-runtime-context.js";
 import { NodeMetaContext } from "./node-meta-context.js";
+import { NodeActionContext } from "./node-action-context.js";
 
 interface Props {
   nodes: Node[];
@@ -46,6 +47,10 @@ interface Props {
   onEditEdge: (id: string) => void;
   /** 点连线 hover 出现的「×」一键删除连线 */
   onDeleteEdge: (id: string) => void;
+  /** 节点 hover 出现的「⎘」复制单个节点 */
+  onCopyNode: (id: string) => void;
+  /** 节点 hover 出现的「🗑」删除节点(连同其连线) */
+  onDeleteNode: (id: string) => void;
   onPaneClick: () => void;
   onNodeContextMenu: NodeMouseHandler;
   onEdgeContextMenu: EdgeMouseHandler;
@@ -132,10 +137,15 @@ export function FlowCanvas(props: Props) {
     [props.activeEdges, props.focusEdges],
   );
   const metaValue = useMemo(() => ({ metas: props.nodeMetas }), [props.nodeMetas]);
+  const actionValue = useMemo(
+    () => ({ copyNode: props.onCopyNode, deleteNode: props.onDeleteNode }),
+    [props.onCopyNode, props.onDeleteNode],
+  );
 
   return (
     <EdgeActionContext.Provider value={{ editEdge: props.onEditEdge, deleteEdge: props.onDeleteEdge }}>
     <EdgeRuntimeContext.Provider value={runtimeValue}>
+    <NodeActionContext.Provider value={actionValue}>
     <NodeMetaContext.Provider value={metaValue}>
     <ReactFlow
       nodes={props.nodes}
@@ -197,6 +207,7 @@ export function FlowCanvas(props: Props) {
       )}
     </ReactFlow>
     </NodeMetaContext.Provider>
+    </NodeActionContext.Provider>
     </EdgeRuntimeContext.Provider>
     </EdgeActionContext.Provider>
   );

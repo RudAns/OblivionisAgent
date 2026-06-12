@@ -1,5 +1,6 @@
-import { Handle, Position, useStore } from "@xyflow/react";
-import type { ReactNode } from "react";
+import { Handle, Position, useStore, useNodeId } from "@xyflow/react";
+import { useContext, type ReactNode } from "react";
+import { NodeActionContext } from "../node-action-context.js";
 
 /**
  * 节点卡片统一外壳（参考专业流程图工具）：
@@ -28,6 +29,9 @@ export function NodeShell({
   // LOD：缩小到 <70% 时只留标题/状态条，不再画元数据(否则文字糊成一片)
   const zoom = useStore((s) => s.transform[2]);
   const lod = zoom < 0.7;
+  // hover 快捷操作：复制 / 删除，缩太小(LOD)时不画，免得糊成一团
+  const id = useNodeId();
+  const { copyNode, deleteNode } = useContext(NodeActionContext);
   return (
     <div
       className={`xnode xnode-${kind} ${selected ? "selected" : ""} ${status ? `xn-${status}` : ""} ${
@@ -35,6 +39,30 @@ export function NodeShell({
       }`}
     >
       {hasTarget && <Handle type="target" position={Position.Left} />}
+      {!lod && id && (
+        <div className="xnode-actions">
+          <button
+            className="xn-act"
+            title="复制此节点"
+            onClick={(e) => {
+              e.stopPropagation();
+              copyNode(id);
+            }}
+          >
+            ⎘
+          </button>
+          <button
+            className="xn-act danger"
+            title="删除此节点及其连线"
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteNode(id);
+            }}
+          >
+            🗑
+          </button>
+        </div>
+      )}
       <div className="xnode-head">
         <span className="xnode-icon">{icon}</span>
         <span className="xnode-label" title={label}>

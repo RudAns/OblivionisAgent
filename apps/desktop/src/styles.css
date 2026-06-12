@@ -1177,6 +1177,7 @@ button.primary {
 /* ---- 新版节点卡片（彩头 + 暗体，参考专业流程工具） ---- */
 .xnode {
   --nc: #5a6b8c;
+  position: relative;
   min-width: 200px;
   max-width: 240px;
   border-radius: 10px;
@@ -1186,6 +1187,51 @@ button.primary {
   font-size: 11.5px;
   overflow: visible;
   transition: box-shadow 0.15s, border-color 0.15s, transform 0.08s;
+}
+/* hover 快捷操作：右上角浮出 复制/删除，平时不占视觉 */
+.xnode-actions {
+  position: absolute;
+  top: -11px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.12s, transform 0.12s;
+  pointer-events: none;
+  z-index: 4;
+}
+.xnode:hover .xnode-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+.xn-act {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.xn-act:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--hover);
+}
+.xn-act.danger:hover {
+  color: var(--st-err);
+  border-color: var(--st-err);
+  background: rgba(255, 80, 80, 0.12);
 }
 .xnode:hover {
   border-color: color-mix(in srgb, var(--nc) 65%, var(--border));
