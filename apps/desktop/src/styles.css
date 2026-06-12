@@ -37,7 +37,7 @@
   --text: #25231f; /* 主文字 */
   --muted: #777268; /* 次要文字 */
   --accent: #d96745; /* 品牌色(不动) */
-  --term-bg: #f5f2ea; /* 终端暖纸色(用户说忽略) */
+  --term-bg: #fcfbf9; /* 终端背景：用户要求再白一点，调到近白(与画布一致) */
   --scrollbar: #dad5cc;
   --scrollbar-hover: #c6c0b6;
   --accent-rgb: 217, 103, 69; /* #d96745 */
@@ -82,15 +82,16 @@
     0 0 0 2px rgba(var(--accent-rgb), 0.22),
     0 2px 7px rgba(60, 55, 45, 0.08);
 }
-/* 浅色下连线上的意图标签：用户要求去掉浅色底，做成无底/纯深字(跟参考图一致) */
+/* 浅色下连线上的意图标签：要白底框(不要橙色调)——干净白胶囊+淡边+浅阴影，把字从连线上托起来 */
 :root[data-theme="light"] .edge-badge.has-cond {
-  background: transparent;
-  border-color: transparent;
+  background: var(--card);
+  border-color: var(--border);
   color: #25231f;
+  box-shadow: 0 1px 3px rgba(60, 55, 45, 0.12);
 }
 :root[data-theme="light"] .edge-badge.has-cond:hover {
-  background: transparent;
-  border-color: transparent;
+  background: var(--card);
+  border-color: var(--accent);
   color: var(--accent);
 }
 :root[data-theme="light"] .edge-badge.no-cond {

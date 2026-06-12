@@ -35,10 +35,10 @@ const TERM_THEME_DARK = {
   brightWhite: "#cdd9e5",
 };
 const TERM_THEME_LIGHT = {
-  background: "#f5f2ea", // 暖纸色，与 CSS --term-bg 一致；纯白太刺眼/不协调
+  background: "#fcfbf9", // 近白(与画布 --term-bg 一致)；用户要求比原暖纸色再白一点
   foreground: "#2a2925",
   cursor: "#c96442",
-  cursorAccent: "#f5f2ea",
+  cursorAccent: "#fcfbf9",
   selectionBackground: "#c9644230",
   black: "#24292f",
   red: "#cf222e",
