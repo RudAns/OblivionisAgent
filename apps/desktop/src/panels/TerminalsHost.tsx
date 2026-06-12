@@ -70,6 +70,8 @@ function TerminalView({
   onTaskDoneRef.current = onTaskDone;
   const actReportRef = useRef(false);
   const actTimerRef = useRef<number | undefined>(undefined);
+  // 用户在本终端按过键没（真·键盘事件，不含 xterm 对程序查询的自动应答）→ 区分"任务"与"启动噪音"
+  const typedRef = useRef(false);
   const searchRef = useRef<SearchAddon | null>(null);
   /** PTY resize 的统一入口（带尺寸比对 + 清缓冲迎接 ConPTY 重放），供激活/重绘 effect 使用 */
   const ptySizeRef = useRef<{ send: (c: number, r: number) => void; seed: (c: number, r: number) => void } | null>(
@@ -435,6 +437,8 @@ function TerminalView({
 
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
+      // 真·按键(非纯修饰键)=用户在用这个终端：之后的 AI 输出才算正式任务(完成红旗用)
+      if (!["Control", "Shift", "Alt", "Meta"].includes(e.key)) typedRef.current = true;
       const ctrl = e.ctrlKey || e.metaKey;
       // Ctrl+F → 打开搜索条（专业 CLI 标配）
       if (ctrl && !e.shiftKey && (e.key === "f" || e.key === "F")) {
@@ -613,7 +617,6 @@ function TerminalView({
     // ⚠️ 只算"AI 在执行"的输出：用户打字时终端会把每个按键回显成输出，那不算运行——
     // 用"距上次用户输入的时间"区分：紧跟输入(<320ms)的输出=回显，跳过；否则=AI 在吐。
     let lastInputAt = 0;
-    let hasTyped = false; // 用户在本终端输入过没（打开会话时 claude 启动输出≠任务，要靠它区分）
     let taskActive = false; // 本轮运行是否算"用户发起的正式任务"
     const reportActive = (v: boolean) => {
       if (actReportRef.current === v) return;
@@ -627,7 +630,7 @@ function TerminalView({
     };
     const bumpActivity = () => {
       if (performance.now() - lastInputAt < 320) return; // 这波输出是用户打字的回显，不刷光
-      if (hasTyped) taskActive = true; // 用户输入过 → 这波 AI 输出算正式任务（启动噪音不会，因还没输入）
+      if (typedRef.current) taskActive = true; // 用户按过键 → 这波 AI 输出算正式任务（启动噪音不会，因还没按键）
       reportActive(true);
       if (actTimerRef.current) window.clearTimeout(actTimerRef.current);
       actTimerRef.current = window.setTimeout(() => reportActive(false), 700);
@@ -697,8 +700,9 @@ function TerminalView({
     })();
 
     const inputDisp = term.onData((data) => {
-      lastInputAt = performance.now(); // 记下用户输入时刻：紧随其后的输出当作回显，不刷光
-      hasTyped = true; // 标记本终端被用户用过：之后的运行才算正式任务（用于完成红旗）
+      // onData 含 xterm 对程序查询的自动应答，不能用来判定"用户用过"(那个交给真键盘事件 typedRef)；
+      // 但拿来做回显时间窗仍可：紧随其后的输出当回显、不刷光。
+      lastInputAt = performance.now();
       if (ptyId) invoke("pty_write", { id: ptyId, data }).catch(() => {});
     });
     // 给 PTY 发 resize 的唯一入口：尺寸没变就不发（防冗余重绘）。
