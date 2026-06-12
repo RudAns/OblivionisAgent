@@ -21,6 +21,7 @@ import {
   type NodeMouseHandler,
 } from "@xyflow/react";
 import { getHelperLines } from "./canvas/helper-lines.js";
+import { AlignBar, type AlignKind } from "./canvas/AlignBar.js";
 import {
   DEFAULT_WS_PORT,
   type OblivionisConfig,
@@ -466,6 +467,61 @@ function Inner() {
     if (id) duplicateNodeById(id);
   }, [nodes, selected, duplicateNodeById]);
 
+  // 多选对齐：按整组的包围盒，把选中节点的对应边/中线对齐
+  const alignSelected = useCallback(
+    (kind: AlignKind) => {
+      setNodes((ns) => {
+        const sel = ns.filter((n) => n.selected);
+        if (sel.length < 2) return ns;
+        const w = (n: Node) => n.measured?.width ?? 0;
+        const h = (n: Node) => n.measured?.height ?? 0;
+        const minL = Math.min(...sel.map((n) => n.position.x));
+        const maxR = Math.max(...sel.map((n) => n.position.x + w(n)));
+        const minT = Math.min(...sel.map((n) => n.position.y));
+        const maxB = Math.max(...sel.map((n) => n.position.y + h(n)));
+        const cx = (minL + maxR) / 2;
+        const cy = (minT + maxB) / 2;
+        return ns.map((n) => {
+          if (!n.selected) return n;
+          let { x, y } = n.position;
+          if (kind === "left") x = minL;
+          else if (kind === "right") x = maxR - w(n);
+          else if (kind === "hcenter") x = cx - w(n) / 2;
+          else if (kind === "top") y = minT;
+          else if (kind === "bottom") y = maxB - h(n);
+          else if (kind === "vcenter") y = cy - h(n) / 2;
+          return { ...n, position: { x, y } };
+        });
+      });
+    },
+    [setNodes],
+  );
+
+  // 多选等距分布：按中心在首尾之间均匀铺开（需 ≥3）
+  const distributeSelected = useCallback(
+    (axis: "h" | "v") => {
+      setNodes((ns) => {
+        const sel = ns.filter((n) => n.selected);
+        if (sel.length < 3) return ns;
+        const size = (n: Node) => (axis === "h" ? (n.measured?.width ?? 0) : (n.measured?.height ?? 0));
+        const pos = (n: Node) => (axis === "h" ? n.position.x : n.position.y);
+        const center = (n: Node) => pos(n) + size(n) / 2;
+        const sorted = [...sel].sort((a, b) => pos(a) - pos(b));
+        const first = center(sorted[0]!);
+        const last = center(sorted[sorted.length - 1]!);
+        const step = (last - first) / (sorted.length - 1);
+        const newCenter = new Map<string, number>();
+        sorted.forEach((n, i) => newCenter.set(n.id, first + step * i));
+        return ns.map((n) => {
+          if (!newCenter.has(n.id)) return n;
+          const v = newCenter.get(n.id)! - size(n) / 2;
+          return { ...n, position: axis === "h" ? { x: v, y: n.position.y } : { x: n.position.x, y: v } };
+        });
+      });
+    },
+    [setNodes],
+  );
+
   // 复制/粘贴：内部剪贴板存「选中节点 + 完全内部的连线」，粘贴时换新 id、清身份、递增偏移。
   const clipboardRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
   const pasteCountRef = useRef(0);
@@ -592,6 +648,9 @@ function Inner() {
       } else if (k === "v") {
         e.preventDefault();
         pasteClipboard();
+      } else if (k === "a") {
+        e.preventDefault();
+        setNodes((ns) => ns.map((n) => ({ ...n, selected: true })));
       } else if (k === "k") {
         e.preventDefault();
         setCmdkQuery("");
@@ -601,7 +660,7 @@ function Inner() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, duplicateSelected, copySelected, pasteClipboard]);
+  }, [undo, redo, duplicateSelected, copySelected, pasteClipboard, setNodes]);
 
   // 自定义 onNodesChange：单节点拖动时算对齐参考线并吸附；其它变更原样应用。
   // 用 applyNodeChanges 复刻 useNodesState 内部行为，只在中途插入吸附与画线。
@@ -628,7 +687,9 @@ function Inner() {
     [setEdges],
   );
 
-  const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
+  const onNodeClick: NodeMouseHandler = useCallback((e, node) => {
+    // Shift/Ctrl 点击是多选手势：不打开单节点检视，交给对齐工具条
+    if (e.shiftKey || e.ctrlKey || e.metaKey) return;
     setSelected(node.id);
     setSelectedEdge(null);
     setInspectorOpen(true);
@@ -802,6 +863,7 @@ function Inner() {
 
   const selectedNode = nodes.find((n) => n.id === selected) ?? null;
   const selectedIsClaude = selectedNode?.type === "claude-session";
+  const multiSelectCount = nodes.reduce((a, n) => a + (n.selected ? 1 : 0), 0);
 
   // 折叠菜单用：画布上所有 Claude 会话节点（单击选择看转录·访客会话 / 双击打开开发终端）
   const claudeNodes = nodes.filter((n) => n.type === "claude-session");
@@ -986,6 +1048,11 @@ function Inner() {
             onPaneContextMenu={onPaneContextMenu}
             helperLines={helperLines}
           />
+
+          {/* 多选(≥2)时浮出对齐/分布工具条 */}
+          {multiSelectCount >= 2 && (
+            <AlignBar count={multiSelectCount} onAlign={alignSelected} onDistribute={distributeSelected} />
+          )}
 
           {/* 浮窗：连线条件编辑（条件分流） */}
           {inspectorOpen && selectedEdgeObj && (

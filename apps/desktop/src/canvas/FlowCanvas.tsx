@@ -28,6 +28,7 @@ import { WebhookNode } from "./nodes/WebhookNode.js";
 import { SoulNode } from "./nodes/SoulNode.js";
 import { ConditionEdge } from "./edges/ConditionEdge.js";
 import { HelperLines } from "./HelperLines.js";
+import { ZoomIndicator } from "./ZoomIndicator.js";
 import { EdgeActionContext } from "./edge-context.js";
 
 interface Props {
@@ -141,6 +142,7 @@ export function FlowCanvas(props: Props) {
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#2c323d" />
       <HelperLines horizontal={props.helperLines?.horizontal} vertical={props.helperLines?.vertical} />
+      <ZoomIndicator />
       <Controls />
       <MiniMap
         pannable

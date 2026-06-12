@@ -388,6 +388,99 @@ button.primary {
   flex-shrink: 0;
 }
 
+/* ---- 多选对齐/分布工具条（画布底部居中浮出）---- */
+.canvas-align-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 7px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(24, 27, 33, 0.96);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  animation: ctx-pop 0.1s ease-out;
+}
+.canvas-align-bar .cab-count {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 0 6px 0 3px;
+  white-space: nowrap;
+}
+.canvas-align-bar .cab-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 3px;
+  background: var(--border);
+}
+.canvas-align-bar .cab-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #c4ccd8;
+  cursor: pointer;
+}
+.canvas-align-bar .cab-btn:hover {
+  background: rgba(79, 140, 255, 0.18);
+  color: #fff;
+}
+.canvas-align-bar .cab-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  background: transparent;
+  color: #c4ccd8;
+}
+.canvas-align-bar .cab-btn span {
+  display: flex;
+}
+
+/* ---- 缩放指示器（Panel top-right）---- */
+.zoom-indicator {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.42);
+}
+.zoom-indicator .zoom-btn,
+.zoom-indicator .zoom-pct {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+  height: 24px;
+}
+.zoom-indicator .zoom-btn {
+  width: 26px;
+  font-size: 15px;
+  line-height: 1;
+}
+.zoom-indicator .zoom-pct {
+  min-width: 46px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.zoom-indicator .zoom-btn:hover,
+.zoom-indicator .zoom-pct:hover {
+  background: #262b33;
+  color: var(--text);
+}
+
 /* ---- 右键菜单（节点/连线/空白）---- */
 .ctx-backdrop {
   position: fixed;
@@ -1062,6 +1155,22 @@ button.primary {
   stroke: var(--accent);
   stroke-width: 2.4;
   stroke-dasharray: 7 4;
+}
+
+/* 目标会话 running 时入边流动，直观看出消息正流向哪个会话 */
+.react-flow__edge-path.edge-flow {
+  stroke-dasharray: 6 5;
+  animation: edge-flow-dash 0.55s linear infinite;
+}
+@keyframes edge-flow-dash {
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__edge-path.edge-flow {
+    animation: none;
+  }
 }
 
 /* ---- 控件 / 小地图：统一到暗色面板风格（专业软件的一致感）---- */
