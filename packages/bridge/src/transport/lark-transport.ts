@@ -188,7 +188,7 @@ export class LarkTransport implements FeishuTransport {
     const senderId: string = sender?.sender_id?.open_id ?? sender?.sender_id?.union_id ?? "unknown";
     // 真实姓名：通讯录接口按 open_id 查（带缓存）；拿不到再退回 user_id
     const senderName =
-      (await this.getUserName(senderId)) ?? sender?.sender_id?.user_id ?? "unknown";
+      (await this.getUserName(senderId, chatId)) ?? sender?.sender_id?.user_id ?? "unknown";
 
     this.cb?.({
       chatId,
@@ -272,32 +272,73 @@ export class LarkTransport implements FeishuTransport {
     return undefined;
   }
 
-  /** open_id -> 真实姓名（contact/v3/users/:id，需通讯录读权限；结果含失败都缓存） */
-  private async getUserName(openId: string): Promise<string | undefined> {
+  /**
+   * open_id -> 真实姓名（带缓存，含失败也缓存避免每条都打 API）。
+   * 1) 通讯录接口 contact/v3/users/:id —— 需通讯录读权限 + 数据范围含该用户；
+   * 2) 拿不到就退回「群成员列表」im/v1/chats/:id/members —— 机器人在群里就能读，不依赖通讯录权限，
+   *    群里常见的访客/外部成员用这条兜底，并顺手把整群成员名字缓存起来。
+   */
+  private async getUserName(openId: string, chatId?: string): Promise<string | undefined> {
     if (!openId || openId === "unknown" || !this.client) return undefined;
     if (this.nameCache.has(openId)) return this.nameCache.get(openId) ?? undefined;
+    let name = await this.contactName(openId);
+    if (!name && chatId) name = await this.chatMemberName(chatId, openId);
+    this.nameCache.set(openId, name ?? null);
+    return name;
+  }
+
+  /** 通讯录接口查名（失败把飞书真实 code/msg 带出来便于判断缺权限还是参数问题） */
+  private async contactName(openId: string): Promise<string | undefined> {
     try {
       const resp: any = await this.client.contact.user.get({
         path: { user_id: openId },
         params: { user_id_type: "open_id" },
       });
       const u = resp?.data?.user ?? resp?.user ?? {};
-      const name: string | undefined = u.name || u.nickname || undefined;
-      this.nameCache.set(openId, name ?? null);
-      return name;
+      return u.name || u.nickname || undefined;
     } catch (e) {
-      // 把飞书真正的错误码/原因带出来（光看 "status code 400" 没法判断是缺权限还是参数问题）
       const err = e as { response?: { data?: { code?: number; msg?: string } }; message?: string };
       const fb = err.response?.data;
       const detail = fb?.code != null ? `code=${fb.code} msg=${fb.msg}` : err.message;
       this.opts.log(
         "warn",
-        `查用户姓名失败(${openId.slice(0, 12)}…): ${detail}` +
+        `通讯录查名失败(${openId.slice(0, 12)}…): ${detail}` +
           (fb?.code === 99991672 || fb?.code === 99991661
-            ? "（多半是应用缺通讯录权限 contact:user.base:readonly，或机器人「数据权限范围」没包含该用户）"
+            ? "（缺 contact:user.base:readonly 或数据范围没含该用户，转用群成员兜底）"
             : ""),
       );
-      this.nameCache.set(openId, null); // 失败也缓存，避免每条消息都打一次 API
+      return undefined;
+    }
+  }
+
+  /** 从群成员列表里找该 open_id 的名字（顺手缓存全群成员名，少打 API） */
+  private async chatMemberName(chatId: string, openId: string): Promise<string | undefined> {
+    try {
+      let found: string | undefined;
+      let pageToken: string | undefined;
+      do {
+        const resp: any = await this.client.im.chatMembers.get({
+          path: { chat_id: chatId },
+          params: { member_id_type: "open_id", page_size: 100, ...(pageToken ? { page_token: pageToken } : {}) },
+        });
+        const data = resp?.data ?? resp ?? {};
+        const items: any[] = data?.items ?? [];
+        for (const it of items) {
+          const id: string | undefined = it?.member_id;
+          const nm: string | undefined = it?.name;
+          if (id && nm && !this.nameCache.has(id)) this.nameCache.set(id, nm);
+          if (id === openId && nm) found = nm;
+        }
+        pageToken = data?.has_more ? data?.page_token : undefined;
+      } while (pageToken && !found);
+      return found;
+    } catch (e) {
+      const err = e as { response?: { data?: { code?: number; msg?: string } }; message?: string };
+      const fb = err.response?.data;
+      this.opts.log(
+        "warn",
+        `群成员查名失败(${chatId.slice(0, 12)}…): ${fb?.code != null ? `code=${fb.code} msg=${fb.msg}` : err.message}`,
+      );
       return undefined;
     }
   }
