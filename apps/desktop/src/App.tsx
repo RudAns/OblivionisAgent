@@ -13,11 +13,14 @@ import {
   useEdgesState,
   useReactFlow,
   addEdge,
+  applyNodeChanges,
   type Node,
   type Edge,
   type Connection,
+  type NodeChange,
   type NodeMouseHandler,
 } from "@xyflow/react";
+import { getHelperLines } from "./canvas/helper-lines.js";
 import {
   DEFAULT_WS_PORT,
   type OblivionisConfig,
@@ -154,8 +157,10 @@ function Inner() {
   const client = useMemo(() => new BridgeClient(`ws://127.0.0.1:${DEFAULT_WS_PORT}`), []);
   const rf = useReactFlow();
   const [config, setConfig] = useState<OblivionisConfig | null>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [nodes, setNodes] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  // 拖动节点时的对齐参考线（画布坐标）；空对象=当前无对齐
+  const [helperLines, setHelperLines] = useState<{ horizontal?: number; vertical?: number }>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   // 右键菜单（节点/连线/空白）：x,y=屏幕坐标；flow=空白处右键时的画布坐标(用于在原位加节点)
@@ -517,6 +522,26 @@ function Inner() {
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo, duplicateSelected]);
 
+  // 自定义 onNodesChange：单节点拖动时算对齐参考线并吸附；其它变更原样应用。
+  // 用 applyNodeChanges 复刻 useNodesState 内部行为，只在中途插入吸附与画线。
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      setNodes((ns) => {
+        const ch = changes[0];
+        if (changes.length === 1 && ch?.type === "position" && ch.dragging && ch.position) {
+          const lines = getHelperLines(ch, ns);
+          ch.position.x = lines.snapPosition.x ?? ch.position.x;
+          ch.position.y = lines.snapPosition.y ?? ch.position.y;
+          setHelperLines({ horizontal: lines.horizontal, vertical: lines.vertical });
+        } else {
+          setHelperLines((h) => (h.horizontal === undefined && h.vertical === undefined ? h : {}));
+        }
+        return applyNodeChanges(changes, ns);
+      });
+    },
+    [setNodes],
+  );
+
   const onConnect = useCallback(
     (c: Connection) => setEdges((eds) => addEdge({ ...c, id: crypto.randomUUID() }, eds)),
     [setEdges],
@@ -854,6 +879,7 @@ function Inner() {
             onNodeContextMenu={onNodeContextMenu}
             onEdgeContextMenu={onEdgeContextMenu}
             onPaneContextMenu={onPaneContextMenu}
+            helperLines={helperLines}
           />
 
           {/* 浮窗：连线条件编辑（条件分流） */}

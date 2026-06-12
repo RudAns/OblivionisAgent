@@ -27,6 +27,7 @@ import { CronNode } from "./nodes/CronNode.js";
 import { WebhookNode } from "./nodes/WebhookNode.js";
 import { SoulNode } from "./nodes/SoulNode.js";
 import { ConditionEdge } from "./edges/ConditionEdge.js";
+import { HelperLines } from "./HelperLines.js";
 import { EdgeActionContext } from "./edge-context.js";
 
 interface Props {
@@ -44,6 +45,8 @@ interface Props {
   onNodeContextMenu: NodeMouseHandler;
   onEdgeContextMenu: EdgeMouseHandler;
   onPaneContextMenu: (e: MouseEvent | ReactMouseEvent) => void;
+  /** 拖动时的对齐参考线坐标（画布坐标系），无对齐则两者为 undefined */
+  helperLines?: { horizontal?: number; vertical?: number };
 }
 
 const edgeTypes = { default: ConditionEdge };
@@ -135,6 +138,7 @@ export function FlowCanvas(props: Props) {
       proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#2c323d" />
+      <HelperLines horizontal={props.helperLines?.horizontal} vertical={props.helperLines?.vertical} />
       <Controls />
       <MiniMap
         pannable
