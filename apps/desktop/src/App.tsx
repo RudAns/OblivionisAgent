@@ -233,6 +233,7 @@ function Inner() {
   const [termRunning, setTermRunning] = useState<Record<string, boolean>>({}); // 各会话终端是否在跑(输出活动)
   const [unseenDone, setUnseenDone] = useState<Record<string, boolean>>({}); // 完成但用户还没切过去看 → 红点
   const [activePaths, setActivePaths] = useState<Record<string, string[]>>({}); // 各会话本轮实际走过的连线(运行时点亮真实链路)
+  const [sessionMetas, setSessionMetas] = useState<Record<string, { base?: number; fork?: number }>>({}); // 会话 transcript 最终修改时间
   // 主题：dark/light/system；resolvedTheme 是 system 解析后的实际明暗，传给画布/终端
   const [theme, setTheme] = useState<ThemePref>(() => {
     const t = localStorage.getItem("oblivionis-theme");
@@ -322,6 +323,9 @@ function Inner() {
           );
           break;
         }
+        case "session-meta":
+          setSessionMetas(msg.metas);
+          break;
         case "session-active-path": {
           // 运行时实际走过的连线：空=熄灭该会话的活动链路
           setActivePaths((m) => {
@@ -1185,6 +1189,7 @@ function Inner() {
             helperLines={helperLines}
             activeEdges={activeEdgeIds}
             theme={resolvedTheme}
+            nodeMetas={sessionMetas}
           />
 
           {/* 多选(≥2)时浮出对齐/分布工具条 */}

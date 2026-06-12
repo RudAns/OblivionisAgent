@@ -9,7 +9,8 @@ import { route } from "./router.js";
 import type { FeishuTransport, InboundMessage } from "./transport/transport.js";
 import { MockTransport } from "./transport/mock-transport.js";
 import { LarkTransport } from "./transport/lark-transport.js";
-import { appendFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, existsSync, statSync } from "node:fs";
+import { transcriptPath } from "./claude/session-path.js";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { collectSecrets, redactText } from "./secrets.js";
@@ -135,6 +136,33 @@ async function main() {
     (lvl, m) => log[lvl](m),
   );
   usage.start();
+
+  // 会话节点的 transcript 最终修改时间 → GUI 节点卡显示"最终修改日期"(比 md5 sid 直观)。
+  // 启动播一次 + 每 30s 刷新(跑完会话后日期会更新)。
+  function broadcastSessionMetas(): void {
+    const cfg = store.get();
+    const def = cfg.claude.defaultCwd || process.cwd();
+    const mtime = (cwd: string, sid?: string): number | undefined => {
+      if (!sid) return undefined;
+      try {
+        return statSync(transcriptPath(cwd, sid)).mtimeMs;
+      } catch {
+        return undefined;
+      }
+    };
+    const metas: Record<string, { base?: number; fork?: number }> = {};
+    for (const n of cfg.graph.nodes) {
+      if (n.kind !== "claude-session") continue;
+      const d = n.data as { cwd?: string; baseSessionId?: string; sessionId?: string };
+      const cwd = d.cwd || def;
+      const base = mtime(cwd, d.baseSessionId);
+      const fork = mtime(cwd, d.sessionId);
+      if (base != null || fork != null) metas[n.id] = { base, fork };
+    }
+    hub.broadcast({ type: "session-meta", metas });
+  }
+  broadcastSessionMetas();
+  setInterval(broadcastSessionMetas, 30_000);
 
   log.info(`OblivionisAgent Bridge 启动，配置文件: ${store.path}`);
 

@@ -119,6 +119,8 @@ export type BridgeMessage =
   /** 运行时实际走过的连线（用于画布"只点亮真实链路"，避免汇聚会话两条入边都亮）。
    *  edgeIds 为空 = 清除该会话的活动链路。 */
   | { type: "session-active-path"; nodeId: string; edgeIds: string[] }
+  /** 各会话节点的原始(base)/脱敏分身(fork) transcript 最终修改时间(ms)，给节点卡显示"最终修改日期" */
+  | { type: "session-meta"; metas: Record<string, { base?: number; fork?: number }> }
   /** 回灌到飞书的出站消息（镜像给 GUI 展示） */
   | { type: "outbound"; chatId: string; text: string; ts: number }
   | { type: "pty-opened"; ptyId: string; nodeId: string }

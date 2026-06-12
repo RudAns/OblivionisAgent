@@ -1,8 +1,19 @@
+import { useContext } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import { NodeShell, Row, tailTruncate } from "./NodeShell.js";
+import { NodeMetaContext } from "../node-meta-context.js";
 
-export function ClaudeSessionNode({ data, selected }: NodeProps) {
+/** ms → 简洁日期：今年只显示「M月D日」，跨年显示「YYYY年M月D日」 */
+function fmtDate(ms?: number): string | undefined {
+  if (!ms) return undefined;
+  const d = new Date(ms);
+  const now = new Date();
+  const md = `${d.getMonth() + 1}月${d.getDate()}日`;
+  return d.getFullYear() === now.getFullYear() ? md : `${d.getFullYear()}年${md}`;
+}
+
+export function ClaudeSessionNode({ id, data, selected }: NodeProps) {
   const d = data as {
     label: string;
     cwd: string;
@@ -13,6 +24,10 @@ export function ClaudeSessionNode({ data, selected }: NodeProps) {
     baseSessionId?: string;
     status?: string;
   };
+  const { metas } = useContext(NodeMetaContext);
+  const meta = metas[id];
+  const baseDate = fmtDate(meta?.base);
+  const forkDate = fmtDate(meta?.fork);
   const isFork = !!d.baseSessionId; // 有 base = 双会话模型：base=终端、fork=飞书分身
   return (
     <NodeShell
@@ -31,13 +46,23 @@ export function ClaudeSessionNode({ data, selected }: NodeProps) {
       <Row k="cwd" v={tailTruncate(d.cwd) || "(未设置)"} dim={!d.cwd} />
       <Row k="模型" v={d.model || "默认"} />
       <Row k="权限" v={`${d.permissionMode} / ${d.guestPermissionMode ?? "default"}`} />
-      {/* 原始(终端)会话 */}
-      <Row k="🖥️原始" v={isFork ? d.baseSessionId!.slice(0, 8) + "… (终端)" : "首次运行生成"} dim={!isFork} />
+      {/* 原始(终端)会话：显示最终修改日期，而非人类不可读的 md5 sid */}
+      <Row
+        k="🖥️原始"
+        v={isFork ? (baseDate ? `终端 · 改于 ${baseDate}` : "终端会话") : "首次运行生成"}
+        dim={!isFork}
+      />
       {/* Fork 脱敏分身：飞书走这条（只读快照，刷新在右侧面板） */}
       <div className="session-fork-strip">
         <span className="sfs-tag">脱敏分身</span>
         <span className="sfs-sid">
-          {d.sessionId ? "sid " + d.sessionId.slice(0, 8) + "…" : isFork ? "首次访客消息时生成" : "首次运行生成"}
+          {d.sessionId
+            ? forkDate
+              ? `改于 ${forkDate}`
+              : "已生成"
+            : isFork
+              ? "首次访客消息时生成"
+              : "首次运行生成"}
         </span>
         <span className="sfs-note">飞书走这条</span>
       </div>
