@@ -13,6 +13,7 @@ import {
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
+  type OnConnectEnd,
   type NodeMouseHandler,
   type EdgeMouseHandler,
   type DefaultEdgeOptions,
@@ -40,6 +41,8 @@ interface Props {
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
+  /** 拖线松手：落空白处时由 App 弹「可连类型」菜单 */
+  onConnectEnd: OnConnectEnd;
   onNodeClick: NodeMouseHandler;
   onNodeDoubleClick: NodeMouseHandler;
   onEdgeClick: EdgeMouseHandler;
@@ -155,6 +158,7 @@ export function FlowCanvas(props: Props) {
       onNodesChange={props.onNodesChange}
       onEdgesChange={props.onEdgesChange}
       onConnect={props.onConnect}
+      onConnectEnd={props.onConnectEnd}
       isValidConnection={isValidConnection}
       onNodeClick={props.onNodeClick}
       onNodeDoubleClick={props.onNodeDoubleClick}

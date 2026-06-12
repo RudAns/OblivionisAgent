@@ -19,6 +19,7 @@ import {
   type Connection,
   type NodeChange,
   type NodeMouseHandler,
+  type OnConnectEnd,
 } from "@xyflow/react";
 import { getHelperLines } from "./canvas/helper-lines.js";
 import { AlignBar, type AlignKind } from "./canvas/AlignBar.js";
@@ -152,6 +153,18 @@ const PALETTE: [keyof typeof NEW_NODE_DEFAULTS, string][] = [
 // kind → 本地化名（检视标题等用，避免直接显示原始 "claude-session"）
 const NODE_LABEL: Record<string, string> = Object.fromEntries(PALETTE);
 
+// 从某类节点的「输出口」拖到空白处时，能落地的目标类型（与 FlowCanvas 连线校验同源）。
+// handle=目标节点上要落的入口(claude-session 的人格口为 "fork")，默认走主入口。
+function dropTargetsFor(
+  sourceKind: string | undefined,
+): { kind: keyof typeof NEW_NODE_DEFAULTS; handle?: string }[] {
+  if (sourceKind === "soul") return [{ kind: "claude-session", handle: "fork" }];
+  if (sourceKind === "cron" || sourceKind === "webhook") return [{ kind: "claude-session" }];
+  if (sourceKind === "feishu-group" || sourceKind === "route" || sourceKind === "intent-switch")
+    return [{ kind: "route" }, { kind: "intent-switch" }, { kind: "claude-session" }];
+  return [];
+}
+
 function graphToRf(config: OblivionisConfig, status: Record<string, string>): {
   nodes: Node[];
   edges: Edge[];
@@ -216,6 +229,14 @@ function Inner() {
     kind: "node" | "edge" | "pane";
     id?: string;
     flow?: { x: number; y: number };
+  } | null>(null);
+  // 从输出口拖到空白处：弹出「可连的节点类型」菜单，选一个自动建好并连上
+  const [dropMenu, setDropMenu] = useState<{
+    sx: number;
+    sy: number;
+    flowPos: { x: number; y: number };
+    srcId: string;
+    opts: { kind: keyof typeof NEW_NODE_DEFAULTS; handle?: string }[];
   } | null>(null);
   // Ctrl+K 命令面板
   const [cmdkOpen, setCmdkOpen] = useState(false);
@@ -862,6 +883,7 @@ function Inner() {
       setInspectorOpen(false);
       setSelectedEdge(null);
       setCtxMenu(null);
+      setDropMenu(null);
       setCmdkOpen(false);
       setSettingsOpen(false);
     };
@@ -1013,6 +1035,46 @@ function Inner() {
     setNodes((n) => [...n, node]);
     setSelected(id);
   };
+
+  // 建一个新节点并立刻把 sourceId 连过来（拖线到空白处落地用）。targetHandle 给人格口等特殊入口。
+  const addNodeConnected = (
+    kind: keyof typeof NEW_NODE_DEFAULTS,
+    pos: { x: number; y: number },
+    sourceId: string,
+    targetHandle?: string,
+  ) => {
+    const baseDef = NEW_NODE_DEFAULTS[kind]!();
+    const id = crypto.randomUUID();
+    setNodes((n) => [
+      ...n,
+      { id, type: kind, position: pos, data: { ...baseDef.data, label: baseDef.label, status: "idle" } },
+    ]);
+    setEdges((es) =>
+      addEdge(
+        { id: crypto.randomUUID(), source: sourceId, sourceHandle: null, target: id, targetHandle: targetHandle ?? null },
+        es,
+      ),
+    );
+    setSelected(id);
+  };
+
+  // 拖线松手：落在合法端口 React Flow 已自动连上；落在空白且来自输出口 → 弹「可连类型」菜单
+  const onConnectEnd = useCallback<OnConnectEnd>(
+    (event, state) => {
+      if (state.isValid) return;
+      const fh = state.fromHandle;
+      if (!fh || fh.type !== "source" || !fh.nodeId) return;
+      const srcKind = nodes.find((n) => n.id === fh.nodeId)?.type;
+      const opts = dropTargetsFor(srcKind);
+      if (opts.length === 0) return;
+      const me = event as MouseEvent;
+      const sx = me.clientX ?? 0;
+      const sy = me.clientY ?? 0;
+      const flowPos = rf.screenToFlowPosition({ x: sx, y: sy });
+      setDropMenu({ sx, sy, flowPos, srcId: fh.nodeId, opts });
+    },
+    [nodes, rf],
+  );
 
   const save = () => {
     if (!config) return;
@@ -1360,6 +1422,7 @@ function Inner() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onConnectEnd={onConnectEnd}
             onNodeClick={onNodeClick}
             onNodeDoubleClick={onNodeDoubleClick}
             onEdgeClick={onEdgeClick}
@@ -1434,7 +1497,7 @@ function Inner() {
           {/* 节点编辑浮窗已移到 main 层级（见下），画布收起时也能编辑选中的会话 */}
 
           {/* 加节点走右键菜单(右键空白处)；顶部不再放工具条，只留一行淡提示 */}
-          <div className="canvas-hint">右键添加节点 · 拖拽平移 · 滚轮缩放 · Ctrl+Z 撤销</div>
+          <div className="canvas-hint">右键添加节点 · 从端口拖到空白接新节点 · 滚轮缩放 · Ctrl+Z 撤销</div>
           </div>
           )}
 
@@ -1793,6 +1856,30 @@ function Inner() {
                   </button>
                 </>
               )}
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* 拖线到空白处：弹「可连的节点类型」，选一个自动建好并连上(像专业节点编辑器) */}
+      {dropMenu &&
+        createPortal(
+          <div className="ctx-backdrop" onClick={() => setDropMenu(null)} onContextMenu={(e) => { e.preventDefault(); setDropMenu(null); }}>
+            <div className="ctx-menu" style={{ left: dropMenu.sx, top: dropMenu.sy }} onClick={(e) => e.stopPropagation()}>
+              <div className="ctx-head">在此处新建并连上</div>
+              {dropMenu.opts.map((opt) => (
+                <button
+                  key={opt.kind + (opt.handle ?? "")}
+                  className="ctx-item"
+                  onClick={() => {
+                    addNodeConnected(opt.kind, dropMenu.flowPos, dropMenu.srcId, opt.handle);
+                    setDropMenu(null);
+                  }}
+                >
+                  ＋ {NODE_LABEL[opt.kind] ?? opt.kind}
+                  {opt.handle === "fork" ? "（人格口）" : ""}
+                </button>
+              ))}
             </div>
           </div>,
           document.body,
