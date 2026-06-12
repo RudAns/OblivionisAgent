@@ -60,6 +60,11 @@
 :root[data-theme="light"] .lvl-error .log-text {
   color: #cf222e;
 }
+/* 浅色下搜索高亮：暖纸黄底 + 深字(深色那套是暗琥珀底 + 浅字，正好相反) */
+:root[data-theme="light"] .evt-text mark {
+  background: #ffe9a8;
+  color: #5a4300;
+}
 /* 浅色画布底：比应用背景再亮一点点(美术稿 #F8F6F0) */
 :root[data-theme="light"] .react-flow {
   background-color: #f8f6f0;
@@ -1769,12 +1774,12 @@ button.primary {
 .del-btn {
   padding: 3px 8px;
   font-size: 11px;
-  border-color: #5a2a2a;
-  color: #ff8a8a;
+  border-color: color-mix(in srgb, var(--st-err) 45%, var(--border));
+  color: var(--st-err);
 }
 .del-btn:hover {
-  border-color: #ff5d5d;
-  background: #2a1414;
+  border-color: var(--st-err);
+  background: rgba(255, 80, 80, 0.12);
 }
 .field {
   display: flex;
@@ -1972,13 +1977,13 @@ button.primary {
   white-space: pre-wrap;
 }
 .evt-tool {
-  color: #ffb84d;
+  color: var(--st-run);
 }
 .evt-result {
-  color: #00b386;
+  color: var(--st-ok);
 }
 .evt-result.err {
-  color: #ff5d5d;
+  color: var(--st-err);
 }
 
 /* 终端容器：外层 .term-pane 控制 overflow，内层多终端保活堆叠 */
@@ -2283,7 +2288,7 @@ button.primary {
   border: 1px solid rgba(224, 177, 62, 0.35);
   border-left: 3px solid #e0b13e;
   border-radius: 8px;
-  background: #1d2027;
+  background: var(--card);
   padding: 9px 11px;
 }
 .inbox-card.soul {
@@ -2338,12 +2343,12 @@ button.primary {
 }
 .inbox-accept {
   border-color: rgba(87, 171, 90, 0.5);
-  color: #6bc46d;
+  color: var(--st-ok);
   font-size: 12px;
 }
 .inbox-accept:hover {
-  background: #1c2a1d;
-  border-color: #57ab5a;
+  background: rgba(87, 171, 90, 0.14);
+  border-color: var(--st-ok);
 }
 .inbox-dismiss {
   color: var(--muted);
@@ -2358,7 +2363,7 @@ button.primary {
   padding: 2px 4px;
 }
 .inbox-done.accepted .inbox-done-rule {
-  color: #9be38f;
+  color: var(--st-ok);
 }
 .inbox-done-rule {
   flex: 1;
@@ -2394,7 +2399,7 @@ button.primary {
   border-radius: 5px;
 }
 .audit-row:hover {
-  background: #20242c;
+  background: var(--hover);
 }
 .audit-ts {
   color: var(--muted);
@@ -2409,15 +2414,15 @@ button.primary {
   white-space: nowrap;
 }
 .badge-owner {
-  background: #1f3a2a;
-  color: #9be38f;
+  background: rgba(87, 171, 90, 0.18);
+  color: var(--st-ok);
 }
 .badge-guest {
-  background: #3a2a10;
-  color: #ffcf6b;
+  background: rgba(224, 177, 62, 0.2);
+  color: var(--st-run);
 }
 .audit-sender {
-  color: #6fd3ff;
+  color: var(--st-link);
   white-space: nowrap;
 }
 .audit-text {
