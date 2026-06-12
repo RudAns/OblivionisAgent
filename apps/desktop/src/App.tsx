@@ -171,6 +171,10 @@ function Inner() {
     id?: string;
     flow?: { x: number; y: number };
   } | null>(null);
+  // Ctrl+K 命令面板
+  const [cmdkOpen, setCmdkOpen] = useState(false);
+  const [cmdkQuery, setCmdkQuery] = useState("");
+  const [cmdkIndex, setCmdkIndex] = useState(0);
   const [tab, setTab] = useState<Tab>("transcript");
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [inbox, setInbox] = useState<AuditItem[]>([]);
@@ -516,6 +520,11 @@ function Inner() {
       } else if (k === "d") {
         e.preventDefault();
         duplicateSelected();
+      } else if (k === "k") {
+        e.preventDefault();
+        setCmdkQuery("");
+        setCmdkIndex(0);
+        setCmdkOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -783,6 +792,26 @@ function Inner() {
   const activeTermLabel = activeTerminalId
     ? ((nodes.find((n) => n.id === activeTerminalId)?.data as { label?: string })?.label ?? null)
     : null;
+  // Ctrl+K 命令面板的命令清单（添加节点定位到画布中心；外加视图/撤销/重做）
+  const cmdkCenter = () => {
+    const rect = document.querySelector(".react-flow")?.getBoundingClientRect();
+    if (!rect) return undefined;
+    return rf.screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+  };
+  const cmdkCommands: { id: string; label: string; hint?: string; run: () => void }[] = [
+    ...PALETTE.map(([kind, label]) => ({
+      id: `add-${kind}`,
+      label: `添加节点：${label}`,
+      hint: "节点",
+      run: () => addNode(kind, cmdkCenter()),
+    })),
+    { id: "fit", label: "适应视图（看全画布）", hint: "视图", run: () => rf.fitView({ duration: 300, padding: 0.2 }) },
+    { id: "undo", label: "撤销", hint: "Ctrl+Z", run: undo },
+    { id: "redo", label: "重做", hint: "Ctrl+Shift+Z", run: redo },
+  ];
+  const cmdkQ = cmdkQuery.trim().toLowerCase();
+  const cmdkFiltered = cmdkQ ? cmdkCommands.filter((c) => c.label.toLowerCase().includes(cmdkQ)) : cmdkCommands;
+
   const pendingKnowledge = knowledge.filter((k) => k.status === "pending").length;
   const TAB_TITLE: Record<Tab, string> = {
     transcript: selectedIsClaude && selectedLabel ? `转录 · ${selectedLabel} 的访客会话` : "转录 · 访客会话（左侧选择一个会话）",
@@ -952,6 +981,18 @@ function Inner() {
             <button onClick={() => addNode("cron")}>+ 定时任务</button>
             <button onClick={() => addNode("webhook")}>+ Webhook</button>
             <button onClick={() => addNode("soul")}>+ 人格</button>
+            <span className="pal-sep" />
+            <button
+              className="pal-icon"
+              title="命令面板：搜索添加节点 / 运行命令 (Ctrl+K)"
+              onClick={() => {
+                setCmdkQuery("");
+                setCmdkIndex(0);
+                setCmdkOpen(true);
+              }}
+            >
+              ⌘K
+            </button>
           </div>
           </div>
           )}
@@ -1204,6 +1245,62 @@ function Inner() {
                   </button>
                 </>
               )}
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Ctrl+K 命令面板：搜索式快速添加节点 / 运行画布命令 */}
+      {cmdkOpen &&
+        createPortal(
+          <div className="cmdk-backdrop" onClick={() => setCmdkOpen(false)}>
+            <div className="cmdk" onClick={(e) => e.stopPropagation()}>
+              <input
+                className="cmdk-input"
+                autoFocus
+                placeholder="搜索命令 / 添加节点…（↑↓ 选择，Enter 执行，Esc 关闭）"
+                value={cmdkQuery}
+                onChange={(e) => {
+                  setCmdkQuery(e.target.value);
+                  setCmdkIndex(0);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setCmdkOpen(false);
+                  } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setCmdkIndex((i) => Math.min(i + 1, cmdkFiltered.length - 1));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setCmdkIndex((i) => Math.max(i - 1, 0));
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    const c = cmdkFiltered[cmdkIndex];
+                    if (c) {
+                      c.run();
+                      setCmdkOpen(false);
+                    }
+                  }
+                }}
+              />
+              <div className="cmdk-list">
+                {cmdkFiltered.length === 0 && <div className="cmdk-empty">没有匹配的命令</div>}
+                {cmdkFiltered.map((c, i) => (
+                  <button
+                    key={c.id}
+                    className={`cmdk-item ${i === cmdkIndex ? "active" : ""}`}
+                    onMouseEnter={() => setCmdkIndex(i)}
+                    onClick={() => {
+                      c.run();
+                      setCmdkOpen(false);
+                    }}
+                  >
+                    <span>{c.label}</span>
+                    {c.hint && <span className="cmdk-hint">{c.hint}</span>}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>,
           document.body,
