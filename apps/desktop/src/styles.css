@@ -19,23 +19,23 @@
   --overlay-rgb: 27, 30, 36; /* 半透明浮层底（工具条/对齐条等） */
 }
 :root[data-theme="light"] {
-  /* 浅色：参考 Claude 暖白(非纯白) + 黏土橙，分层用不同暖度区分而非纯白堆叠 */
-  --bg: #f3f1e8; /* 主画布暖米白 */
-  --panel: #fbfaf6; /* 浮起面：弹窗/工具条/卡片(暖白，不刺眼) */
-  --border: #e4e1d6;
-  --text: #201f1b;
-  --muted: #74736b;
-  --accent: #c96442; /* 黏土橙 */
-  --frame: #eae7dd; /* 最外框：图标栏/状态栏 */
-  --card: #fbfaf6;
-  --hover: #ece9df;
-  --term-bg: #f5f2ea; /* 终端：暖纸色，别用纯白(太刺眼/不协调) */
-  --scrollbar: #d2cfc3;
-  --scrollbar-hover: #bbb8ab;
-  --input: #efece2;
-  --surface-2: #f0ede3;
-  --accent-rgb: 201, 100, 66; /* #c96442 */
-  --overlay-rgb: 251, 250, 246;
+  /* 浅色：按美术规范的四层表面层级(app/侧栏/工作区/卡片)，避免相邻几乎同色的米白堆叠 */
+  --bg: #f6f3ec; /* ① 应用背景 */
+  --frame: #f1eee6; /* ② 侧栏(图标栏/会话栏)/状态栏 */
+  --panel: #fbfaf7; /* ③ 主工作区(顶栏/面板/弹窗容器) */
+  --card: #ffffff; /* ④ 卡片 */
+  --input: #ffffff; /* ④ 输入框 */
+  --surface-2: #f1eee6; /* 抬升/recessed 面(节点头/标签页) */
+  --hover: #ece8de; /* hover 底(只改底色，不位移) */
+  --border: #ddd8cd;
+  --text: #25231f; /* 主文字 */
+  --muted: #777268; /* 次要文字 */
+  --accent: #d96745; /* 品牌色 */
+  --term-bg: #f5f2ea; /* 终端暖纸色(用户说忽略) */
+  --scrollbar: #d6d1c5;
+  --scrollbar-hover: #c2bcae;
+  --accent-rgb: 217, 103, 69; /* #d96745 */
+  --overlay-rgb: 255, 255, 255;
 }
 /* 浅色下，几处"为深底调的亮色文字"在白底会糊，单独压暗 */
 :root[data-theme="light"] .log-inbound .log-text {
@@ -116,8 +116,8 @@ body {
   align-items: center;
   gap: 8px;
   /* 无边框窗口的标题栏：右侧无内距让窗口控件贴边，整条可拖动 */
-  height: 40px;
-  padding: 0 0 0 12px;
+  height: 52px;
+  padding: 0 0 0 14px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   flex-shrink: 0;
@@ -212,7 +212,7 @@ button.primary {
 
 /* ---- 左侧图标竖栏 ---- */
 .railbar {
-  width: 46px;
+  width: 52px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -755,12 +755,12 @@ button.primary {
   background: #232a36;
 }
 .rail {
-  width: 212px;
+  width: 260px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--bg);
+  background: var(--frame); /* 侧栏层(②)，与应用背景拉开层级 */
   border-right: 1px solid var(--border);
 }
 .rail-head {
@@ -817,7 +817,7 @@ button.primary {
   flex-direction: column;
   gap: 6px;
   padding: 11px 12px;
-  border-radius: 9px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   /* 卡片比侧栏底亮一档 + 轻投影 → 浅/深色下都能从背景里"浮"出来 */
@@ -844,11 +844,8 @@ button.primary {
   opacity: 0.85;
 }
 .rail-card:hover {
-  border-color: rgba(var(--accent-rgb), 0.6);
-  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.14);
-}
-.rail-card:active {
-  transform: translateY(1px);
+  border-color: rgba(var(--accent-rgb), 0.55);
+  background: var(--hover);
 }
 .rail-card.sel {
   border-color: var(--accent);
@@ -1014,10 +1011,10 @@ button.primary {
   flex-direction: column;
   /* 不透明背景（原来 0.97 + blur）：浮窗压在 WebGL 终端上时，backdrop-filter 会逼着
      GPU 每帧重采样终端画面 → 终端一直抖。改纯色去掉 blur，几乎无视觉差别。 */
-  background: var(--panel);
+  background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
   z-index: 10;
 }
 .popup-feishu {
@@ -1029,7 +1026,7 @@ button.primary {
   position: fixed;
   top: auto;
   bottom: 10px;
-  left: 52px;
+  left: 58px;
   width: 288px;
   z-index: 30;
 }
@@ -1125,19 +1122,17 @@ button.primary {
   --nc: #5a6b8c;
   min-width: 178px;
   max-width: 240px;
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--card);
   border: 1px solid color-mix(in srgb, var(--nc) 36%, var(--border));
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.42);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
   font-size: 11.5px;
   overflow: visible;
   transition: box-shadow 0.15s, border-color 0.15s, transform 0.08s;
 }
 .xnode:hover {
   border-color: color-mix(in srgb, var(--nc) 65%, var(--border));
-  box-shadow:
-    0 7px 22px rgba(0, 0, 0, 0.5),
-    0 0 14px color-mix(in srgb, var(--nc) 18%, transparent);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.14);
 }
 .xnode.selected {
   border-color: var(--nc);
@@ -1685,9 +1680,9 @@ button.primary {
   flex: 1;
   background: var(--input);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 8px;
   color: var(--text);
-  padding: 4px 6px;
+  padding: 5px 8px;
 }
 .hint {
   color: var(--muted);
