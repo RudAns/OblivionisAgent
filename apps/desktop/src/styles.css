@@ -1878,7 +1878,7 @@ button.primary {
   align-items: center;
   gap: 10px;
   padding: 4px 10px;
-  background: #161a20;
+  background: var(--surface-2);
   border-bottom: 1px solid var(--border);
   font-size: 11px;
   flex-shrink: 0;
@@ -1900,11 +1900,11 @@ button.primary {
   text-overflow: ellipsis;
 }
 .ti-sid {
-  color: #539bf5;
+  color: var(--accent);
   font-family: "Cascadia Mono", Consolas, monospace;
   font-size: 10.5px;
-  background: rgba(83, 155, 245, 0.12);
-  border: 1px solid rgba(83, 155, 245, 0.3);
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: 4px;
   padding: 0 6px;
   flex-shrink: 0;
