@@ -53,6 +53,8 @@ interface Props {
   helperLines?: { horizontal?: number; vertical?: number };
   /** 运行时高亮的连线 id 集合（流线动画） */
   activeEdges: Set<string>;
+  /** 当前明暗主题：驱动 React Flow colorMode 与背景点/缩略图配色 */
+  theme: "dark" | "light";
 }
 
 const edgeTypes = { default: ConditionEdge };
@@ -141,12 +143,17 @@ export function FlowCanvas(props: Props) {
       onPaneContextMenu={props.onPaneContextMenu}
       defaultEdgeOptions={defaultEdgeOptions}
       connectionLineType={ConnectionLineType.Bezier}
-      colorMode="dark"
+      colorMode={props.theme}
       deleteKeyCode={["Delete"]}
       fitView
       proOptions={{ hideAttribution: true }}
     >
-      <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#2c323d" />
+      <Background
+        variant={BackgroundVariant.Dots}
+        gap={22}
+        size={1.4}
+        color={props.theme === "light" ? "#d9d6cb" : "#2c323d"}
+      />
       <HelperLines horizontal={props.helperLines?.horizontal} vertical={props.helperLines?.vertical} />
       <ZoomIndicator />
       {/* 缩放交给右上角带百分比的指示器，这里只保留 适应视图 / 交互锁，避免两处缩放重复 */}
@@ -158,8 +165,8 @@ export function FlowCanvas(props: Props) {
         nodeStrokeColor={miniMapNodeColor}
         nodeStrokeWidth={3}
         nodeBorderRadius={3}
-        maskColor="rgba(0,0,0,0.6)"
-        style={{ backgroundColor: "#1b1e24" }}
+        maskColor={props.theme === "light" ? "rgba(180,178,166,0.45)" : "rgba(0,0,0,0.6)"}
+        style={{ backgroundColor: props.theme === "light" ? "#ffffff" : "#1b1e24" }}
       />
       {props.nodes.length === 0 && (
         <div className="canvas-empty-guide">

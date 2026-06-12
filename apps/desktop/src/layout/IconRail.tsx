@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { IconGraph, IconTranscript, IconTerminal, IconAudit, IconLogs, IconInbox, IconFeishu, IconSettings } from "./icons.js";
 
-export type RailKey = "canvas" | "transcript" | "terminal" | "audit" | "logs" | "inbox" | "feishu";
+export type RailKey = "canvas" | "transcript" | "terminal" | "audit" | "logs" | "inbox" | "feishu" | "settings";
 
 interface Props {
   /** 画布是否展开（高亮"节点图"项） */
@@ -9,6 +9,7 @@ interface Props {
   /** 右侧面板当前标签 */
   tab: string;
   feishuOpen: boolean;
+  settingsOpen: boolean;
   /** 知识收件箱待裁决数（徽标） */
   inboxBadge?: number;
   onAction: (key: RailKey) => void;
@@ -39,7 +40,7 @@ function RailButton({
  * 最左侧图标竖栏（参考专业 IDE）：不常用的入口收在这里。
  * 节点图(画布开关) / 转录 / 终端 / 审计 / 日志，底部：飞书连接 / 设置(占位)。
  */
-export function IconRail({ canvasOpen, tab, feishuOpen, inboxBadge, onAction }: Props) {
+export function IconRail({ canvasOpen, tab, feishuOpen, settingsOpen, inboxBadge, onAction }: Props) {
   return (
     <nav className="railbar">
       <RailButton title="节点图（展开/收起连线画布）" active={canvasOpen} onClick={() => onAction("canvas")}>
@@ -70,9 +71,9 @@ export function IconRail({ canvasOpen, tab, feishuOpen, inboxBadge, onAction }: 
       <RailButton title="飞书连接" active={feishuOpen} onClick={() => onAction("feishu")}>
         <IconFeishu />
       </RailButton>
-      <button className="railbar-btn dim" title="设置（规划中）" disabled>
+      <RailButton title="设置（主题等）" active={settingsOpen} onClick={() => onAction("settings")}>
         <IconSettings />
-      </button>
+      </RailButton>
     </nav>
   );
 }

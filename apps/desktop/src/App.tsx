@@ -46,6 +46,7 @@ import { SessionSidebar } from "./layout/SessionSidebar.js";
 import { StatusBar } from "./layout/StatusBar.js";
 
 type Tab = "transcript" | "terminal" | "audit" | "logs" | "inbox";
+type ThemePref = "dark" | "light" | "system";
 
 const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">> = {
   "feishu-group": () => ({
@@ -232,6 +233,15 @@ function Inner() {
   const [termRunning, setTermRunning] = useState<Record<string, boolean>>({}); // 各会话终端是否在跑(输出活动)
   const [unseenDone, setUnseenDone] = useState<Record<string, boolean>>({}); // 完成但用户还没切过去看 → 红点
   const [activePaths, setActivePaths] = useState<Record<string, string[]>>({}); // 各会话本轮实际走过的连线(运行时点亮真实链路)
+  // 主题：dark/light/system；resolvedTheme 是 system 解析后的实际明暗，传给画布/终端
+  const [theme, setTheme] = useState<ThemePref>(() => {
+    const t = localStorage.getItem("oblivionis-theme");
+    return t === "light" || t === "system" || t === "dark" ? t : "dark";
+  });
+  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">(
+    () => (document.documentElement.getAttribute("data-theme") as "dark" | "light") || "dark",
+  );
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
@@ -770,10 +780,27 @@ function Inner() {
       setSelectedEdge(null);
       setCtxMenu(null);
       setCmdkOpen(false);
+      setSettingsOpen(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  // 主题：解析 system → 实际明暗，写 data-theme（CSS 变量切换），持久化；system 时跟随系统变化
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const apply = () => {
+      const r = theme === "light" || (theme === "system" && mq.matches) ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", r);
+      setResolvedTheme(r);
+    };
+    apply();
+    localStorage.setItem("oblivionis-theme", theme);
+    if (theme === "system") {
+      mq.addEventListener("change", apply);
+      return () => mq.removeEventListener("change", apply);
+    }
+  }, [theme]);
 
   // 切到某会话(显示其终端)时：记录"在看谁"，并清掉它的完成红点
   useEffect(() => {
@@ -1004,6 +1031,9 @@ function Inner() {
       case "feishu":
         setFeishuOpen((o) => !o);
         break;
+      case "settings":
+        setSettingsOpen((o) => !o);
+        break;
       default:
         setTab(key);
     }
@@ -1110,6 +1140,7 @@ function Inner() {
           canvasOpen={!canvasCollapsed}
           tab={tab}
           feishuOpen={feishuOpen}
+          settingsOpen={settingsOpen}
           inboxBadge={pendingKnowledge}
           onAction={onRailAction}
         />
@@ -1154,6 +1185,7 @@ function Inner() {
             onPaneContextMenu={onPaneContextMenu}
             helperLines={helperLines}
             activeEdges={activeEdgeIds}
+            theme={resolvedTheme}
           />
 
           {/* 多选(≥2)时浮出对齐/分布工具条 */}
@@ -1264,6 +1296,37 @@ function Inner() {
           </div>
         )}
 
+        {/* 设置浮窗（左下角设置按钮触发）：当前放主题切换 */}
+        {settingsOpen && (
+          <div className="popup popup-settings">
+            <div className="popup-head">
+              <span>设置</span>
+              <button className="popup-x" onClick={() => setSettingsOpen(false)} title="隐藏">
+                ×
+              </button>
+            </div>
+            <div className="popup-body">
+              <div className="settings-label">主题</div>
+              <div className="seg">
+                {(
+                  [
+                    ["dark", "🌙 深色"],
+                    ["light", "☀️ 浅色"],
+                    ["system", "🖥️ 跟随系统"],
+                  ] as [ThemePref, string][]
+                ).map(([v, label]) => (
+                  <button key={v} className={`seg-btn ${theme === v ? "on" : ""}`} onClick={() => setTheme(v)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="hint" style={{ marginTop: 10 }}>
+                浅色为基础版（参考 Claude 主页配色），部分细节仍在逐步调色。
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 节点编辑浮窗：挂在 main 层级，画布收起(终端为主)时也能编辑选中的会话——不再是死胡同。
             多选(≥2)时不显单节点检视，避免"显示一个却以为操作全局"的误导(改由对齐工具条主导)。 */}
         {inspectorOpen && selectedNode && multiSelectCount < 2 && (
@@ -1326,6 +1389,7 @@ function Inner() {
                   setOpenedTerminals((o) => o.filter((x) => x !== id));
                   setActiveTerminal((a) => (a === id ? null : a));
                 }}
+                theme={resolvedTheme}
                 onActivity={(id, r) =>
                   setTermRunning((m) => (m[id] === r ? m : { ...m, [id]: r }))
                 }

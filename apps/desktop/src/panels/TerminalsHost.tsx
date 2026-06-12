@@ -10,6 +10,55 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+/** 终端配色：深色(GitHub Dark Dimmed 系) / 浅色(GitHub Light 系)。切主题时整套替换。 */
+const TERM_THEME_DARK = {
+  background: "#1b1e24",
+  foreground: "#dce3ec",
+  cursor: "#4f8cff",
+  cursorAccent: "#1b1e24",
+  selectionBackground: "#2e4f8855",
+  black: "#21262e",
+  red: "#f47067",
+  green: "#57ab5a",
+  yellow: "#e0b13e",
+  blue: "#539bf5",
+  magenta: "#b083f0",
+  cyan: "#39c5cf",
+  white: "#adbac7",
+  brightBlack: "#636e7b",
+  brightRed: "#ff938a",
+  brightGreen: "#6bc46d",
+  brightYellow: "#f0cd58",
+  brightBlue: "#6cb6ff",
+  brightMagenta: "#dcbdfb",
+  brightCyan: "#56d4dd",
+  brightWhite: "#cdd9e5",
+};
+const TERM_THEME_LIGHT = {
+  background: "#ffffff",
+  foreground: "#1f2328",
+  cursor: "#c96442",
+  cursorAccent: "#ffffff",
+  selectionBackground: "#c9644230",
+  black: "#24292f",
+  red: "#cf222e",
+  green: "#116329",
+  yellow: "#7d4e00",
+  blue: "#0969da",
+  magenta: "#8250df",
+  cyan: "#1b7c83",
+  white: "#6e7781",
+  brightBlack: "#57606a",
+  brightRed: "#a40e26",
+  brightGreen: "#1a7f37",
+  brightYellow: "#633c01",
+  brightBlue: "#218bff",
+  brightMagenta: "#a475f9",
+  brightCyan: "#3192aa",
+  brightWhite: "#8c959f",
+};
+const termTheme = (t: "dark" | "light") => (t === "light" ? TERM_THEME_LIGHT : TERM_THEME_DARK);
+
 /** 搜索命中高亮（与主题强调色一致） */
 const SEARCH_DECORATIONS = {
   matchBackground: "#3a4d2f",
@@ -49,12 +98,14 @@ function TerminalView({
   info,
   active,
   repaintTick,
+  theme,
   onActivity,
   onTaskDone,
 }: {
   info: TermInfo;
   active: boolean;
   repaintTick: number;
+  theme: "dark" | "light";
   /** 终端有输出=正在运行，停 700ms=空闲。用于侧栏「扫光」 */
   onActivity?: (running: boolean) => void;
   /** 一次"用户发起的正式任务"跑完（区别于打开会话时 claude 启动的输出）→ 完成红旗 */
@@ -62,6 +113,8 @@ function TerminalView({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
   const fitRef = useRef<FitAddon | null>(null);
   const ptyIdRef = useRef<string | null>(null);
   const onActivityRef = useRef(onActivity);
@@ -148,30 +201,8 @@ function TerminalView({
       scrollback: 8000,
       // unicode-graphemes 插件走 xterm 的 proposed API，必须显式允许（VS Code 同款做法）
       allowProposedApi: true,
-      // 专业 CLI 配色：16 色 ANSI 精修（GitHub Dark Dimmed 系），重点信息(错误红/警告橙/成功绿/链接蓝)对比拉开
-      theme: {
-        background: "#1b1e24",
-        foreground: "#dce3ec",
-        cursor: "#4f8cff",
-        cursorAccent: "#1b1e24",
-        selectionBackground: "#2e4f8855",
-        black: "#21262e",
-        red: "#f47067",
-        green: "#57ab5a",
-        yellow: "#e0b13e",
-        blue: "#539bf5",
-        magenta: "#b083f0",
-        cyan: "#39c5cf",
-        white: "#adbac7",
-        brightBlack: "#636e7b",
-        brightRed: "#ff938a",
-        brightGreen: "#6bc46d",
-        brightYellow: "#f0cd58",
-        brightBlue: "#6cb6ff",
-        brightMagenta: "#dcbdfb",
-        brightCyan: "#56d4dd",
-        brightWhite: "#cdd9e5",
-      },
+      // 16 色 ANSI 精修，按当前明暗主题取（切主题时 effect 里整套替换）
+      theme: termTheme(themeRef.current),
     });
     termRef.current = term;
     const fit = new FitAddon();
@@ -804,6 +835,18 @@ function TerminalView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 切换深/浅主题：整套替换 xterm 配色并刷新（WebGL 图集随之重建）
+  useEffect(() => {
+    const t = termRef.current;
+    if (!t) return;
+    t.options.theme = termTheme(theme);
+    try {
+      t.refresh(0, t.rows - 1);
+    } catch {
+      /* ignore */
+    }
+  }, [theme]);
+
   // 变为可见时：等布局稳定后重新拟合尺寸并重绘缓冲。
   // 注意：绝不做"resize 抖动"去逼 claude 重排——每次重排都会在 scrollback 留残行，
   // 快速左右切换时残行叠加=错乱。真正的根因(零尺寸 resize、WebGL 图集损坏)已分别由
@@ -955,6 +998,7 @@ function TerminalView({
 export function TerminalsHost({
   terminals,
   activeId,
+  theme,
   onActivate,
   onClose,
   onActivity,
@@ -962,6 +1006,7 @@ export function TerminalsHost({
 }: {
   terminals: TermInfo[];
   activeId: string | null;
+  theme: "dark" | "light";
   onActivate: (nodeId: string) => void;
   onClose: (nodeId: string) => void;
   /** 某终端运行/空闲变化 → 上抛给 App 驱动侧栏扫光 */
@@ -1018,6 +1063,7 @@ export function TerminalsHost({
             info={t}
             active={t.nodeId === activeId}
             repaintTick={t.nodeId === activeId ? repaintTick : 0}
+            theme={theme}
             onActivity={(r) => {
               setRunning((m) => (m[t.nodeId] === r ? m : { ...m, [t.nodeId]: r }));
               onActivity?.(t.nodeId, r);

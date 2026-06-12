@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OblivionisAgent</title>
+    <script>
+      // 启动前先定主题，避免深↔浅切换闪一下。system 跟随系统亮/暗。
+      (function () {
+        try {
+          var t = localStorage.getItem("oblivionis-theme") || "dark";
+          var r =
+            t === "light" || (t === "system" && window.matchMedia("(prefers-color-scheme: light)").matches)
+              ? "light"
+              : "dark";
+          document.documentElement.setAttribute("data-theme", r);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
