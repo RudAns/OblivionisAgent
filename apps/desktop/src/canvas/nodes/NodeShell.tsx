@@ -1,4 +1,4 @@
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useStore } from "@xyflow/react";
 import type { ReactNode } from "react";
 
 /**
@@ -25,8 +25,15 @@ export function NodeShell({
   hasSource?: boolean;
   children?: ReactNode;
 }) {
+  // LOD：缩小到 <70% 时只留标题/状态条，不再画元数据(否则文字糊成一片)
+  const zoom = useStore((s) => s.transform[2]);
+  const lod = zoom < 0.7;
   return (
-    <div className={`xnode xnode-${kind} ${selected ? "selected" : ""} ${status ? `xn-${status}` : ""}`}>
+    <div
+      className={`xnode xnode-${kind} ${selected ? "selected" : ""} ${status ? `xn-${status}` : ""} ${
+        lod ? "xn-lod" : ""
+      }`}
+    >
       {hasTarget && <Handle type="target" position={Position.Left} />}
       <div className="xnode-head">
         <span className="xnode-icon">{icon}</span>
@@ -35,7 +42,7 @@ export function NodeShell({
         </span>
         {status && <span className={`xnode-dot status-${status}`} title={status} />}
       </div>
-      {children && <div className="xnode-body">{children}</div>}
+      {!lod && children && <div className="xnode-body">{children}</div>}
       {hasSource && <Handle type="source" position={Position.Right} />}
     </div>
   );

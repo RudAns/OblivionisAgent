@@ -591,6 +591,52 @@ function Inner() {
     [setNodes],
   );
 
+  // 自动布局：按拓扑「最长路径」分层成列(输入源→分流/路由→会话，从左到右)，列内纵向排开，
+  // 同类自然纵向对齐、少交叉。人格(soul)特殊放到所连会话上方。改完 fitView；旧布局靠 Ctrl+Z 撤销。
+  const autoLayout = useCallback(() => {
+    setNodes((ns) => {
+      if (ns.length === 0) return ns;
+      const preds = new Map<string, string[]>();
+      for (const e of edges) {
+        if (!preds.has(e.target)) preds.set(e.target, []);
+        preds.get(e.target)!.push(e.source);
+      }
+      const layerOf = new Map<string, number>();
+      const compute = (id: string, stack: Set<string>): number => {
+        if (layerOf.has(id)) return layerOf.get(id)!;
+        if (stack.has(id)) return 0; // 防环
+        stack.add(id);
+        const ps = preds.get(id) ?? [];
+        const l = ps.length ? Math.max(...ps.map((p) => compute(p, stack))) + 1 : 0;
+        stack.delete(id);
+        layerOf.set(id, l);
+        return l;
+      };
+      for (const n of ns) compute(n.id, new Set());
+      const byLayer = new Map<number, string[]>();
+      for (const n of ns) {
+        if (n.type === "soul") continue; // soul 单独贴到会话上方
+        const l = layerOf.get(n.id) ?? 0;
+        if (!byLayer.has(l)) byLayer.set(l, []);
+        byLayer.get(l)!.push(n.id);
+      }
+      const COL = 320;
+      const ROW = 150;
+      const X0 = 60;
+      const Y0 = 80;
+      const pos = new Map<string, { x: number; y: number }>();
+      for (const [l, ids] of byLayer) ids.forEach((id, i) => pos.set(id, { x: X0 + l * COL, y: Y0 + i * ROW }));
+      for (const n of ns) {
+        if (n.type !== "soul") continue;
+        const tgt = edges.find((e) => e.source === n.id)?.target;
+        const t = tgt ? pos.get(tgt) : undefined;
+        pos.set(n.id, t ? { x: t.x, y: t.y - 120 } : { x: X0, y: Y0 });
+      }
+      return ns.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }));
+    });
+    window.setTimeout(() => rf.fitView({ duration: 400, padding: 0.18 }), 60);
+  }, [edges, setNodes, rf]);
+
   // 复制/粘贴：内部剪贴板存「选中节点 + 完全内部的连线」，粘贴时换新 id、清身份、递增偏移。
   const clipboardRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
   const pasteCountRef = useRef(0);
@@ -1153,6 +1199,7 @@ function Inner() {
         setEdges((es) => es.filter((e) => !ids.has(e.source) && !ids.has(e.target)));
       },
     },
+    { id: "autolayout", label: "自动整理布局（左→右分层）", hint: "画布", run: () => autoLayout() },
     { id: "fit", label: "适应视图（看全画布）", hint: "视图", run: () => rf.fitView({ duration: 300, padding: 0.2 }) },
     { id: "undo", label: "撤销", hint: "Ctrl+Z", run: undo },
     { id: "redo", label: "重做", hint: "Ctrl+Shift+Z", run: redo },
@@ -1667,6 +1714,16 @@ function Inner() {
                     </button>
                   ))}
                   <div className="ctx-sep" />
+                  <button
+                    className="ctx-item"
+                    title="按链路自动排成左→右分层布局（可 Ctrl+Z 撤销）"
+                    onClick={() => {
+                      autoLayout();
+                      setCtxMenu(null);
+                    }}
+                  >
+                    ⌗ 自动整理布局
+                  </button>
                   <button
                     className="ctx-item"
                     onClick={() => {
