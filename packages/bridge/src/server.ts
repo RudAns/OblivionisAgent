@@ -1,4 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { homedir } from "node:os";
 import type { ClientMessage, BridgeMessage, AuditEntry } from "@oblivionis/shared";
 import type { ConfigStore } from "./config-store.js";
 import type { Hub } from "./hub.js";
@@ -107,6 +110,28 @@ export class ControlServer {
         if (before !== after) sessions.invalidate();
         onConfigChanged();
         hub.broadcast({ type: "config", config: store.get() });
+        break;
+      }
+      case "set-claude-theme": {
+        // 切换 App 主题时顺手把 Claude 终端主题也写进 ~/.claude/settings.json，
+        // 这样之后新开的终端里 claude 的 diff/语法配色跟着深/浅。保留其它设置项。
+        try {
+          const file = join(homedir(), ".claude", "settings.json");
+          let json: Record<string, unknown> = {};
+          try {
+            json = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+          } catch {
+            /* 不存在/损坏 → 从空对象起 */
+          }
+          if (json.theme !== msg.theme) {
+            json.theme = msg.theme;
+            mkdirSync(dirname(file), { recursive: true });
+            writeFileSync(file, JSON.stringify(json, null, 2));
+            log.info(`已同步 Claude 终端主题: ${msg.theme}`);
+          }
+        } catch (e) {
+          log.warn(`同步 Claude 主题失败: ${(e as Error).message}`);
+        }
         break;
       }
       case "feishu-set":

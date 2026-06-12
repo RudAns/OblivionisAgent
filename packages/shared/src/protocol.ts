@@ -22,6 +22,8 @@ export type ClientMessage =
   | { type: "feishu-disconnect" }
   /** 列出某工作目录下的所有 Claude 会话（用于挑选 fork 基础会话） */
   | { type: "list-sessions"; cwd: string }
+  /** 切换 App 明暗主题时，顺手把 Claude 终端主题写进 ~/.claude/settings.json */
+  | { type: "set-claude-theme"; theme: "light" | "dark" }
   /** 用手机号/邮箱查 open_id（在本机刻意设置主人，不依赖飞书消息） */
   | { type: "lookup-openid"; mobile?: string; email?: string }
   /** 重新从基础会话 fork 出访客会话并脱敏（刷新快照） */

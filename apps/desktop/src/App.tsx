@@ -42,6 +42,7 @@ import { AuditPanel, type AuditItem } from "./panels/AuditPanel.js";
 import { InboxPanel } from "./panels/InboxPanel.js";
 import { FeishuPanel, FeishuStatusDot, type FeishuState } from "./panels/FeishuPanel.js";
 import { IconRail, type RailKey } from "./layout/IconRail.js";
+import { IconMoon, IconSun, IconMonitor } from "./layout/icons.js";
 import { SessionSidebar } from "./layout/SessionSidebar.js";
 import { StatusBar } from "./layout/StatusBar.js";
 
@@ -243,6 +244,7 @@ function Inner() {
     () => (document.documentElement.getAttribute("data-theme") as "dark" | "light") || "dark",
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [themeNotice, setThemeNotice] = useState(false); // 切主题后提示"已同步 Claude、需重开终端"
   const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
@@ -806,6 +808,18 @@ function Inner() {
     }
   }, [theme]);
 
+  // 用户在设置里主动切主题：更新 App 主题 + 顺手把 Claude 终端主题写进 ~/.claude/settings.json。
+  // 只在"主动切换"时同步(不在每次启动/系统变化时写)，避免覆盖用户在别处设的 Claude 主题。
+  const applyTheme = (v: ThemePref) => {
+    setTheme(v);
+    const resolved =
+      v === "light" || (v === "system" && window.matchMedia("(prefers-color-scheme: light)").matches)
+        ? "light"
+        : "dark";
+    client.send({ type: "set-claude-theme", theme: resolved });
+    setThemeNotice(true);
+  };
+
   // 点浮窗外部 → 关闭浮窗（设置/飞书/节点·连线编辑）。点浮窗内、或点该浮窗自己的触发器
   // (data-popup)不关——触发器自身的 onClick 负责 toggle；点别的浮窗触发器则照常关本浮窗。
   useEffect(() => {
@@ -1332,19 +1346,27 @@ function Inner() {
               <div className="seg">
                 {(
                   [
-                    ["dark", "🌙 深色"],
-                    ["light", "☀️ 浅色"],
-                    ["system", "🖥️ 跟随系统"],
-                  ] as [ThemePref, string][]
-                ).map(([v, label]) => (
-                  <button key={v} className={`seg-btn ${theme === v ? "on" : ""}`} onClick={() => setTheme(v)}>
+                    ["dark", "深色", IconMoon],
+                    ["light", "浅色", IconSun],
+                    ["system", "跟随系统", IconMonitor],
+                  ] as [ThemePref, string, (p: { size?: number }) => JSX.Element][]
+                ).map(([v, label, Icon]) => (
+                  <button key={v} className={`seg-btn ${theme === v ? "on" : ""}`} onClick={() => applyTheme(v)}>
+                    <Icon size={14} />
                     {label}
                   </button>
                 ))}
               </div>
-              <div className="hint" style={{ marginTop: 10 }}>
-                浅色为基础版（参考 Claude 主页配色），部分细节仍在逐步调色。
-              </div>
+              {themeNotice ? (
+                <div className="hint settings-notice" style={{ marginTop: 10 }}>
+                  已同步 Claude 终端主题（写入 ~/.claude/settings.json）。<b>已开着的终端需重开</b>、
+                  或重启软件后才生效。
+                </div>
+              ) : (
+                <div className="hint" style={{ marginTop: 10 }}>
+                  切换会一并设置 Claude 终端主题；浅色参考 Claude 主页配色，部分细节仍在调。
+                </div>
+              )}
             </div>
           </div>
         )}

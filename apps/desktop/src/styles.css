@@ -992,6 +992,10 @@ button.primary {
 }
 .seg-btn {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   padding: 6px 4px;
   border: none;
   border-radius: 6px;
@@ -1001,6 +1005,9 @@ button.primary {
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s, color 0.12s;
+}
+.seg-btn svg {
+  flex-shrink: 0;
 }
 .seg-btn:hover {
   color: var(--text);
@@ -1946,7 +1953,8 @@ button.primary {
   /* 左右各留 ~10px(半个多字符)，长行文字不贴边；fit 会据此少算一列、提前折行 */
   padding: 6px 10px 6px 10px;
   overflow: hidden;
-  background: var(--panel);
+  /* 用终端色，让这圈 padding 与终端融为一体(原来是 --panel，浅色下成了白边一圈) */
+  background: var(--term-bg);
 }
 /* 只让 .xterm 根填满容器；绝不强撑 .xterm-screen——它被拉高后，
    WebGL 画布只绘 rows*cellHeight 的格子，多出来那截被清成【纯黑】=底部黑带。

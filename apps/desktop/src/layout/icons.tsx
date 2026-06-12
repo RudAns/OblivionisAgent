@@ -90,6 +90,35 @@ export function IconInbox({ size }: IconProps) {
   );
 }
 
+/** 深色（月亮） */
+export function IconMoon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M20.5 13.3A8.2 8.2 0 1 1 10.7 3.5 6.4 6.4 0 0 0 20.5 13.3Z" />
+    </svg>
+  );
+}
+
+/** 浅色（太阳） */
+export function IconSun({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.5 1.5M18.3 18.3l1.5 1.5M2.5 12h2M19.5 12h2M4.2 19.8l1.5-1.5M18.3 5.7l1.5-1.5" />
+    </svg>
+  );
+}
+
+/** 跟随系统（显示器） */
+export function IconMonitor({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <rect x="3" y="4.5" width="18" height="12" rx="2" />
+      <path d="M9 20.5h6M12 16.5v4" />
+    </svg>
+  );
+}
+
 /** 设置（齿轮） */
 export function IconSettings({ size }: IconProps) {
   return (
