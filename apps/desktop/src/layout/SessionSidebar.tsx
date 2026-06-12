@@ -28,7 +28,6 @@ export function SessionSidebar({
   openedTerminals,
   termRunning,
   unseenDone,
-  onSelect,
   onOpenTerminal,
   onAddSession,
 }: Props) {
@@ -56,7 +55,7 @@ export function SessionSidebar({
               className={`rail-card ${activeTerminalId === n.id ? "active" : ""} ${
                 selected === n.id && activeTerminalId !== n.id ? "sel" : ""
               } ${sweep}`}
-              title={`${d.cwd || ""}\n单击=打开/聚焦开发终端 · 💬=看访客转录`}
+              title={`${d.cwd || ""}\n单击=打开/聚焦开发终端`}
               onClick={() => onOpenTerminal(n.id)}
             >
               <div className="rail-card-top">
@@ -65,19 +64,22 @@ export function SessionSidebar({
                 {done && <span className="rail-flag" title="有已完成的回复，还没查看" />}
                 {open && (
                   <span className="rail-open" title="终端已打开">
-                    ▮
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="1.8" y="3" width="12.4" height="10" rx="2.2" />
+                      <path d="M4.6 6.4 6.8 8.1 4.6 9.8" />
+                      <line x1="8.2" y1="10" x2="11" y2="10" />
+                    </svg>
                   </span>
                 )}
-                <button
-                  className="rail-transcript"
-                  title="查看访客会话转录（少用）"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelect(n.id);
-                  }}
-                >
-                  💬
-                </button>
               </div>
               <div className="rail-cwd">{d.cwd || "(未设置工作区)"}</div>
             </div>

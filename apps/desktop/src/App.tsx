@@ -233,6 +233,7 @@ function Inner() {
   const [activeTerminal, setActiveTerminal] = useState<string | null>(null); // 当前显示的终端(独立状态)
   const [termRunning, setTermRunning] = useState<Record<string, boolean>>({}); // 各会话终端是否在跑(输出活动)
   const [unseenDone, setUnseenDone] = useState<Record<string, boolean>>({}); // 完成但用户还没切过去看 → 红点
+  const [activePaths, setActivePaths] = useState<Record<string, string[]>>({}); // 各会话本轮实际走过的连线(运行时点亮真实链路)
   const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
@@ -316,6 +317,19 @@ function Inner() {
               nd.id === msg.nodeId ? { ...nd, data: { ...nd.data, status: msg.status } } : nd,
             ),
           );
+          break;
+        }
+        case "session-active-path": {
+          // 运行时实际走过的连线：空=熄灭该会话的活动链路
+          setActivePaths((m) => {
+            if (msg.edgeIds.length === 0) {
+              if (!m[msg.nodeId]) return m;
+              const next = { ...m };
+              delete next[msg.nodeId];
+              return next;
+            }
+            return { ...m, [msg.nodeId]: msg.edgeIds };
+          });
           break;
         }
         case "log":
@@ -908,7 +922,8 @@ function Inner() {
   const selectedIsClaude = selectedNode?.type === "claude-session";
   const multiSelectCount = nodes.reduce((a, n) => a + (n.selected ? 1 : 0), 0);
 
-  // 运行时高亮：从所有 running 节点沿入边回溯，标记整条上游链路上的连线 → 放流线动画
+  // 运行时高亮：每个 running 会话——若引擎报来了"本轮真实链路"(activePaths)就只点亮那条，
+  // 避免汇聚会话两条入边都亮；否则(cron/webhook 等无路由)回退为沿入边回溯整条上游链路。
   const activeEdgeIds = useMemo(() => {
     const runningIds = nodes
       .filter((n) => (n.data as { status?: string } | undefined)?.status === "running")
@@ -921,20 +936,28 @@ function Inner() {
       else incoming.set(e.target, [e]);
     }
     const active = new Set<string>();
-    const visited = new Set<string>(runningIds);
-    const frontier = [...runningIds];
-    while (frontier.length) {
-      const cur = frontier.pop()!;
-      for (const e of incoming.get(cur) ?? []) {
-        active.add(e.id);
-        if (!visited.has(e.source)) {
-          visited.add(e.source);
-          frontier.push(e.source);
+    for (const rid of runningIds) {
+      const reported = activePaths[rid];
+      if (reported && reported.length) {
+        for (const eid of reported) active.add(eid); // 真实链路：只点这条
+        continue;
+      }
+      // 回退：从该 running 节点沿入边回溯整条上游链路
+      const visited = new Set<string>([rid]);
+      const frontier = [rid];
+      while (frontier.length) {
+        const cur = frontier.pop()!;
+        for (const e of incoming.get(cur) ?? []) {
+          active.add(e.id);
+          if (!visited.has(e.source)) {
+            visited.add(e.source);
+            frontier.push(e.source);
+          }
         }
       }
     }
     return active;
-  }, [nodes, edges]);
+  }, [nodes, edges, activePaths]);
 
   // 折叠菜单用：画布上所有 Claude 会话节点（单击选择看转录·访客会话 / 双击打开开发终端）
   const claudeNodes = nodes.filter((n) => n.type === "claude-session");

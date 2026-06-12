@@ -327,6 +327,8 @@ async function main() {
     log.info(`处理消息 from=${inbound.senderId} owner=${isOwner} perm=${permissionMode}${inbound.quoted ? " (含引用)" : ""}`);
 
     const replyOpts = { replyToMessageId: inbound.messageId, atUserId: inbound.senderId };
+    // 运行时点亮真实链路：把这条消息实际走过的连线告诉 GUI（汇聚会话就不会两条入边都亮）
+    hub.broadcast({ type: "session-active-path", nodeId: node.id, edgeIds: resolved.pathEdgeIds });
     try {
       const reply = await sessions.send(node.id, finalText, permissionMode, appendPrompt, {
         nodeId: node.id,
@@ -383,6 +385,9 @@ async function main() {
       const errMsg = `⚠️ 处理失败: ${(e as Error).message}`;
       log.error(errMsg);
       await gateway.transport?.reply(inbound.chatId, errMsg, replyOpts).catch(() => {});
+    } finally {
+      // 本轮结束(成功或失败)：熄灭该会话的活动链路
+      hub.broadcast({ type: "session-active-path", nodeId: node.id, edgeIds: [] });
     }
     } catch (outerErr) {
       // 路由/分类/解析等环节出错：别静默吞，回一条兜底提示

@@ -116,6 +116,9 @@ export type BridgeMessage =
       sessionId: string;
       status: SessionStatus;
     }
+  /** 运行时实际走过的连线（用于画布"只点亮真实链路"，避免汇聚会话两条入边都亮）。
+   *  edgeIds 为空 = 清除该会话的活动链路。 */
+  | { type: "session-active-path"; nodeId: string; edgeIds: string[] }
   /** 回灌到飞书的出站消息（镜像给 GUI 展示） */
   | { type: "outbound"; chatId: string; text: string; ts: number }
   | { type: "pty-opened"; ptyId: string; nodeId: string }

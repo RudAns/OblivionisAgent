@@ -11,6 +11,8 @@ export interface RouteResult {
   text: string;
   /** 用户原始消息（去 @、不含任何路由前缀/系统注入）——知识提取/群记忆只看它，避免把前缀/系统提示词当成规则 */
   userText: string;
+  /** 本条消息实际走过的连线 id（群→…→会话）——画布运行时只点亮这条真实链路 */
+  pathEdgeIds: string[];
 }
 
 /** 意图分类器：给定消息和候选意图，返回命中第几个(1..N)或 0(都不命中) */
@@ -51,6 +53,7 @@ export async function route(
   const intentText = stripMentions(inbound.text, mentionKeys); // 用于意图分类的干净用户消息
   let text = inbound.text;
   const visited = new Set<string>();
+  const pathEdgeIds: string[] = []; // 累计实际走过的连线
   let cursor: GraphNode | undefined = group;
 
   while (cursor) {
@@ -81,12 +84,13 @@ export async function route(
       else chosen = fallback ?? conditional[0]!; // 都不匹配：有默认边走它，否则退到第一条
     }
     if (!chosen) break;
+    pathEdgeIds.push(chosen.id);
 
     const next: GraphNode | undefined = nodes.find((n) => n.id === chosen!.target);
     if (!next) break;
 
     if (next.kind === "claude-session") {
-      return { sessionNode: next, text: text.trim(), userText: intentText };
+      return { sessionNode: next, text: text.trim(), userText: intentText, pathEdgeIds };
     }
     cursor = next;
   }

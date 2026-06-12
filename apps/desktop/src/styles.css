@@ -821,8 +821,10 @@ button.primary {
 }
 .rail-open {
   color: var(--accent);
-  font-size: 10px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.92;
 }
 
 /* ===== 运行时扫光（会话卡片）：fork 跑=蓝，终端跑=绿，两个都跑=彩色 ===== */
