@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import type { Node } from "@xyflow/react";
 
 interface Props {
@@ -31,6 +32,17 @@ export function SessionSidebar({
   onOpenTerminal,
   onAddSession,
 }: Props) {
+  // 会话多时才露出搜索框：按名称/工作区过滤，找会话不用一路滚
+  const [q, setQ] = useState("");
+  const showSearch = claudeNodes.length > 6;
+  const query = q.trim().toLowerCase();
+  const shown = useMemo(() => {
+    if (!query) return claudeNodes;
+    return claudeNodes.filter((n) => {
+      const d = n.data as { label?: string; cwd?: string };
+      return `${d.label ?? ""} ${d.cwd ?? ""}`.toLowerCase().includes(query);
+    });
+  }, [claudeNodes, query]);
   return (
     <div className="rail">
       <div className="rail-head">
@@ -39,9 +51,27 @@ export function SessionSidebar({
           +
         </button>
       </div>
+      {showSearch && (
+        <div className="rail-search">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="搜索会话 / 工作区…"
+            spellCheck={false}
+          />
+          {q && (
+            <button className="rail-search-x" title="清除" onClick={() => setQ("")}>
+              ×
+            </button>
+          )}
+        </div>
+      )}
       <div className="rail-list">
         {claudeNodes.length === 0 && <div className="rail-empty">还没有 Claude 会话节点</div>}
-        {claudeNodes.map((n) => {
+        {claudeNodes.length > 0 && shown.length === 0 && (
+          <div className="rail-empty">没有匹配「{q}」的会话</div>
+        )}
+        {shown.map((n) => {
           const d = n.data as { label?: string; cwd?: string; status?: string };
           const open = openedTerminals.includes(n.id);
           const forkRun = d.status === "running"; // 飞书 fork 正在处理

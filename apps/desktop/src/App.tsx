@@ -930,6 +930,22 @@ function Inner() {
     setCanvasCollapsed(true); // 打开终端 → 退出节点视图，终端占满
   }, []);
 
+  // 在节点视图里定位某节点：确保画布展开 → 选中 → 平滑居中。供会话侧栏点击 / Ctrl+K 搜索复用。
+  const locateNode = useCallback(
+    (nodeId: string) => {
+      setCanvasCollapsed(false);
+      setSelected(nodeId);
+      setNodes((ns) => ns.map((nd) => ({ ...nd, selected: nd.id === nodeId })));
+      const n = nodes.find((x) => x.id === nodeId);
+      if (n) {
+        const w = n.measured?.width ?? 180;
+        const h = n.measured?.height ?? 90;
+        rf.setCenter(n.position.x + w / 2, n.position.y + h / 2, { zoom: 1, duration: 400 });
+      }
+    },
+    [nodes, setNodes, rf],
+  );
+
   // 一键重开所有终端(卸载→重挂)：claude 以 --resume 重启，按新主题整屏重渲染(含 diff/语法色)，
   // 会话/历史靠 resume 保留。用于切主题后让已开终端里 Claude 的配色也跟着变。
   const reopenAllTerminals = () => {
@@ -1233,6 +1249,17 @@ function Inner() {
     { id: "fit", label: "适应视图（看全画布）", hint: "视图", run: () => rf.fitView({ duration: 300, padding: 0.2 }) },
     { id: "undo", label: "撤销", hint: "Ctrl+Z", run: undo },
     { id: "redo", label: "重做", hint: "Ctrl+Shift+Z", run: redo },
+    // 每个节点一条「定位」命令：输入名字即可搜索并平滑跳到它，会话/节点多时找位置很方便
+    ...nodes.map((n) => {
+      const dl = (n.data as { label?: string } | undefined)?.label;
+      const kindLabel = PALETTE.find(([k]) => k === n.type)?.[1] ?? n.type ?? "节点";
+      return {
+        id: `loc-${n.id}`,
+        label: `定位节点：${dl ? `${dl}（${kindLabel}）` : kindLabel}`,
+        hint: "搜索",
+        run: () => locateNode(n.id),
+      };
+    }),
   ];
   const cmdkQ = cmdkQuery.trim().toLowerCase();
   const cmdkFiltered = cmdkQ ? cmdkCommands.filter((c) => c.label.toLowerCase().includes(cmdkQ)) : cmdkCommands;
@@ -1316,14 +1343,7 @@ function Inner() {
           onOpenTerminal={(id) => {
             if (!canvasCollapsed) {
               // 节点视图下点会话 → 定位到该节点(选中+居中)，会话多时方便找位置，不切去终端
-              setSelected(id);
-              setNodes((ns) => ns.map((nd) => ({ ...nd, selected: nd.id === id })));
-              const n = nodes.find((x) => x.id === id);
-              if (n) {
-                const w = n.measured?.width ?? 180;
-                const h = n.measured?.height ?? 90;
-                rf.setCenter(n.position.x + w / 2, n.position.y + h / 2, { zoom: 1, duration: 400 });
-              }
+              locateNode(id);
             } else {
               openTerminalForNode(id);
             }
@@ -1673,17 +1693,22 @@ function Inner() {
                         ⎘ 复制 <span className="ctx-kbd">Ctrl+C</span>
                       </button>
                       <div className="ctx-sep" />
-                      <button
-                        className="ctx-item danger"
-                        title="删除节点及其连线（可 Ctrl+Z 撤销）"
-                        onClick={() => {
-                          const id = ctxMenu.id!;
-                          setCtxMenu(null);
-                          deleteNodeById(id);
-                        }}
-                      >
-                        🗑 删除
-                      </button>
+                      {(() => {
+                        const broken = edges.filter((e) => e.source === ctxMenu.id || e.target === ctxMenu.id).length;
+                        return (
+                          <button
+                            className="ctx-item danger"
+                            title="删除节点及其连线（可 Ctrl+Z 撤销）"
+                            onClick={() => {
+                              const id = ctxMenu.id!;
+                              setCtxMenu(null);
+                              deleteNodeById(id);
+                            }}
+                          >
+                            🗑 删除{broken > 0 ? `（断开 ${broken} 条连线）` : ""}
+                          </button>
+                        );
+                      })()}
                     </>
                   );
                 })()}

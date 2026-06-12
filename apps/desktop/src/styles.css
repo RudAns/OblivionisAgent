@@ -17,6 +17,11 @@
   --surface-2: #1d2128; /* 抬升面：行 hover / 次级卡片 */
   --accent-rgb: 79, 140, 255; /* 强调色 rgb（供 rgba 微光/选区用，随主题变） */
   --overlay-rgb: 27, 30, 36; /* 半透明浮层底（工具条/对齐条等） */
+  /* 语义状态色：运行(暖)/出错(红)/成功(绿)/链接(蓝)。浅色单独压暗，避免霓虹刺眼 */
+  --st-run: #ffb84d;
+  --st-err: #ff5d5d;
+  --st-ok: #5fd08a;
+  --st-link: #6aa6ff;
 }
 :root[data-theme="light"] {
   /* 浅色：按美术规范的四层表面层级(app/侧栏/工作区/卡片)，避免相邻几乎同色的米白堆叠 */
@@ -36,6 +41,11 @@
   --scrollbar-hover: #c2bcae;
   --accent-rgb: 217, 103, 69; /* #d96745 */
   --overlay-rgb: 255, 255, 255;
+  /* 浅色语义状态色(美术规范)：成功#2F8F5B / 警告#B7791F / 链接#4169C1，外加偏稳的红 */
+  --st-run: #b7791f;
+  --st-err: #c0392b;
+  --st-ok: #2f8f5b;
+  --st-link: #4169c1;
 }
 /* 浅色下，几处"为深底调的亮色文字"在白底会糊，单独压暗 */
 :root[data-theme="light"] .log-inbound .log-text {
@@ -318,7 +328,7 @@ button.primary {
 }
 .sb-btn:hover {
   color: var(--text);
-  background: #1d222b;
+  background: var(--hover);
   border: none;
 }
 .sb-flex {
@@ -757,7 +767,7 @@ button.primary {
 .canvas-collapse:hover {
   color: var(--text);
   border-color: var(--accent);
-  background: #232a36;
+  background: var(--hover);
 }
 .rail {
   width: 260px;
@@ -800,7 +810,53 @@ button.primary {
 .rail-toggle:hover {
   color: var(--text);
   border-color: var(--accent);
-  background: #232a36;
+  background: var(--hover);
+}
+/* 会话搜索框：会话多时才出现，过滤名称/工作区 */
+.rail-search {
+  position: relative;
+  padding: 8px 8px 0;
+  flex-shrink: 0;
+}
+.rail-search input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 24px 0 9px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--input);
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.rail-search input:focus {
+  border-color: var(--accent);
+}
+.rail-search input::placeholder {
+  color: var(--muted);
+}
+.rail-search-x {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: var(--hover);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rail-search-x:hover {
+  color: var(--text);
 }
 .rail-list {
   flex: 1;
@@ -871,10 +927,10 @@ button.primary {
   background: var(--scrollbar-hover);
 }
 .rail-dot.status-running {
-  background: #ffb84d;
+  background: var(--st-run);
 }
 .rail-dot.status-error {
-  background: #ff5d5d;
+  background: var(--st-err);
 }
 .rail-label {
   flex: 1;
@@ -1205,12 +1261,12 @@ button.primary {
   flex-shrink: 0;
 }
 .xnode-dot.status-running {
-  background: #ffb84d;
-  box-shadow: 0 0 6px #ffb84d;
+  background: var(--st-run);
+  box-shadow: 0 0 6px var(--st-run);
 }
 .xnode-dot.status-error {
-  background: #ff5d5d;
-  box-shadow: 0 0 6px #ff5d5d;
+  background: var(--st-err);
+  box-shadow: 0 0 6px var(--st-err);
 }
 .xnode-body {
   padding: 7px 10px 8px;
@@ -1388,20 +1444,20 @@ button.primary {
   padding: 0;
   border-radius: 50%;
   border: 1px solid var(--border);
-  background: #2a2e36;
-  color: #ff8585;
+  background: var(--card);
+  color: var(--st-err);
   font-size: 13px;
   line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.25);
   transition: background 0.12s, border-color 0.12s;
 }
 .edge-del:hover {
-  background: rgba(255, 80, 80, 0.22);
-  border-color: #ff8585;
+  background: rgba(255, 80, 80, 0.18);
+  border-color: var(--st-err);
 }
 
 /* ---- nodes ---- */
@@ -1636,10 +1692,10 @@ button.primary {
   color: var(--muted);
 }
 .status-running {
-  color: #ffb84d;
+  color: var(--st-run);
 }
 .status-error {
-  color: #ff5d5d;
+  color: var(--st-err);
 }
 
 /* ---- inspector ---- */

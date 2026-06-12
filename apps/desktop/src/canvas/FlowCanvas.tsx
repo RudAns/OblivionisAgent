@@ -84,7 +84,8 @@ const NODE_COLORS: Record<string, string> = {
   webhook: "#b7791f",
   soul: "#8167b2",
 };
-const miniMapNodeColor = (node: Node) => NODE_COLORS[node.type ?? ""] ?? "#3a4250";
+// 缩略图降饱和：只突出选中节点(用本色)，其余统一灰，避免一堆彩点喧宾夺主
+const miniMapNodeColor = (node: Node) => (node.selected ? NODE_COLORS[node.type ?? ""] ?? "#888" : "#c3bdb0");
 
 // 合法连线语法（像专业节点编辑器一样，连错当场拒绝）：
 //   群/路由/分流/定时/Webhook → 路由/分流/会话（cron/webhook 只直连会话）
