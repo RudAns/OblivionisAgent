@@ -182,16 +182,17 @@ button.primary {
   align-items: center;
   gap: 10px;
   padding: 7px 12px;
-  background: #2a2410;
-  border-bottom: 1px solid #4a3f12;
-  color: #ffcf6b;
+  background: color-mix(in srgb, #b7791f 14%, var(--panel));
+  border-bottom: 1px solid color-mix(in srgb, #b7791f 35%, var(--border));
+  color: color-mix(in srgb, #b7791f 70%, var(--text));
   font-size: 12px;
 }
 .banner code {
   background: var(--input);
+  border: 1px solid var(--border);
   padding: 1px 6px;
-  border-radius: 3px;
-  color: #6fd3ff;
+  border-radius: 4px;
+  color: var(--accent);
 }
 .banner .ghost {
   background: transparent;

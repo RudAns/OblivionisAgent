@@ -54,6 +54,8 @@ interface Props {
   helperLines?: { horizontal?: number; vertical?: number };
   /** 运行时高亮的连线 id 集合（流线动画） */
   activeEdges: Set<string>;
+  /** 选中节点的上下游链路连线集合(其它连线降透明度)；null=未聚焦 */
+  focusEdges: Set<string> | null;
   /** 当前明暗主题：驱动 React Flow colorMode 与背景点/缩略图配色 */
   theme: "dark" | "light";
   /** 各会话节点 transcript 最终修改时间，供节点卡显示日期 */
@@ -124,7 +126,10 @@ export function FlowCanvas(props: Props) {
     [kindById],
   );
 
-  const runtimeValue = useMemo(() => ({ activeEdges: props.activeEdges }), [props.activeEdges]);
+  const runtimeValue = useMemo(
+    () => ({ activeEdges: props.activeEdges, focusEdges: props.focusEdges }),
+    [props.activeEdges, props.focusEdges],
+  );
   const metaValue = useMemo(() => ({ metas: props.nodeMetas }), [props.nodeMetas]);
 
   return (

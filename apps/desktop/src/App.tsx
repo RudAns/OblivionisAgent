@@ -1106,6 +1106,36 @@ function Inner() {
     return active;
   }, [nodes, edges, activePaths]);
 
+  // 聚焦高亮：选中单个节点时，它上下游链路上的连线集合（其它连线降透明度）。无选中=null。
+  const focusEdgeIds = useMemo(() => {
+    if (!selected || multiSelectCount > 1) return null;
+    const out = new Map<string, Edge[]>();
+    const inc = new Map<string, Edge[]>();
+    for (const e of edges) {
+      (out.get(e.source) ?? (out.set(e.source, []), out.get(e.source)!)).push(e);
+      (inc.get(e.target) ?? (inc.set(e.target, []), inc.get(e.target)!)).push(e);
+    }
+    const set = new Set<string>();
+    const walk = (start: string, adj: Map<string, Edge[]>, next: (e: Edge) => string) => {
+      const seen = new Set([start]);
+      const stack = [start];
+      while (stack.length) {
+        const cur = stack.pop()!;
+        for (const e of adj.get(cur) ?? []) {
+          set.add(e.id);
+          const nx = next(e);
+          if (!seen.has(nx)) {
+            seen.add(nx);
+            stack.push(nx);
+          }
+        }
+      }
+    };
+    walk(selected, out, (e) => e.target); // 下游
+    walk(selected, inc, (e) => e.source); // 上游
+    return set.size ? set : null; // 选中孤立节点(无连线)不做聚焦，免得把所有线都压暗
+  }, [selected, multiSelectCount, edges]);
+
   // 折叠菜单用：画布上所有 Claude 会话节点（单击选择看转录·访客会话 / 双击打开开发终端）
   const claudeNodes = nodes.filter((n) => n.type === "claude-session");
 
@@ -1327,6 +1357,7 @@ function Inner() {
             onPaneContextMenu={onPaneContextMenu}
             helperLines={helperLines}
             activeEdges={activeEdgeIds}
+            focusEdges={focusEdgeIds}
             theme={resolvedTheme}
             nodeMetas={sessionMetas}
           />

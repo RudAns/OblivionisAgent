@@ -47,17 +47,19 @@ export function ConditionEdge({
   };
 
   // 运行时：该连线在"正被处理的链路"上时整条流动起来（上游回溯，见 EdgeRuntimeContext）
-  const { activeEdges } = useContext(EdgeRuntimeContext);
+  const { activeEdges, focusEdges } = useContext(EdgeRuntimeContext);
   const flowing = activeEdges.has(id);
+  const dimmed = focusEdges != null && !focusEdges.has(id); // 选中节点时，不在其链路上的连线降透明
 
   const active = hovered || selected;
   // 只在有意图条件时显示标签(不再有重复的"＋意图"占位；加条件走右键菜单)
   const showBadge = !!cond;
+  const baseStyle = dimmed ? { ...style, opacity: 0.22 } : style;
   const mergedStyle = active
-    ? { ...style, stroke: "#4e6f9e", strokeWidth: 2.2 } // 选中/hover：美术稿选中连线色
+    ? { ...baseStyle, stroke: "#4e6f9e", strokeWidth: 2.2, opacity: 1 } // 选中/hover：美术稿选中连线色
     : flowing
-      ? { ...style, stroke: "#6f86a8", strokeWidth: 2.2 }
-      : style;
+      ? { ...baseStyle, stroke: "#6f86a8", strokeWidth: 2.2 }
+      : baseStyle;
 
   return (
     <>
@@ -87,6 +89,7 @@ export function ConditionEdge({
               position: "absolute",
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
               pointerEvents: "all",
+              opacity: dimmed && !active ? 0.3 : 1,
             }}
             onMouseEnter={enter}
             onMouseLeave={leave}
