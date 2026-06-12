@@ -43,7 +43,7 @@ export function ClaudeSessionNode({ id, data, selected }: NodeProps) {
       <Handle type="target" id="fork" position={Position.Top} className="soul-port" style={{ left: "50%" }} />
       <span className="soul-port-label" style={{ left: "50%" }}>🎭人格</span>
 
-      <Row k="cwd" v={tailTruncate(d.cwd) || "(未设置)"} dim={!d.cwd} />
+      <Row k="cwd" v={tailTruncate(d.cwd) || "(未设置)"} dim={!d.cwd} title={d.cwd || undefined} />
       <Row k="模型" v={d.model || "默认"} />
       <Row k="权限" v={`${d.permissionMode} / ${d.guestPermissionMode ?? "default"}`} />
       {/* 原始(终端)会话：显示最终修改日期，而非人类不可读的 md5 sid */}

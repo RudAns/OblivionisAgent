@@ -6,7 +6,11 @@ export function RouteNode({ data, selected }: NodeProps) {
   return (
     <NodeShell kind="route" icon="🔀" label={d.label || "路由"} selected={selected}>
       {d.prefix ? (
-        <Row k="前缀" v={d.prefix.length > 22 ? d.prefix.slice(0, 22) + "…" : d.prefix} />
+        <Row
+          k="前缀"
+          v={d.prefix.length > 22 ? d.prefix.slice(0, 22) + "…" : d.prefix}
+          title={d.prefix.length > 22 ? d.prefix : undefined}
+        />
       ) : (
         <Row k="前缀" v="（无）" dim />
       )}

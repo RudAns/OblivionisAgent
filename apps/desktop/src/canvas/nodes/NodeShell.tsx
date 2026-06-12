@@ -76,12 +76,14 @@ export function NodeShell({
   );
 }
 
-/** 卡片主体的一行字段：左键名右值，值过长省略 */
-export function Row({ k, v, dim }: { k: string; v: ReactNode; dim?: boolean }) {
+/** 卡片主体的一行字段：左键名右值，值过长省略。title=hover 看完整值(路径/ID 截断时用) */
+export function Row({ k, v, dim, title }: { k: string; v: ReactNode; dim?: boolean; title?: string }) {
   return (
     <div className={`xnode-row ${dim ? "dim" : ""}`}>
       <span className="xr-k">{k}</span>
-      <span className="xr-v">{v}</span>
+      <span className="xr-v" title={title}>
+        {v}
+      </span>
     </div>
   );
 }

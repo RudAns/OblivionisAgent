@@ -10,8 +10,9 @@ export function CronNode({ data, selected }: NodeProps) {
         k="指令"
         v={d.prompt ? (d.prompt.length > 22 ? d.prompt.slice(0, 22) + "…" : d.prompt) : "(未设置)"}
         dim={!d.prompt}
+        title={d.prompt && d.prompt.length > 22 ? d.prompt : undefined}
       />
-      <Row k="投递" v={d.chatId ? `…${d.chatId.slice(-10)}` : "Home Chat"} />
+      <Row k="投递" v={d.chatId ? `…${d.chatId.slice(-10)}` : "Home Chat"} title={d.chatId || undefined} />
       {d.enabled === false ? <Row k="" v="⏸ 已停用" dim /> : null}
     </NodeShell>
   );
