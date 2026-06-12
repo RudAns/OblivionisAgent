@@ -82,6 +82,10 @@
     0 0 0 2px rgba(var(--accent-rgb), 0.22),
     0 2px 7px rgba(60, 55, 45, 0.08);
 }
+/* 浅色：会话侧栏背景按用户要求再白一点(比 --frame 更靠近白；白卡片靠边/阴影区分) */
+:root[data-theme="light"] .rail {
+  background: #faf9f7;
+}
 /* 浅色下连线上的意图标签：要白底框(不要橙色调)——干净白胶囊+淡边+浅阴影，把字从连线上托起来 */
 :root[data-theme="light"] .edge-badge.has-cond {
   background: var(--card);
