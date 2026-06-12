@@ -33,6 +33,7 @@ import {
   type KnowledgeItem,
 } from "@oblivionis/shared";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { BridgeClient } from "./bridge-client.js";
 import { FlowCanvas } from "./canvas/FlowCanvas.js";
 import { TranscriptPanel } from "./panels/TranscriptPanel.js";
@@ -97,6 +98,36 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
     },
   }),
 };
+
+// 自绘窗口控件（最小化/最大化/关闭）——无边框窗口(decorations:false)用，融进顶栏
+function WindowControls() {
+  const act = (fn: "minimize" | "toggleMaximize" | "close") => {
+    try {
+      void getCurrentWindow()[fn]();
+    } catch {
+      /* 浏览器开发版无窗口 API */
+    }
+  };
+  return (
+    <div className="win-ctrls">
+      <button className="win-btn" title="最小化" onClick={() => act("minimize")}>
+        <svg width="11" height="11" viewBox="0 0 16 16">
+          <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+      </button>
+      <button className="win-btn" title="最大化 / 还原" onClick={() => act("toggleMaximize")}>
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+          <rect x="3.5" y="3.5" width="9" height="9" rx="1" stroke="currentColor" strokeWidth="1.3" />
+        </svg>
+      </button>
+      <button className="win-btn win-close" title="关闭" onClick={() => act("close")}>
+        <svg width="11" height="11" viewBox="0 0 16 16">
+          <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+      </button>
+    </div>
+  );
+}
 
 // 复制/粘贴/再制时清掉节点的「身份」字段，避免与原节点冲突(同一会话/群/token)
 function clearedNodeData(node: Node, addSuffix: boolean): Record<string, unknown> {
@@ -1074,7 +1105,7 @@ function Inner() {
   const onRailAction = (key: RailKey) => {
     switch (key) {
       case "canvas":
-        setCanvasCollapsed(false); // 进入节点视图(画布占满)
+        setCanvasCollapsed(!canvasCollapsed); // 切换:节点视图 ⇄ 终端/面板视图
         break;
       case "feishu":
         setFeishuOpen((o) => !o);
@@ -1140,8 +1171,8 @@ function Inner() {
 
   return (
     <div className="app">
-      <header className="toolbar">
-        <strong className="brand">
+      <header className="toolbar" data-tauri-drag-region>
+        <strong className="brand" data-tauri-drag-region>
           Oblivionis<span className="brand-accent">Agent</span>
         </strong>
         <button
@@ -1158,7 +1189,7 @@ function Inner() {
             ✎ 编辑节点
           </button>
         )}
-        <div className="spacer" />
+        <div className="spacer" data-tauri-drag-region />
         {usage?.sessionPct != null && (
           <span
             className={`usage-chip ${usage.sessionPct >= 85 ? "hot" : usage.sessionPct >= 60 ? "warm" : ""}`}
@@ -1173,6 +1204,7 @@ function Inner() {
             {usage.weekPct != null && <span className="usage-week">周 {Math.round(usage.weekPct)}%</span>}
           </span>
         )}
+        <WindowControls />
       </header>
 
       {unroutedActive && (
@@ -1204,7 +1236,21 @@ function Inner() {
             setSelected(id);
             setTab("transcript");
           }}
-          onOpenTerminal={openTerminalForNode}
+          onOpenTerminal={(id) => {
+            if (!canvasCollapsed) {
+              // 节点视图下点会话 → 定位到该节点(选中+居中)，会话多时方便找位置，不切去终端
+              setSelected(id);
+              setNodes((ns) => ns.map((nd) => ({ ...nd, selected: nd.id === id })));
+              const n = nodes.find((x) => x.id === id);
+              if (n) {
+                const w = n.measured?.width ?? 180;
+                const h = n.measured?.height ?? 90;
+                rf.setCenter(n.position.x + w / 2, n.position.y + h / 2, { zoom: 1, duration: 400 });
+              }
+            } else {
+              openTerminalForNode(id);
+            }
+          }}
           onAddSession={() => addNode("claude-session")}
         />
 

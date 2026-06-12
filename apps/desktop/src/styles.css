@@ -115,12 +115,42 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  /* 无边框窗口的标题栏：右侧无内距让窗口控件贴边，整条可拖动 */
+  height: 40px;
+  padding: 0 0 0 12px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
+  flex-shrink: 0;
 }
 .toolbar .spacer {
   flex: 1;
+  align-self: stretch;
+}
+/* 自绘窗口控件：最小化/最大化/关闭，贴右上角、满栏高 */
+.win-ctrls {
+  display: flex;
+  align-self: stretch;
+  margin-left: 4px;
+}
+.win-btn {
+  width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.win-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.win-close:hover {
+  background: #e5544b;
+  color: #fff;
 }
 .toolbar .muted {
   color: var(--muted);
