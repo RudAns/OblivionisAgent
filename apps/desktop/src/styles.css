@@ -191,13 +191,13 @@ button.primary {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: #6b7484;
+  color: var(--muted);
   padding: 0;
   transition: color 0.12s, background 0.12s, border-color 0.12s;
 }
 .railbar-btn:hover {
   color: var(--text);
-  background: #1d222b;
+  background: var(--hover);
   border-color: transparent;
 }
 .railbar-btn.on {
@@ -319,7 +319,7 @@ button.primary {
   width: 64px;
   height: 6px;
   border-radius: 3px;
-  background: var(--hover);
+  background: var(--scrollbar); /* 比 chip 底深一档，浅色下也看得见轨道 */
   overflow: hidden;
 }
 .usage-bar > span {
@@ -759,9 +759,11 @@ button.primary {
   gap: 6px;
   padding: 11px 12px;
   border-radius: 9px;
-  border: 1px solid rgba(var(--accent-rgb), 0.28);
+  border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  background: linear-gradient(180deg, var(--surface-2) 0%, var(--card) 100%);
+  /* 卡片比侧栏底亮一档 + 轻投影 → 浅/深色下都能从背景里"浮"出来 */
+  background: var(--card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   color: var(--text);
   font-size: 12.5px;
   cursor: pointer;
@@ -969,8 +971,11 @@ button.primary {
   top: auto;
   bottom: 10px;
   left: 52px;
-  width: 280px;
+  width: 288px;
   z-index: 30;
+}
+.popup-settings .popup-body {
+  padding: 13px 15px 15px; /* 内容别贴边 */
 }
 .settings-label {
   font-size: 12px;
@@ -1226,12 +1231,12 @@ button.primary {
   margin-top: 4px;
   padding: 3px 6px;
   border-radius: 5px;
-  background: color-mix(in srgb, var(--nc) 12%, #161a20);
+  background: color-mix(in srgb, var(--nc) 12%, var(--surface-2));
   border: 1px dashed color-mix(in srgb, var(--nc) 40%, var(--border));
   font-size: 10.5px;
 }
 .session-fork-strip .sfs-tag {
-  color: #c9a8f5;
+  color: var(--accent);
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -1244,13 +1249,13 @@ button.primary {
 }
 .session-fork-strip .sfs-note {
   margin-left: auto;
-  color: #6cb6ff;
+  color: var(--muted);
   flex-shrink: 0;
 }
 
 /* 连线上的条件(意图)标签 chip */
 .react-flow__edge-textbg {
-  fill: #1d232e;
+  fill: var(--surface-2);
 }
 .react-flow__edge-text {
   fill: #ffb84d !important;
@@ -1809,7 +1814,7 @@ button.primary {
   align-items: center;
   gap: 4px;
   padding: 3px 6px 3px 9px;
-  background: #20242b;
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 11px;
@@ -1821,7 +1826,7 @@ button.primary {
   border-color: var(--accent);
 }
 .term-tab.on {
-  background: #2a3340;
+  background: color-mix(in srgb, var(--accent) 14%, var(--card));
   border-color: var(--accent);
   color: var(--text);
 }

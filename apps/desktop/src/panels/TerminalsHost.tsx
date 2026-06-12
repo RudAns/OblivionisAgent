@@ -115,6 +115,7 @@ function TerminalView({
   const termRef = useRef<Terminal | null>(null);
   const themeRef = useRef(theme);
   themeRef.current = theme;
+  const webglRef = useRef<WebglAddon | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const ptyIdRef = useRef<string | null>(null);
   const onActivityRef = useRef(onActivity);
@@ -225,8 +226,10 @@ function TerminalView({
           /* ignore */
         }
         webgl = null;
+        webglRef.current = null;
       });
       term.loadAddon(webgl);
+      webglRef.current = webgl;
     } catch {
       webgl = null; // WebGL 不可用则回退默认 DOM 渲染器
     }
@@ -835,12 +838,14 @@ function TerminalView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 切换深/浅主题：整套替换 xterm 配色并刷新（WebGL 图集随之重建）
+  // 切换深/浅主题：整套替换 xterm 配色。WebGL 渲染器会缓存旧底色的字形图集，
+  // 必须 clearTextureAtlas() 再 refresh，否则已绘制的单元格背景仍是旧主题色(深色残留)。
   useEffect(() => {
     const t = termRef.current;
     if (!t) return;
     t.options.theme = termTheme(theme);
     try {
+      webglRef.current?.clearTextureAtlas();
       t.refresh(0, t.rows - 1);
     } catch {
       /* ignore */
