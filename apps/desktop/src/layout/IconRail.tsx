@@ -18,17 +18,25 @@ function RailButton({
   title,
   active,
   badge,
+  dataPopup,
   onClick,
   children,
 }: {
   title: string;
   active?: boolean;
   badge?: number;
+  /** 标记此按钮是某浮窗的触发器，供"点外部关闭"逻辑跳过自身 */
+  dataPopup?: string;
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
-    <button className={`railbar-btn ${active ? "on" : ""}`} title={title} onClick={onClick}>
+    <button
+      className={`railbar-btn ${active ? "on" : ""}`}
+      title={title}
+      data-popup={dataPopup}
+      onClick={onClick}
+    >
       {children}
       {badge ? <span className="railbar-badge">{badge > 99 ? "99+" : badge}</span> : null}
     </button>
@@ -67,7 +75,7 @@ export function IconRail({ canvasOpen, tab, settingsOpen, inboxBadge, onAction }
         <IconLogs />
       </RailButton>
       <div className="railbar-spacer" />
-      <RailButton title="设置（主题等）" active={settingsOpen} onClick={() => onAction("settings")}>
+      <RailButton title="设置（主题等）" active={settingsOpen} dataPopup="settings" onClick={() => onAction("settings")}>
         <IconSettings />
       </RailButton>
     </nav>

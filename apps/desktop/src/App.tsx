@@ -806,6 +806,23 @@ function Inner() {
     }
   }, [theme]);
 
+  // 点浮窗外部 → 关闭浮窗（设置/飞书/节点·连线编辑）。点浮窗内、或点该浮窗自己的触发器
+  // (data-popup)不关——触发器自身的 onClick 负责 toggle；点别的浮窗触发器则照常关本浮窗。
+  useEffect(() => {
+    if (!feishuOpen && !settingsOpen && !inspectorOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t || t.closest(".popup")) return; // 点在某浮窗内部
+      const trig = t.closest("[data-popup]")?.getAttribute("data-popup");
+      if (trig !== "settings") setSettingsOpen(false);
+      if (trig !== "feishu") setFeishuOpen(false);
+      // 节点检视：点节点不关(让 onNodeClick 切换/拖动保持)，点真正的外部(空白/面板/侧栏)才关
+      if (!t.closest(".react-flow__node")) setInspectorOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [feishuOpen, settingsOpen, inspectorOpen]);
+
   // 切到某会话(显示其终端)时：记录"在看谁"，并清掉它的完成红点
   useEffect(() => {
     activeTermRef.current = activeTerminal;
@@ -1101,6 +1118,7 @@ function Inner() {
         </strong>
         <button
           className={`fs-chip ${feishuOpen ? "on" : ""}`}
+          data-popup="feishu"
           onClick={() => setFeishuOpen((o) => !o)}
           title="飞书连接（点开/收起设置）"
         >
