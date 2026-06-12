@@ -11,13 +11,16 @@ interface Props {
 export function StatusBar({ bridgeUp, sessionCount, openTerminals, activeLabel, saved }: Props) {
   return (
     <footer className="statusbar">
-      <span
-        className={`sb-item sb-bridge ${bridgeUp ? "up" : "down"}`}
-        title="本软件的后台服务（随应用自动启动，负责飞书收发与会话调度）"
-      >
-        <span className="sb-dot" />
-        {bridgeUp ? "服务就绪" : "正在启动后台服务…"}
-      </span>
+      {/* 服务就绪是常态，无需常驻提示；只有还没就绪(启动中/掉线)才显示 */}
+      {!bridgeUp && (
+        <span
+          className="sb-item sb-bridge down"
+          title="本软件的后台服务（随应用自动启动，负责飞书收发与会话调度）"
+        >
+          <span className="sb-dot" />
+          正在启动后台服务…
+        </span>
+      )}
       <span className="sb-flex" />
       {activeLabel && (
         <span className="sb-item" title="当前终端">
