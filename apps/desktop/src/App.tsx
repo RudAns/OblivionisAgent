@@ -153,6 +153,39 @@ const PALETTE: [keyof typeof NEW_NODE_DEFAULTS, string][] = [
 // kind → 本地化名（检视标题等用，避免直接显示原始 "claude-session"）
 const NODE_LABEL: Record<string, string> = Object.fromEntries(PALETTE);
 
+// 「＋ 添加节点」下拉的分组(参考美术稿)：输入源 / 路由与决策 / 执行节点 / 辅助。
+// icon 与节点卡片一致；color 取节点代表色，给菜单图标上色。
+const ADD_GROUPS: {
+  title: string;
+  items: { kind: keyof typeof NEW_NODE_DEFAULTS; label: string; icon: string; color: string }[];
+}[] = [
+  {
+    title: "输入源",
+    items: [
+      { kind: "feishu-group", label: "飞书群", icon: "💬", color: "#3b9b70" },
+      { kind: "webhook", label: "Webhook", icon: "🪝", color: "#b7791f" },
+    ],
+  },
+  {
+    title: "路由与决策",
+    items: [
+      { kind: "intent-switch", label: "意图分流", icon: "🧠", color: "#c68a32" },
+      { kind: "route", label: "路由", icon: "🔀", color: "#8167b2" },
+    ],
+  },
+  {
+    title: "执行节点",
+    items: [
+      { kind: "claude-session", label: "Claude 会话", icon: "🤖", color: "#d96745" },
+      { kind: "cron", label: "定时任务", icon: "⏰", color: "#3a8fa0" },
+    ],
+  },
+  {
+    title: "辅助",
+    items: [{ kind: "soul", label: "人格", icon: "🎭", color: "#9d7bc9" }],
+  },
+];
+
 // 从某类节点的「输出口」拖到空白处时，能落地的目标类型（与 FlowCanvas 连线校验同源）。
 // handle=目标节点上要落的入口(claude-session 的人格口为 "fork")，默认走主入口。
 function dropTargetsFor(
@@ -242,6 +275,8 @@ function Inner() {
   const [cmdkOpen, setCmdkOpen] = useState(false);
   const [cmdkQuery, setCmdkQuery] = useState("");
   const [cmdkIndex, setCmdkIndex] = useState(0);
+  // 画布左上角「＋ 添加节点」下拉菜单
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   // 剪贴板里是否有内容（驱动右键菜单的「粘贴」是否出现）
   const [hasClipboard, setHasClipboard] = useState(false);
   const [tab, setTab] = useState<Tab>("transcript");
@@ -886,6 +921,7 @@ function Inner() {
       setDropMenu(null);
       setCmdkOpen(false);
       setSettingsOpen(false);
+      setAddMenuOpen(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -922,19 +958,21 @@ function Inner() {
   // 点浮窗外部 → 关闭浮窗（设置/飞书/节点·连线编辑）。点浮窗内、或点该浮窗自己的触发器
   // (data-popup)不关——触发器自身的 onClick 负责 toggle；点别的浮窗触发器则照常关本浮窗。
   useEffect(() => {
-    if (!feishuOpen && !settingsOpen && !inspectorOpen) return;
+    if (!feishuOpen && !settingsOpen && !inspectorOpen && !addMenuOpen) return;
     const onDown = (e: MouseEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t || t.closest(".popup")) return; // 点在某浮窗内部
       const trig = t.closest("[data-popup]")?.getAttribute("data-popup");
       if (trig !== "settings") setSettingsOpen(false);
       if (trig !== "feishu") setFeishuOpen(false);
+      // 添加节点下拉：点按钮自身(data-popup=addmenu)或菜单内部不关，点别处才关
+      if (trig !== "addmenu" && !t.closest(".add-menu")) setAddMenuOpen(false);
       // 节点检视：点节点不关(让 onNodeClick 切换/拖动保持)，点真正的外部(空白/面板/侧栏)才关
       if (!t.closest(".react-flow__node")) setInspectorOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [feishuOpen, settingsOpen, inspectorOpen]);
+  }, [feishuOpen, settingsOpen, inspectorOpen, addMenuOpen]);
 
   // 切到某会话(显示其终端)时：记录"在看谁"，并清掉它的完成红点
   useEffect(() => {
@@ -1470,7 +1508,7 @@ function Inner() {
                     <span>触发意图</span>
                     <textarea
                       rows={3}
-                      style={{ flex: 1, background: "#14171c", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", padding: "4px 6px" }}
+                      style={{ flex: 1, background: "var(--input)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", padding: "4px 6px" }}
                       value={(selectedEdgeObj.data as { condition?: string } | undefined)?.condition ?? ""}
                       placeholder="留空=默认边。填一句意图，如：用户想触发打包/角色管线CI/构建"
                       onChange={(e) => setEdgeCondition(selectedEdgeObj.id, e.target.value)}
@@ -1496,7 +1534,49 @@ function Inner() {
 
           {/* 节点编辑浮窗已移到 main 层级（见下），画布收起时也能编辑选中的会话 */}
 
-          {/* 加节点走右键菜单(右键空白处)；顶部不再放工具条，只留一行淡提示 */}
+          {/* 左上角工具条：分类「＋ 添加节点」下拉 + 自动布局（参考美术稿） */}
+          <div className="canvas-toolbar">
+            <div className="add-node-wrap">
+              <button
+                className={`add-node-btn ${addMenuOpen ? "on" : ""}`}
+                data-popup="addmenu"
+                onClick={() => setAddMenuOpen((o) => !o)}
+                title="添加节点"
+              >
+                <span className="anb-plus">＋</span> 添加节点
+                <span className="anb-caret">▾</span>
+              </button>
+              {addMenuOpen && (
+                <div className="add-menu">
+                  {ADD_GROUPS.map((g) => (
+                    <div className="add-group" key={g.title}>
+                      <div className="add-group-title">{g.title}</div>
+                      {g.items.map((it) => (
+                        <button
+                          className="add-item"
+                          key={it.kind}
+                          onClick={() => {
+                            addNode(it.kind, cmdkCenter());
+                            setAddMenuOpen(false);
+                          }}
+                        >
+                          <span className="add-item-icon" style={{ background: `${it.color}1f`, color: it.color }}>
+                            {it.icon}
+                          </span>
+                          {it.label}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button className="tb-btn" onClick={() => autoLayout()} title="按链路自动排成左→右分层布局">
+              ⌗ 自动布局
+            </button>
+          </div>
+
+          {/* 加节点：左上角工具条 / 右键空白处 / 从端口拖到空白；底部留一行淡提示 */}
           <div className="canvas-hint">右键添加节点 · 从端口拖到空白接新节点 · 滚轮缩放 · Ctrl+Z 撤销</div>
           </div>
           )}
@@ -1977,6 +2057,17 @@ function Inspector({
       <input value={value ?? ""} onChange={(e) => onPatch({ [key]: e.target.value })} />
     </label>
   );
+  const fieldArea = (label: string, value: string, key: string, rows = 3, placeholder?: string) => (
+    <label className="field" style={{ alignItems: "flex-start" }}>
+      <span>{label}</span>
+      <textarea
+        rows={rows}
+        value={value ?? ""}
+        placeholder={placeholder}
+        onChange={(e) => onPatch({ [key]: e.target.value })}
+      />
+    </label>
+  );
 
   return (
     <div className="inspector">
@@ -2013,7 +2104,7 @@ function Inspector({
           <div className="hint" style={{ marginBottom: 6 }}>
             发给 Claude 前会自动去掉飞书 @ 占位符（无需配置）。这里只设可选「前缀」。
           </div>
-          {field("前缀", d.prefix, "prefix")}
+          {fieldArea("前缀", d.prefix, "prefix", 3, "可选。该路由下消息统一加的前缀（可多行）")}
         </>
       )}
       {node.type === "soul" && (

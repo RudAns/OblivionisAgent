@@ -466,10 +466,10 @@ button.primary {
   flex-shrink: 0;
 }
 
-/* 画布顶部淡提示(替代原工具条)：加节点改走右键 */
+/* 画布底部淡提示：加节点入口有左上角工具条/右键/拖端口三种 */
 .canvas-hint {
   position: absolute;
-  top: 12px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 4;
@@ -483,6 +483,122 @@ button.primary {
   border-radius: 999px;
   padding: 3px 12px;
   opacity: 0.7;
+}
+
+/* 画布左上角工具条：分类「＋ 添加节点」下拉 + 自动布局 */
+.canvas-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.add-node-wrap {
+  position: relative;
+}
+.add-node-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 9px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.32);
+  transition: filter 0.12s, box-shadow 0.12s;
+}
+.add-node-btn:hover {
+  filter: brightness(1.06);
+}
+.add-node-btn.on {
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.25);
+}
+.anb-plus {
+  font-size: 15px;
+  line-height: 1;
+}
+.anb-caret {
+  font-size: 10px;
+  opacity: 0.85;
+  margin-left: 1px;
+}
+.add-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 204px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+  padding: 8px;
+  z-index: 20;
+}
+.add-group {
+  margin-bottom: 6px;
+}
+.add-group:last-child {
+  margin-bottom: 0;
+}
+.add-group-title {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 8px 3px;
+  letter-spacing: 0.04em;
+}
+.add-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.add-item:hover {
+  background: var(--hover);
+}
+.add-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12.5px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.12s, background 0.12s;
+}
+.tb-btn:hover {
+  border-color: var(--accent);
+  background: var(--hover);
 }
 
 /* 画板浮动工具条：加节点按钮（top-center，避开左上角的收起键/节点编辑浮窗） */
@@ -1815,13 +1931,21 @@ button.primary {
   color: var(--muted);
 }
 .field input,
-.field select {
+.field select,
+.field textarea {
   flex: 1;
   background: var(--input);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text);
   padding: 5px 8px;
+}
+.field textarea {
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 56px;
 }
 .hint {
   color: var(--muted);
