@@ -423,6 +423,25 @@ button.primary {
   flex-shrink: 0;
 }
 
+/* 画布顶部淡提示(替代原工具条)：加节点改走右键 */
+.canvas-hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+  background: rgba(var(--overlay-rgb), 0.55);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 12px;
+  opacity: 0.7;
+}
+
 /* 画板浮动工具条：加节点按钮（top-center，避开左上角的收起键/节点编辑浮窗） */
 .canvas-palette {
   position: absolute;

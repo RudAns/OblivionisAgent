@@ -1333,31 +1333,8 @@ function Inner() {
 
           {/* 节点编辑浮窗已移到 main 层级（见下），画布收起时也能编辑选中的会话 */}
 
-          {/* 画板浮动工具条：加节点（画板收起时自然隐藏） */}
-          <div className="canvas-palette">
-            <button
-              className="pal-icon"
-              title="撤销 (Ctrl+Z)"
-              disabled={!histState.canUndo}
-              onClick={undo}
-            >
-              ↶
-            </button>
-            <button
-              className="pal-icon"
-              title="重做 (Ctrl+Shift+Z)"
-              disabled={!histState.canRedo}
-              onClick={redo}
-            >
-              ↷
-            </button>
-            <span className="pal-sep" />
-            {PALETTE.map(([kind, label]) => (
-              <button key={kind} onClick={() => addNode(kind)}>
-                + {label}
-              </button>
-            ))}
-          </div>
+          {/* 加节点走右键菜单(右键空白处)；顶部不再放工具条，只留一行淡提示 */}
+          <div className="canvas-hint">右键空白处添加节点 · 滚轮缩放 · Ctrl+Z 撤销</div>
           </div>
           )}
 
