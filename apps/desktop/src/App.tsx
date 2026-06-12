@@ -1334,7 +1334,7 @@ function Inner() {
           {/* 节点编辑浮窗已移到 main 层级（见下），画布收起时也能编辑选中的会话 */}
 
           {/* 加节点走右键菜单(右键空白处)；顶部不再放工具条，只留一行淡提示 */}
-          <div className="canvas-hint">右键空白处添加节点 · 滚轮缩放 · Ctrl+Z 撤销</div>
+          <div className="canvas-hint">右键添加节点 · 拖拽平移 · 滚轮缩放 · Ctrl+Z 撤销</div>
           </div>
           )}
 

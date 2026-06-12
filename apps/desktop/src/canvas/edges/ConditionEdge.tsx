@@ -33,7 +33,6 @@ export function ConditionEdge({
   });
   const d = data as { condition?: string; sourceKind?: string } | undefined;
   const cond = (d?.condition ?? "").trim();
-  const conditional = d?.sourceKind === "intent-switch" || d?.sourceKind === "route";
   const { editEdge, deleteEdge } = useContext(EdgeActionContext);
 
   // hover 状态带 60ms 延迟清除：从线条移到工具按钮的瞬间不闪烁
@@ -52,11 +51,12 @@ export function ConditionEdge({
   const flowing = activeEdges.has(id);
 
   const active = hovered || selected;
-  const showBadge = !!cond || conditional;
+  // 只在有意图条件时显示标签(不再有重复的"＋意图"占位；加条件走右键菜单)
+  const showBadge = !!cond;
   const mergedStyle = active
-    ? { ...style, stroke: "#7aa2ff", strokeWidth: 2.6 }
+    ? { ...style, stroke: "#4e6f9e", strokeWidth: 2.2 } // 选中/hover：美术稿选中连线色
     : flowing
-      ? { ...style, stroke: "#4f8cff", strokeWidth: 2.4 }
+      ? { ...style, stroke: "#6f86a8", strokeWidth: 2.2 }
       : style;
 
   return (
@@ -93,16 +93,14 @@ export function ConditionEdge({
           >
             {showBadge && (
               <button
-                className={`edge-badge ${cond ? "has-cond" : "no-cond"} ${selected ? "sel" : ""}`}
+                className={`edge-badge has-cond ${selected ? "sel" : ""}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   editEdge(id);
                 }}
-                title={
-                  cond ? `意图条件：${cond}（点击编辑）` : "点击设置触发意图（用于意图分流；留空=默认边）"
-                }
+                title={`意图条件：${cond}（点击编辑）`}
               >
-                {cond ? (cond.length > 16 ? cond.slice(0, 16) + "…" : cond) : "＋ 意图"}
+                意图：{cond.length > 12 ? cond.slice(0, 12) + "…" : cond}
               </button>
             )}
             {active && (

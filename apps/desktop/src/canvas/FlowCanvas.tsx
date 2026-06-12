@@ -64,22 +64,23 @@ const edgeTypes = { default: ConditionEdge };
 
 // 劲道连线：贝塞尔曲线但收紧曲率(0.5)——出入口方向感强、中段绷直不软塌，配箭头收尾。
 // pathOptions 会被 ReactFlow 浅合并进每条边、由 BezierEdge 读取；类型定义没收录故断言。
+// 连线：低饱和蓝灰(美术稿 #7186A3)，细一点不喧宾夺主
 const defaultEdgeOptions = {
   type: "default",
   pathOptions: { curvature: 0.5 },
-  style: { stroke: "#5d7290", strokeWidth: 2 },
-  markerEnd: { type: MarkerType.ArrowClosed, width: 15, height: 15, color: "#5d7290" },
+  style: { stroke: "#7186a3", strokeWidth: 1.8 },
+  markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: "#7186a3" },
 } as unknown as DefaultEdgeOptions;
 
-// 各类节点的代表色（与节点卡左侧色条一致），用于右下角缩略图上色
+// 各类节点的代表色(美术稿)：输入绿/意图琥珀/路由紫/Claude 珊瑚橙。只用于图标/顶部细条/边框
 const NODE_COLORS: Record<string, string> = {
-  "feishu-group": "#00b386",
-  route: "#c08cff",
-  "intent-switch": "#ffb84d",
-  "claude-session": "#4f8cff",
-  cron: "#39c5cf",
-  webhook: "#e0b13e",
-  soul: "#b083f0",
+  "feishu-group": "#3b9b70",
+  route: "#8167b2",
+  "intent-switch": "#c68a32",
+  "claude-session": "#d96745",
+  cron: "#3a8fa0",
+  webhook: "#b7791f",
+  soul: "#8167b2",
 };
 const miniMapNodeColor = (node: Node) => NODE_COLORS[node.type ?? ""] ?? "#3a4250";
 
