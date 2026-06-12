@@ -348,6 +348,10 @@ button.primary {
   z-index: 5;
   display: flex;
   align-items: center;
+  justify-content: center;
+  /* 画板变窄时整条不再越界压到右侧面板：限宽到画板内 + 换行成多排（按钮仍单行不变形） */
+  flex-wrap: wrap;
+  max-width: calc(100% - 20px);
   gap: 6px;
   padding: 6px 8px;
   background: rgba(27, 30, 36, 0.92);

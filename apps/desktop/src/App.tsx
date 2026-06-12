@@ -1327,14 +1327,15 @@ function Inner() {
                   setActiveTerminal((a) => (a === id ? null : a));
                 }}
                 onActivity={(id, r) =>
-                  setTermRunning((m) => {
-                    // 终端跑完(running→idle)而我没在看这个会话 → 点完成小红旗
-                    if (m[id] && !r && activeTermRef.current !== id) {
-                      setUnseenDone((u) => (u[id] ? u : { ...u, [id]: true }));
-                    }
-                    return m[id] === r ? m : { ...m, [id]: r };
-                  })
+                  setTermRunning((m) => (m[id] === r ? m : { ...m, [id]: r }))
                 }
+                onTaskDone={(id) => {
+                  // 一次用户发起的正式任务跑完、而我没在看这个会话 → 插完成小红旗
+                  // (打开会话时 claude 启动的输出不算任务，故不会误插)
+                  if (activeTermRef.current !== id) {
+                    setUnseenDone((u) => (u[id] ? u : { ...u, [id]: true }));
+                  }
+                }}
               />
             </div>
             {tab === "audit" && (

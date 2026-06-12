@@ -50,12 +50,15 @@ function TerminalView({
   active,
   repaintTick,
   onActivity,
+  onTaskDone,
 }: {
   info: TermInfo;
   active: boolean;
   repaintTick: number;
-  /** 终端有输出=正在运行，停 700ms=空闲。用于侧栏「扫光」与完成红点 */
+  /** 终端有输出=正在运行，停 700ms=空闲。用于侧栏「扫光」 */
   onActivity?: (running: boolean) => void;
+  /** 一次"用户发起的正式任务"跑完（区别于打开会话时 claude 启动的输出）→ 完成红旗 */
+  onTaskDone?: () => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -63,6 +66,8 @@ function TerminalView({
   const ptyIdRef = useRef<string | null>(null);
   const onActivityRef = useRef(onActivity);
   onActivityRef.current = onActivity;
+  const onTaskDoneRef = useRef(onTaskDone);
+  onTaskDoneRef.current = onTaskDone;
   const actReportRef = useRef(false);
   const actTimerRef = useRef<number | undefined>(undefined);
   const searchRef = useRef<SearchAddon | null>(null);
@@ -608,13 +613,21 @@ function TerminalView({
     // ⚠️ 只算"AI 在执行"的输出：用户打字时终端会把每个按键回显成输出，那不算运行——
     // 用"距上次用户输入的时间"区分：紧跟输入(<320ms)的输出=回显，跳过；否则=AI 在吐。
     let lastInputAt = 0;
+    let hasTyped = false; // 用户在本终端输入过没（打开会话时 claude 启动输出≠任务，要靠它区分）
+    let taskActive = false; // 本轮运行是否算"用户发起的正式任务"
     const reportActive = (v: boolean) => {
       if (actReportRef.current === v) return;
       actReportRef.current = v;
       onActivityRef.current?.(v);
+      if (!v && taskActive) {
+        // 一次正式任务跑完(running→idle) → 上报，让侧栏插旗
+        taskActive = false;
+        onTaskDoneRef.current?.();
+      }
     };
     const bumpActivity = () => {
       if (performance.now() - lastInputAt < 320) return; // 这波输出是用户打字的回显，不刷光
+      if (hasTyped) taskActive = true; // 用户输入过 → 这波 AI 输出算正式任务（启动噪音不会，因还没输入）
       reportActive(true);
       if (actTimerRef.current) window.clearTimeout(actTimerRef.current);
       actTimerRef.current = window.setTimeout(() => reportActive(false), 700);
@@ -685,6 +698,7 @@ function TerminalView({
 
     const inputDisp = term.onData((data) => {
       lastInputAt = performance.now(); // 记下用户输入时刻：紧随其后的输出当作回显，不刷光
+      hasTyped = true; // 标记本终端被用户用过：之后的运行才算正式任务（用于完成红旗）
       if (ptyId) invoke("pty_write", { id: ptyId, data }).catch(() => {});
     });
     // 给 PTY 发 resize 的唯一入口：尺寸没变就不发（防冗余重绘）。
@@ -923,13 +937,16 @@ export function TerminalsHost({
   onActivate,
   onClose,
   onActivity,
+  onTaskDone,
 }: {
   terminals: TermInfo[];
   activeId: string | null;
   onActivate: (nodeId: string) => void;
   onClose: (nodeId: string) => void;
-  /** 某终端运行/空闲变化 → 上抛给 App 驱动侧栏扫光与完成红点 */
+  /** 某终端运行/空闲变化 → 上抛给 App 驱动侧栏扫光 */
   onActivity?: (nodeId: string, running: boolean) => void;
+  /** 某终端一次正式任务跑完 → 上抛给 App 插完成红旗 */
+  onTaskDone?: (nodeId: string) => void;
 }) {
   // 手动重绘信号：点按钮 +1，当前激活的终端做一次高度抖动让 claude 整屏重画
   const [repaintTick, setRepaintTick] = useState(0);
@@ -984,6 +1001,7 @@ export function TerminalsHost({
               setRunning((m) => (m[t.nodeId] === r ? m : { ...m, [t.nodeId]: r }));
               onActivity?.(t.nodeId, r);
             }}
+            onTaskDone={() => onTaskDone?.(t.nodeId)}
           />
         ))}
       </div>
