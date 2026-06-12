@@ -154,7 +154,13 @@ function Inner() {
     error?: string;
   } | null>(null);
   const [testText, setTestText] = useState("");
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorOpen, setInspectorOpen] = useState(() => {
+    try {
+      return localStorage.getItem("oblivionis.canvasCollapsed") !== "1"; // 启动若是折叠态，不自动弹节点编辑
+    } catch {
+      return true;
+    }
+  });
   const [feishuOpen, setFeishuOpen] = useState(false);
   const [panelWidth, setPanelWidth] = useState(480);
   // 连线画布折叠态（记住到 localStorage）：折叠后左侧变成 Claude 会话卡片窄菜单，给终端腾空间
@@ -167,6 +173,7 @@ function Inner() {
   });
   const setCanvasCollapsed = useCallback((v: boolean) => {
     setCanvasCollapsedState(v);
+    if (v) setInspectorOpen(false); // 折叠(终端为主)时不自动弹节点编辑，按需点「✎ 编辑节点」再开
     try {
       localStorage.setItem("oblivionis.canvasCollapsed", v ? "1" : "0");
     } catch {
@@ -584,8 +591,8 @@ function Inner() {
           <FeishuStatusDot status={feishu.status} />
           飞书{feishu.bot?.name ? `：${feishu.bot.name}` : ""}
         </button>
-        {!canvasCollapsed && selectedNode && !inspectorOpen && (
-          <button onClick={() => setInspectorOpen(true)} title="显示节点编辑">
+        {selectedNode && !inspectorOpen && (
+          <button onClick={() => setInspectorOpen(true)} title="编辑选中节点（画布收起时也可用）">
             ✎ 编辑节点
           </button>
         )}
@@ -694,40 +701,7 @@ function Inner() {
             </div>
           )}
 
-          {/* 浮窗：节点编辑（左上，可隐藏） */}
-          {inspectorOpen && selectedNode && (
-            <div className="popup popup-inspector">
-              <div className="popup-head">
-                <span>节点编辑</span>
-                <button className="popup-x" onClick={() => setInspectorOpen(false)} title="隐藏">
-                  ×
-                </button>
-              </div>
-              <div className="popup-body">
-                <Inspector
-                  node={selectedNode}
-                  onPatch={patchSelected}
-                  onDelete={deleteSelected}
-                  sessions={sessions}
-                  onListSessions={(cwd) => client.send({ type: "list-sessions", cwd })}
-                  onRefreshSnapshot={(nodeId) => client.send({ type: "prepare-fork", nodeId })}
-                  onEditSoul={(nodeId) => client.send({ type: "ensure-soul", nodeId })}
-                  onEditGroupMemory={(chatId) => client.send({ type: "ensure-group-memory", chatId })}
-                />
-                {selectedIsClaude && (
-                  <div className="test-box">
-                    <input
-                      value={testText}
-                      placeholder="给该会话发测试消息（绕过飞书）"
-                      onChange={(e) => setTestText(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && sendTest()}
-                    />
-                    <button onClick={sendTest}>发送</button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* 节点编辑浮窗已移到 main 层级（见下），画布收起时也能编辑选中的会话 */}
 
           {/* 画板浮动工具条：加节点（画板收起时自然隐藏） */}
           <div className="canvas-palette">
@@ -769,6 +743,41 @@ function Inner() {
                 }}
                 onSetHomeChat={setHomeChat}
               />
+            </div>
+          </div>
+        )}
+
+        {/* 节点编辑浮窗：挂在 main 层级，画布收起(终端为主)时也能编辑选中的会话——不再是死胡同 */}
+        {inspectorOpen && selectedNode && (
+          <div className="popup popup-inspector">
+            <div className="popup-head">
+              <span>节点编辑{canvasCollapsed ? "（画布已收起）" : ""}</span>
+              <button className="popup-x" onClick={() => setInspectorOpen(false)} title="隐藏">
+                ×
+              </button>
+            </div>
+            <div className="popup-body">
+              <Inspector
+                node={selectedNode}
+                onPatch={patchSelected}
+                onDelete={deleteSelected}
+                sessions={sessions}
+                onListSessions={(cwd) => client.send({ type: "list-sessions", cwd })}
+                onRefreshSnapshot={(nodeId) => client.send({ type: "prepare-fork", nodeId })}
+                onEditSoul={(nodeId) => client.send({ type: "ensure-soul", nodeId })}
+                onEditGroupMemory={(chatId) => client.send({ type: "ensure-group-memory", chatId })}
+              />
+              {selectedIsClaude && (
+                <div className="test-box">
+                  <input
+                    value={testText}
+                    placeholder="给该会话发测试消息（绕过飞书）"
+                    onChange={(e) => setTestText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && sendTest()}
+                  />
+                  <button onClick={sendTest}>发送</button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1047,10 +1056,11 @@ function Inspector({
 
           <div className="fs-actions">
             <button
-              title="编辑该会话的人格文件 SOUL.md（首次自动生成模板，保存即生效）。人格只影响表达风格，访客安全护栏始终优先。"
+              className="ghost"
+              title="本会话的内联人格 SOUL.md——仅当没有「🎭 人格节点」连到此会话的人格口时才回退生效。推荐：建一个人格节点连到会话单独管理（可共享给多个会话）。"
               onClick={() => node && onEditSoul(node.id)}
             >
-              🎭 编辑灵魂 (SOUL.md)
+              🎭 内联人格（回退·未接人格节点时）
             </button>
           </div>
 
