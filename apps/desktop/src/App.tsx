@@ -116,6 +116,8 @@ const PALETTE: [keyof typeof NEW_NODE_DEFAULTS, string][] = [
   ["webhook", "Webhook"],
   ["soul", "人格"],
 ];
+// kind → 本地化名（检视标题等用，避免直接显示原始 "claude-session"）
+const NODE_LABEL: Record<string, string> = Object.fromEntries(PALETTE);
 
 function graphToRf(config: OblivionisConfig, status: Record<string, string>): {
   nodes: Node[];
@@ -188,6 +190,8 @@ function Inner() {
   const [cmdkIndex, setCmdkIndex] = useState(0);
   // 剪贴板里是否有内容（驱动右键菜单的「粘贴」是否出现）
   const [hasClipboard, setHasClipboard] = useState(false);
+  // 工具条「＋ 添加节点」下拉是否展开
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("transcript");
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [inbox, setInbox] = useState<AuditItem[]>([]);
@@ -236,6 +240,7 @@ function Inner() {
   const [, forceRender] = useState(0);
   const statusRef = useRef<Record<string, string>>({});
   const activeTermRef = useRef<string | null>(null); // 当前在看的终端(供 WS 回调判断要不要点红点)
+  const saveRef = useRef<() => void>(() => {}); // 指向最新 save()，供快捷键 Ctrl+S 调用(避免闭包过期)
   const graphInit = useRef(false);
   const configRef = useRef<OblivionisConfig | null>(null);
   const lastSavedSig = useRef<string | null>(null);
@@ -479,10 +484,12 @@ function Inner() {
   const alignSelected = useCallback(
     (kind: AlignKind) => {
       setNodes((ns) => {
-        const sel = ns.filter((n) => n.selected);
+        // 只对已测量尺寸的选中节点对齐(未测量当 0×0 会把右/中/底对歪)
+        const sel = ns.filter((n) => n.selected && n.measured);
         if (sel.length < 2) return ns;
         const w = (n: Node) => n.measured?.width ?? 0;
         const h = (n: Node) => n.measured?.height ?? 0;
+        const ids = new Set(sel.map((n) => n.id));
         const minL = Math.min(...sel.map((n) => n.position.x));
         const maxR = Math.max(...sel.map((n) => n.position.x + w(n)));
         const minT = Math.min(...sel.map((n) => n.position.y));
@@ -490,7 +497,7 @@ function Inner() {
         const cx = (minL + maxR) / 2;
         const cy = (minT + maxB) / 2;
         return ns.map((n) => {
-          if (!n.selected) return n;
+          if (!ids.has(n.id)) return n;
           let { x, y } = n.position;
           if (kind === "left") x = minL;
           else if (kind === "right") x = maxR - w(n);
@@ -509,7 +516,7 @@ function Inner() {
   const distributeSelected = useCallback(
     (axis: "h" | "v") => {
       setNodes((ns) => {
-        const sel = ns.filter((n) => n.selected);
+        const sel = ns.filter((n) => n.selected && n.measured);
         if (sel.length < 3) return ns;
         const size = (n: Node) => (axis === "h" ? (n.measured?.width ?? 0) : (n.measured?.height ?? 0));
         const pos = (n: Node) => (axis === "h" ? n.position.x : n.position.y);
@@ -591,16 +598,15 @@ function Inner() {
     setSelected(newNodes.length === 1 ? newNodes[0]!.id : null);
   }, [setNodes, setEdges]);
 
-  // 删除指定节点及其连线（context menu 用；二次确认防误删，自动保存会同步引擎）
+  // 删除指定节点及其连线（context menu 用）。删除全编辑器统一：不弹确认，靠 Ctrl+Z 撤销兜底
+  // （与连线"×"删除一致；自动保存会同步引擎）。
   const deleteNodeById = useCallback(
     (nodeId: string) => {
-      const label = ((nodes.find((n) => n.id === nodeId)?.data as { label?: string })?.label as string) ?? "该节点";
-      if (!window.confirm(`确定删除「${label}」及其全部连线？`)) return;
       setNodes((ns) => ns.filter((n) => n.id !== nodeId));
       setEdges((es) => es.filter((e) => e.source !== nodeId && e.target !== nodeId));
       setSelected((s) => (s === nodeId ? null : s));
     },
-    [nodes, setNodes, setEdges],
+    [setNodes, setEdges],
   );
 
   // 右键菜单：菜单宽 ~180px，靠近右/下边缘时回拉，避免溢出窗口
@@ -630,15 +636,11 @@ function Inner() {
     [rf],
   );
 
-  // 画布快捷键：Ctrl+Z 撤销 / Ctrl+Shift+Z·Ctrl+Y 重做 / Ctrl+D 复制节点。
-  // 焦点在输入框或终端时不接管(终端的 Ctrl+Z 要交给 claude)。
+  // 画布快捷键。焦点在输入框/终端、或命令面板/右键菜单开着时一律不接管
+  // (终端的 Ctrl+A/C/D/K/S 要原样交给 claude)。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-      // 终端可见时一律不接管：xterm 常把焦点丢回 body，光靠 activeElement 守不住，
-      // Ctrl+A/C/D/K 这些组合得原样交给 claude(行首/中断/EOF/kill-line)。
-      if (tab === "terminal") return;
-      if (cmdkOpen || ctxMenu) return; // 命令面板/右键菜单开着时不接管
+      if (tab === "terminal" || cmdkOpen || ctxMenu) return;
       const ae = document.activeElement as HTMLElement | null;
       if (
         ae &&
@@ -646,6 +648,14 @@ function Inner() {
       )
         return;
       const k = e.key.toLowerCase();
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) {
+        if (k === "f") {
+          e.preventDefault();
+          rf.fitView({ duration: 300, padding: 0.2 }); // F = 适应视图
+        }
+        return;
+      }
       if (k === "z" && !e.shiftKey) {
         e.preventDefault();
         undo();
@@ -669,11 +679,24 @@ function Inner() {
         setCmdkQuery("");
         setCmdkIndex(0);
         setCmdkOpen(true);
+      } else if (k === "s") {
+        e.preventDefault(); // 已自动保存，这里只是顺手存一次 + 状态栏闪一下
+        saveRef.current();
+        flashSaved();
+      } else if (k === "0") {
+        e.preventDefault();
+        rf.zoomTo(1, { duration: 150 });
+      } else if (k === "=" || k === "+") {
+        e.preventDefault();
+        rf.zoomIn({ duration: 150 });
+      } else if (k === "-") {
+        e.preventDefault();
+        rf.zoomOut({ duration: 150 });
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, duplicateSelected, copySelected, pasteClipboard, setNodes, tab, cmdkOpen, ctxMenu]);
+  }, [undo, redo, duplicateSelected, copySelected, pasteClipboard, setNodes, tab, cmdkOpen, ctxMenu, rf, flashSaved]);
 
   // 自定义 onNodesChange：单节点拖动时算对齐参考线并吸附；其它变更原样应用。
   // 纯函数写法：不在 setNodes 更新器里改 state、不改入参 change（StrictMode 双调用安全）。
@@ -820,6 +843,7 @@ function Inner() {
     lastSavedSig.current = JSON.stringify(graph);
     client.send({ type: "set-config", config: { ...config, graph } });
   };
+  saveRef.current = save;
 
   /** 更新主人列表（全局配置），立即存盘 */
   const setOwners = (owners: Owner[]) => {
@@ -872,12 +896,9 @@ function Inner() {
     );
   };
 
-  /** 删除选中的节点及其连线（二次确认防误删；自动保存会同步引擎） */
+  /** 删除选中的节点及其连线（不弹确认，靠 Ctrl+Z 撤销；自动保存会同步引擎） */
   const deleteSelected = () => {
     if (!selected) return;
-    const label =
-      ((nodes.find((n) => n.id === selected)?.data as { label?: string })?.label as string) ?? "该节点";
-    if (!window.confirm(`确定删除「${label}」及其全部连线？`)) return;
     setNodes((ns) => ns.filter((n) => n.id !== selected));
     setEdges((es) => es.filter((e) => e.source !== selected && e.target !== selected));
     setSelected(null);
@@ -982,6 +1003,7 @@ function Inner() {
     if (!rect) return undefined;
     return rf.screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
   };
+  const selIds = () => new Set(nodes.filter((n) => n.selected).map((n) => n.id));
   const cmdkCommands: { id: string; label: string; hint?: string; run: () => void }[] = [
     ...PALETTE.map(([kind, label]) => ({
       id: `add-${kind}`,
@@ -989,6 +1011,20 @@ function Inner() {
       hint: "节点",
       run: () => addNode(kind, cmdkCenter()),
     })),
+    { id: "selall", label: "全选节点", hint: "Ctrl+A", run: () => setNodes((ns) => ns.map((n) => ({ ...n, selected: true }))) },
+    { id: "copy", label: "复制选中（放入剪贴板）", hint: "Ctrl+C", run: () => copySelected() },
+    ...(hasClipboard ? [{ id: "paste", label: "粘贴", hint: "Ctrl+V", run: () => pasteClipboard() }] : []),
+    {
+      id: "del",
+      label: "删除选中（可撤销）",
+      hint: "Delete",
+      run: () => {
+        const ids = selIds();
+        if (!ids.size) return;
+        setNodes((ns) => ns.filter((n) => !ids.has(n.id)));
+        setEdges((es) => es.filter((e) => !ids.has(e.source) && !ids.has(e.target)));
+      },
+    },
     { id: "fit", label: "适应视图（看全画布）", hint: "视图", run: () => rf.fitView({ duration: 300, padding: 0.2 }) },
     { id: "undo", label: "撤销", hint: "Ctrl+Z", run: undo },
     { id: "redo", label: "重做", hint: "Ctrl+Shift+Z", run: redo },
@@ -1170,13 +1206,29 @@ function Inner() {
               ↷
             </button>
             <span className="pal-sep" />
-            <button onClick={() => addNode("feishu-group")}>+ 飞书群</button>
-            <button onClick={() => addNode("route")}>+ 路由</button>
-            <button onClick={() => addNode("intent-switch")}>+ 意图分流</button>
-            <button onClick={() => addNode("claude-session")}>+ Claude 会话</button>
-            <button onClick={() => addNode("cron")}>+ 定时任务</button>
-            <button onClick={() => addNode("webhook")}>+ Webhook</button>
-            <button onClick={() => addNode("soul")}>+ 人格</button>
+            <div className="pal-add">
+              <button className="pal-add-btn" onClick={() => setAddMenuOpen((o) => !o)} title="添加节点">
+                ＋ 添加节点 <span className="pal-caret">▾</span>
+              </button>
+              {addMenuOpen && (
+                <>
+                  <div className="pal-add-backdrop" onClick={() => setAddMenuOpen(false)} />
+                  <div className="pal-add-menu">
+                    {PALETTE.map(([kind, label]) => (
+                      <button
+                        key={kind}
+                        onClick={() => {
+                          addNode(kind);
+                          setAddMenuOpen(false);
+                        }}
+                      >
+                        ＋ {label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <span className="pal-sep" />
             <button
               className="pal-icon"
@@ -1224,8 +1276,9 @@ function Inner() {
           </div>
         )}
 
-        {/* 节点编辑浮窗：挂在 main 层级，画布收起(终端为主)时也能编辑选中的会话——不再是死胡同 */}
-        {inspectorOpen && selectedNode && (
+        {/* 节点编辑浮窗：挂在 main 层级，画布收起(终端为主)时也能编辑选中的会话——不再是死胡同。
+            多选(≥2)时不显单节点检视，避免"显示一个却以为操作全局"的误导(改由对齐工具条主导)。 */}
+        {inspectorOpen && selectedNode && multiSelectCount < 2 && (
           <div className="popup popup-inspector">
             <div className="popup-head">
               <span>节点编辑{canvasCollapsed ? "（画布已收起）" : ""}</span>
@@ -1369,6 +1422,7 @@ function Inner() {
                       )}
                       <button
                         className="ctx-item"
+                        title="就地生成一个副本（不经剪贴板）"
                         onClick={() => {
                           duplicateNodeById(ctxMenu.id!);
                           setCtxMenu(null);
@@ -1378,6 +1432,7 @@ function Inner() {
                       </button>
                       <button
                         className="ctx-item"
+                        title="放入剪贴板，可粘贴到别处（含组内连线）"
                         onClick={() => {
                           copySelected(ctxMenu.id);
                           setCtxMenu(null);
@@ -1388,6 +1443,7 @@ function Inner() {
                       <div className="ctx-sep" />
                       <button
                         className="ctx-item danger"
+                        title="删除节点及其连线（可 Ctrl+Z 撤销）"
                         onClick={() => {
                           const id = ctxMenu.id!;
                           setCtxMenu(null);
@@ -1415,6 +1471,7 @@ function Inner() {
                   <div className="ctx-sep" />
                   <button
                     className="ctx-item danger"
+                    title="删除连线（可 Ctrl+Z 撤销）"
                     onClick={() => {
                       const id = ctxMenu.id;
                       setEdges((es) => es.filter((x) => x.id !== id));
@@ -1437,7 +1494,7 @@ function Inner() {
                           setCtxMenu(null);
                         }}
                       >
-                        ⎙ 粘贴到此处 <span className="ctx-kbd">Ctrl+V</span>
+                        📋 粘贴到此处 <span className="ctx-kbd">Ctrl+V</span>
                       </button>
                       <div className="ctx-sep" />
                     </>
@@ -1568,8 +1625,8 @@ function Inspector({
   return (
     <div className="inspector">
       <div className="inspector-head">
-        <span className="inspector-title">{node.type}</span>
-        <button className="del-btn" onClick={onDelete} title="删除此节点及其连线">
+        <span className="inspector-title">{NODE_LABEL[node.type ?? ""] ?? node.type}</span>
+        <button className="del-btn" onClick={onDelete} title="删除此节点及其连线（可 Ctrl+Z 撤销）">
           🗑 删除
         </button>
       </div>

@@ -149,7 +149,8 @@ export function FlowCanvas(props: Props) {
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#2c323d" />
       <HelperLines horizontal={props.helperLines?.horizontal} vertical={props.helperLines?.vertical} />
       <ZoomIndicator />
-      <Controls />
+      {/* 缩放交给右上角带百分比的指示器，这里只保留 适应视图 / 交互锁，避免两处缩放重复 */}
+      <Controls showZoom={false} />
       <MiniMap
         pannable
         zoomable
@@ -172,6 +173,7 @@ export function FlowCanvas(props: Props) {
             <span className="ceg-chip cs">Claude 会话</span>
           </div>
           <div className="ceg-hint">连好后，在飞书群 @机器人 即可对话。连线会自动校验，连错会被拒绝。</div>
+          <div className="ceg-hint">提示：按住 Shift 点选 / 框选多个节点可批量对齐分布 · 右键空白处或 Ctrl+K 快速加节点。</div>
         </div>
       )}
     </ReactFlow>
