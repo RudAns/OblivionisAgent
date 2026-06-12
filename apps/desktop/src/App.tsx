@@ -6,10 +6,12 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   ReactFlowProvider,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   addEdge,
   type Node,
   type Edge,
@@ -90,6 +92,17 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
   }),
 };
 
+// 工具条 / 右键「添加节点」菜单共用的节点清单（kind → 中文名）
+const PALETTE: [keyof typeof NEW_NODE_DEFAULTS, string][] = [
+  ["feishu-group", "飞书群"],
+  ["route", "路由"],
+  ["intent-switch", "意图分流"],
+  ["claude-session", "Claude 会话"],
+  ["cron", "定时任务"],
+  ["webhook", "Webhook"],
+  ["soul", "人格"],
+];
+
 function graphToRf(config: OblivionisConfig, status: Record<string, string>): {
   nodes: Node[];
   edges: Edge[];
@@ -139,11 +152,20 @@ function rfToGraph(nodes: Node[], edges: Edge[]): OblivionisConfig["graph"] {
 
 function Inner() {
   const client = useMemo(() => new BridgeClient(`ws://127.0.0.1:${DEFAULT_WS_PORT}`), []);
+  const rf = useReactFlow();
   const [config, setConfig] = useState<OblivionisConfig | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
+  // 右键菜单（节点/连线/空白）：x,y=屏幕坐标；flow=空白处右键时的画布坐标(用于在原位加节点)
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number;
+    y: number;
+    kind: "node" | "edge" | "pane";
+    id?: string;
+    flow?: { x: number; y: number };
+  } | null>(null);
   const [tab, setTab] = useState<Tab>("transcript");
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [inbox, setInbox] = useState<AuditItem[]>([]);
@@ -400,26 +422,73 @@ function Inner() {
     syncHist();
   }, [setNodes, setEdges, syncHist]);
 
+  const duplicateNodeById = useCallback(
+    (nodeId: string) => {
+      const sel = nodes.find((n) => n.id === nodeId);
+      if (!sel) return;
+      const id = crypto.randomUUID();
+      // 复制配置但清掉"身份"字段，避免和原节点冲突(同一会话/群/token)
+      const data: Record<string, unknown> = { ...(sel.data as Record<string, unknown>) };
+      if (sel.type === "claude-session") delete data.sessionId;
+      if (sel.type === "feishu-group") data.chatId = "";
+      if (sel.type === "webhook") data.token = crypto.randomUUID().replace(/-/g, "");
+      if (typeof data.label === "string") data.label = `${data.label} 副本`;
+      const copy: Node = {
+        ...sel,
+        id,
+        position: { x: sel.position.x + 36, y: sel.position.y + 36 },
+        selected: true,
+        data,
+      };
+      setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), copy]);
+      setSelected(id);
+    },
+    [nodes, setNodes],
+  );
+
   const duplicateSelected = useCallback(() => {
-    const sel = nodes.find((n) => n.selected) ?? (selected ? nodes.find((n) => n.id === selected) : undefined);
-    if (!sel) return;
-    const id = crypto.randomUUID();
-    // 复制配置但清掉"身份"字段，避免和原节点冲突(同一会话/群/token)
-    const data: Record<string, unknown> = { ...(sel.data as Record<string, unknown>) };
-    if (sel.type === "claude-session") delete data.sessionId;
-    if (sel.type === "feishu-group") data.chatId = "";
-    if (sel.type === "webhook") data.token = crypto.randomUUID().replace(/-/g, "");
-    if (typeof data.label === "string") data.label = `${data.label} 副本`;
-    const copy: Node = {
-      ...sel,
-      id,
-      position: { x: sel.position.x + 36, y: sel.position.y + 36 },
-      selected: true,
-      data,
-    };
-    setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), copy]);
-    setSelected(id);
-  }, [nodes, selected, setNodes]);
+    const id = nodes.find((n) => n.selected)?.id ?? selected ?? undefined;
+    if (id) duplicateNodeById(id);
+  }, [nodes, selected, duplicateNodeById]);
+
+  // 删除指定节点及其连线（context menu 用；二次确认防误删，自动保存会同步引擎）
+  const deleteNodeById = useCallback(
+    (nodeId: string) => {
+      const label = ((nodes.find((n) => n.id === nodeId)?.data as { label?: string })?.label as string) ?? "该节点";
+      if (!window.confirm(`确定删除「${label}」及其全部连线？`)) return;
+      setNodes((ns) => ns.filter((n) => n.id !== nodeId));
+      setEdges((es) => es.filter((e) => e.source !== nodeId && e.target !== nodeId));
+      setSelected((s) => (s === nodeId ? null : s));
+    },
+    [nodes, setNodes, setEdges],
+  );
+
+  // 右键菜单：菜单宽 ~180px，靠近右/下边缘时回拉，避免溢出窗口
+  const clampMenu = (x: number, y: number) => ({
+    x: Math.min(x, window.innerWidth - 196),
+    y: Math.min(y, window.innerHeight - 240),
+  });
+  const onNodeContextMenu = useCallback((e: ReactMouseEvent, node: Node) => {
+    e.preventDefault();
+    setSelected(node.id);
+    const p = clampMenu(e.clientX, e.clientY);
+    setCtxMenu({ x: p.x, y: p.y, kind: "node", id: node.id });
+  }, []);
+  const onEdgeContextMenu = useCallback((e: ReactMouseEvent, edge: Edge) => {
+    e.preventDefault();
+    const p = clampMenu(e.clientX, e.clientY);
+    setCtxMenu({ x: p.x, y: p.y, kind: "edge", id: edge.id });
+  }, []);
+  const onPaneContextMenu = useCallback(
+    (e: MouseEvent | ReactMouseEvent) => {
+      e.preventDefault();
+      const me = e as ReactMouseEvent;
+      const flow = rf.screenToFlowPosition({ x: me.clientX, y: me.clientY });
+      const p = clampMenu(me.clientX, me.clientY);
+      setCtxMenu({ x: p.x, y: p.y, kind: "pane", flow });
+    },
+    [rf],
+  );
 
   // 画布快捷键：Ctrl+Z 撤销 / Ctrl+Shift+Z·Ctrl+Y 重做 / Ctrl+D 复制节点。
   // 焦点在输入框或终端时不接管(终端的 Ctrl+Z 要交给 claude)。
@@ -483,6 +552,7 @@ function Inner() {
       setFeishuOpen(false);
       setInspectorOpen(false);
       setSelectedEdge(null);
+      setCtxMenu(null);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -542,13 +612,13 @@ function Inner() {
     window.addEventListener("mouseup", onUp);
   };
 
-  const addNode = (kind: keyof typeof NEW_NODE_DEFAULTS) => {
+  const addNode = (kind: keyof typeof NEW_NODE_DEFAULTS, pos?: { x: number; y: number }) => {
     const base = NEW_NODE_DEFAULTS[kind]!();
     const id = crypto.randomUUID();
     const node: Node = {
       id,
       type: kind,
-      position: { x: 80 + Math.round(60 * (nodes.length % 5)), y: 80 + 40 * nodes.length },
+      position: pos ?? { x: 80 + Math.round(60 * (nodes.length % 5)), y: 80 + 40 * nodes.length },
       data: { ...base.data, label: base.label, status: "idle" },
     };
     setNodes((n) => [...n, node]);
@@ -781,6 +851,9 @@ function Inner() {
               setInspectorOpen(true);
             }}
             onPaneClick={onPaneClick}
+            onNodeContextMenu={onNodeContextMenu}
+            onEdgeContextMenu={onEdgeContextMenu}
+            onPaneContextMenu={onPaneContextMenu}
           />
 
           {/* 浮窗：连线条件编辑（条件分流） */}
@@ -988,6 +1061,127 @@ function Inner() {
         }
         saved={savedFlash}
       />
+
+      {/* 右键菜单（节点/连线/空白）：portal 到 body，避开画布 transform 影响定位 */}
+      {ctxMenu &&
+        createPortal(
+          <div
+            className="ctx-backdrop"
+            onClick={() => setCtxMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setCtxMenu(null);
+            }}
+          >
+            <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={(e) => e.stopPropagation()}>
+              {ctxMenu.kind === "node" &&
+                (() => {
+                  const n = nodes.find((x) => x.id === ctxMenu.id);
+                  return (
+                    <>
+                      <button
+                        className="ctx-item"
+                        onClick={() => {
+                          setSelected(ctxMenu.id!);
+                          setSelectedEdge(null);
+                          setInspectorOpen(true);
+                          setCtxMenu(null);
+                        }}
+                      >
+                        ✎ 编辑
+                      </button>
+                      {n?.type === "claude-session" && (
+                        <button
+                          className="ctx-item"
+                          onClick={() => {
+                            openTerminalForNode(ctxMenu.id!);
+                            setCtxMenu(null);
+                          }}
+                        >
+                          ⌨ 打开终端
+                        </button>
+                      )}
+                      <button
+                        className="ctx-item"
+                        onClick={() => {
+                          duplicateNodeById(ctxMenu.id!);
+                          setCtxMenu(null);
+                        }}
+                      >
+                        ⧉ 复制 <span className="ctx-kbd">Ctrl+D</span>
+                      </button>
+                      <div className="ctx-sep" />
+                      <button
+                        className="ctx-item danger"
+                        onClick={() => {
+                          const id = ctxMenu.id!;
+                          setCtxMenu(null);
+                          deleteNodeById(id);
+                        }}
+                      >
+                        🗑 删除
+                      </button>
+                    </>
+                  );
+                })()}
+              {ctxMenu.kind === "edge" && (
+                <>
+                  <button
+                    className="ctx-item"
+                    onClick={() => {
+                      setSelectedEdge(ctxMenu.id!);
+                      setSelected(null);
+                      setInspectorOpen(true);
+                      setCtxMenu(null);
+                    }}
+                  >
+                    ✎ 设置意图条件
+                  </button>
+                  <div className="ctx-sep" />
+                  <button
+                    className="ctx-item danger"
+                    onClick={() => {
+                      const id = ctxMenu.id;
+                      setEdges((es) => es.filter((x) => x.id !== id));
+                      setSelectedEdge((s) => (s === id ? null : s));
+                      setCtxMenu(null);
+                    }}
+                  >
+                    🗑 删除连线
+                  </button>
+                </>
+              )}
+              {ctxMenu.kind === "pane" && (
+                <>
+                  <div className="ctx-head">在此处添加节点</div>
+                  {PALETTE.map(([kind, label]) => (
+                    <button
+                      key={kind}
+                      className="ctx-item"
+                      onClick={() => {
+                        addNode(kind, ctxMenu.flow);
+                        setCtxMenu(null);
+                      }}
+                    >
+                      ＋ {label}
+                    </button>
+                  ))}
+                  <div className="ctx-sep" />
+                  <button
+                    className="ctx-item"
+                    onClick={() => {
+                      rf.fitView({ duration: 300, padding: 0.2 });
+                      setCtxMenu(null);
+                    }}
+                  >
+                    ⤢ 适应视图
+                  </button>
+                </>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

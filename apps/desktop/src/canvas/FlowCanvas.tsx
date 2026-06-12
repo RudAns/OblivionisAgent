@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type MouseEvent as ReactMouseEvent } from "react";
 import {
   ReactFlow,
   Background,
@@ -41,6 +41,9 @@ interface Props {
   /** 点连线上的"意图徽标"时打开条件编辑 */
   onEditEdge: (id: string) => void;
   onPaneClick: () => void;
+  onNodeContextMenu: NodeMouseHandler;
+  onEdgeContextMenu: EdgeMouseHandler;
+  onPaneContextMenu: (e: MouseEvent | ReactMouseEvent) => void;
 }
 
 const edgeTypes = { default: ConditionEdge };
@@ -121,6 +124,9 @@ export function FlowCanvas(props: Props) {
       onNodeDoubleClick={props.onNodeDoubleClick}
       onEdgeClick={props.onEdgeClick}
       onPaneClick={props.onPaneClick}
+      onNodeContextMenu={props.onNodeContextMenu}
+      onEdgeContextMenu={props.onEdgeContextMenu}
+      onPaneContextMenu={props.onPaneContextMenu}
       defaultEdgeOptions={defaultEdgeOptions}
       connectionLineType={ConnectionLineType.Bezier}
       colorMode="dark"

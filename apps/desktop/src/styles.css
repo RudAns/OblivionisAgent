@@ -388,6 +388,78 @@ button.primary {
   flex-shrink: 0;
 }
 
+/* ---- 右键菜单（节点/连线/空白）---- */
+.ctx-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+.ctx-menu {
+  position: fixed;
+  min-width: 168px;
+  padding: 5px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12.5px;
+  animation: ctx-pop 0.09s ease-out;
+}
+@keyframes ctx-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ctx-head {
+  padding: 4px 9px 5px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 9px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ctx-item:hover {
+  background: rgba(79, 140, 255, 0.16);
+}
+.ctx-item.danger {
+  color: #ff8585;
+}
+.ctx-item.danger:hover {
+  background: rgba(255, 80, 80, 0.14);
+}
+.ctx-kbd {
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.ctx-sep {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+
 /* ---- 折叠态：左侧 Claude 会话卡片窄菜单 ---- */
 .canvas-collapse {
   position: absolute;
