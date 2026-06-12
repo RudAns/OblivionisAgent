@@ -95,6 +95,16 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
   }),
 };
 
+// 复制/粘贴/再制时清掉节点的「身份」字段，避免与原节点冲突(同一会话/群/token)
+function clearedNodeData(node: Node, addSuffix: boolean): Record<string, unknown> {
+  const data: Record<string, unknown> = { ...(node.data as Record<string, unknown>) };
+  if (node.type === "claude-session") delete data.sessionId;
+  if (node.type === "feishu-group") data.chatId = "";
+  if (node.type === "webhook") data.token = crypto.randomUUID().replace(/-/g, "");
+  if (addSuffix && typeof data.label === "string") data.label = `${data.label} 副本`;
+  return data;
+}
+
 // 工具条 / 右键「添加节点」菜单共用的节点清单（kind → 中文名）
 const PALETTE: [keyof typeof NEW_NODE_DEFAULTS, string][] = [
   ["feishu-group", "飞书群"],
@@ -175,6 +185,8 @@ function Inner() {
   const [cmdkOpen, setCmdkOpen] = useState(false);
   const [cmdkQuery, setCmdkQuery] = useState("");
   const [cmdkIndex, setCmdkIndex] = useState(0);
+  // 剪贴板里是否有内容（驱动右键菜单的「粘贴」是否出现）
+  const [hasClipboard, setHasClipboard] = useState(false);
   const [tab, setTab] = useState<Tab>("transcript");
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [inbox, setInbox] = useState<AuditItem[]>([]);
@@ -436,18 +448,12 @@ function Inner() {
       const sel = nodes.find((n) => n.id === nodeId);
       if (!sel) return;
       const id = crypto.randomUUID();
-      // 复制配置但清掉"身份"字段，避免和原节点冲突(同一会话/群/token)
-      const data: Record<string, unknown> = { ...(sel.data as Record<string, unknown>) };
-      if (sel.type === "claude-session") delete data.sessionId;
-      if (sel.type === "feishu-group") data.chatId = "";
-      if (sel.type === "webhook") data.token = crypto.randomUUID().replace(/-/g, "");
-      if (typeof data.label === "string") data.label = `${data.label} 副本`;
       const copy: Node = {
         ...sel,
         id,
         position: { x: sel.position.x + 36, y: sel.position.y + 36 },
         selected: true,
-        data,
+        data: clearedNodeData(sel, true),
       };
       setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), copy]);
       setSelected(id);
@@ -459,6 +465,66 @@ function Inner() {
     const id = nodes.find((n) => n.selected)?.id ?? selected ?? undefined;
     if (id) duplicateNodeById(id);
   }, [nodes, selected, duplicateNodeById]);
+
+  // 复制/粘贴：内部剪贴板存「选中节点 + 完全内部的连线」，粘贴时换新 id、清身份、递增偏移。
+  const clipboardRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
+  const pasteCountRef = useRef(0);
+
+  const copySelected = useCallback(
+    (explicitId?: string) => {
+      let picked = nodes.filter((n) => n.selected);
+      if (explicitId) {
+        const one = nodes.find((n) => n.id === explicitId);
+        picked = one ? [one] : [];
+      } else if (picked.length === 0 && selected) {
+        const one = nodes.find((n) => n.id === selected);
+        if (one) picked = [one];
+      }
+      if (picked.length === 0) return;
+      const set = new Set(picked.map((n) => n.id));
+      const inner = edges.filter((e) => set.has(e.source) && set.has(e.target));
+      clipboardRef.current = { nodes: picked, edges: inner };
+      pasteCountRef.current = 0;
+      setHasClipboard(true);
+    },
+    [nodes, edges, selected],
+  );
+
+  const pasteClipboard = useCallback((at?: { x: number; y: number }) => {
+    const clip = clipboardRef.current;
+    if (!clip || clip.nodes.length === 0) return;
+    let dx: number;
+    let dy: number;
+    if (at) {
+      // 粘贴到光标：把整组的左上角对齐到该点，保留组内相对布局
+      const minX = Math.min(...clip.nodes.map((n) => n.position.x));
+      const minY = Math.min(...clip.nodes.map((n) => n.position.y));
+      dx = at.x - minX;
+      dy = at.y - minY;
+    } else {
+      pasteCountRef.current += 1;
+      dx = dy = 28 * pasteCountRef.current;
+    }
+    const idMap = new Map<string, string>();
+    for (const n of clip.nodes) idMap.set(n.id, crypto.randomUUID());
+    const newNodes: Node[] = clip.nodes.map((n) => ({
+      ...n,
+      id: idMap.get(n.id)!,
+      position: { x: n.position.x + dx, y: n.position.y + dy },
+      selected: true,
+      data: clearedNodeData(n, true),
+    }));
+    const newEdges: Edge[] = clip.edges.map((e) => ({
+      ...e,
+      id: crypto.randomUUID(),
+      source: idMap.get(e.source)!,
+      target: idMap.get(e.target)!,
+      selected: false,
+    }));
+    setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), ...newNodes]);
+    if (newEdges.length) setEdges((es) => [...es, ...newEdges]);
+    setSelected(newNodes.length === 1 ? newNodes[0]!.id : null);
+  }, [setNodes, setEdges]);
 
   // 删除指定节点及其连线（context menu 用；二次确认防误删，自动保存会同步引擎）
   const deleteNodeById = useCallback(
@@ -520,6 +586,12 @@ function Inner() {
       } else if (k === "d") {
         e.preventDefault();
         duplicateSelected();
+      } else if (k === "c") {
+        e.preventDefault();
+        copySelected();
+      } else if (k === "v") {
+        e.preventDefault();
+        pasteClipboard();
       } else if (k === "k") {
         e.preventDefault();
         setCmdkQuery("");
@@ -529,7 +601,7 @@ function Inner() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, duplicateSelected]);
+  }, [undo, redo, duplicateSelected, copySelected, pasteClipboard]);
 
   // 自定义 onNodesChange：单节点拖动时算对齐参考线并吸附；其它变更原样应用。
   // 用 applyNodeChanges 复刻 useNodesState 内部行为，只在中途插入吸附与画线。
@@ -1175,7 +1247,16 @@ function Inner() {
                           setCtxMenu(null);
                         }}
                       >
-                        ⧉ 复制 <span className="ctx-kbd">Ctrl+D</span>
+                        ⧉ 再制 <span className="ctx-kbd">Ctrl+D</span>
+                      </button>
+                      <button
+                        className="ctx-item"
+                        onClick={() => {
+                          copySelected(ctxMenu.id);
+                          setCtxMenu(null);
+                        }}
+                      >
+                        ⎘ 复制 <span className="ctx-kbd">Ctrl+C</span>
                       </button>
                       <div className="ctx-sep" />
                       <button
@@ -1220,6 +1301,20 @@ function Inner() {
               )}
               {ctxMenu.kind === "pane" && (
                 <>
+                  {hasClipboard && (
+                    <>
+                      <button
+                        className="ctx-item"
+                        onClick={() => {
+                          pasteClipboard(ctxMenu.flow);
+                          setCtxMenu(null);
+                        }}
+                      >
+                        ⎙ 粘贴到此处 <span className="ctx-kbd">Ctrl+V</span>
+                      </button>
+                      <div className="ctx-sep" />
+                    </>
+                  )}
                   <div className="ctx-head">在此处添加节点</div>
                   {PALETTE.map(([kind, label]) => (
                     <button
