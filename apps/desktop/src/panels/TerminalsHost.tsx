@@ -722,10 +722,18 @@ function TerminalView({
 
     // resize 防抖：拖动窗口时 ResizeObserver 每帧触发，若每次都通知 PTY，claude 会整屏重绘
     // 几十次。本地 fit 即时做(视觉跟手)，pty_resize 在拖动停止 250ms 后只发最后一次。
+    // ⚠️ 尺寸没变就别 fit：浮窗/合成层引起的 RO 回调若每次都 fit，会和布局形成自反馈环 → 终端一直抖。
     let resizeTimer: number | undefined;
+    let lastFitW = 0;
+    let lastFitH = 0;
     const onResize = () => {
+      const w = host.clientWidth;
+      const h = host.clientHeight;
       // 隐藏(display:none)时容器为 0 尺寸——别 fit/resize，否则会把 PTY 缩成极小、切回来时 claude TUI 错乱重影
-      if (!host.clientWidth || !host.clientHeight) return;
+      if (!w || !h) return;
+      if (w === lastFitW && h === lastFitH) return; // 宿主尺寸没真的变 → 不 fit，断开抖动环
+      lastFitW = w;
+      lastFitH = h;
       try {
         fit.fit();
       } catch {
@@ -738,7 +746,16 @@ function TerminalView({
       }, 250);
     };
     window.addEventListener("resize", onResize);
-    const ro = new ResizeObserver(() => onResize());
+    // RO 回调放进 rAF 并合并，避免 "ResizeObserver loop" 与同帧多次 fit
+    let roPending = false;
+    const ro = new ResizeObserver(() => {
+      if (roPending) return;
+      roPending = true;
+      requestAnimationFrame(() => {
+        roPending = false;
+        onResize();
+      });
+    });
     ro.observe(host);
 
     // 只有真正卸载(从父组件移除=显式关闭)才会跑到这里：关 PTY + 销毁

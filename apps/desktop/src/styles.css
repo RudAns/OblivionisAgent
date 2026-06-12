@@ -903,12 +903,13 @@ button.primary {
   max-height: calc(100% - 24px);
   display: flex;
   flex-direction: column;
-  background: rgba(27, 30, 36, 0.97);
+  /* 不透明背景（原来 0.97 + blur）：浮窗压在 WebGL 终端上时，backdrop-filter 会逼着
+     GPU 每帧重采样终端画面 → 终端一直抖。改纯色去掉 blur，几乎无视觉差别。 */
+  background: #1b1e24;
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
   z-index: 10;
-  backdrop-filter: blur(2px);
 }
 .popup-feishu {
   top: 12px;
