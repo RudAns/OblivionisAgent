@@ -86,17 +86,17 @@
 :root[data-theme="light"] .rail {
   background: #faf9f7;
 }
-/* 浅色下连线上的意图标签：要白底框(不要橙色调)——干净白胶囊+淡边+浅阴影，把字从连线上托起来 */
+/* 浅色下连线上的意图标签：白胶囊底框 + 橙色文本(用户要求默认橙字) */
 :root[data-theme="light"] .edge-badge.has-cond {
   background: var(--card);
   border-color: var(--border);
-  color: #25231f;
+  color: #cf6f2e;
   box-shadow: 0 1px 3px rgba(60, 55, 45, 0.12);
 }
 :root[data-theme="light"] .edge-badge.has-cond:hover {
   background: var(--card);
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: #cf6f2e;
+  color: #cf6f2e;
 }
 :root[data-theme="light"] .edge-badge.no-cond {
   color: #8a8680;
@@ -580,25 +580,6 @@ button.primary {
   border-radius: 7px;
   font-size: 13px;
   flex-shrink: 0;
-}
-.tb-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text);
-  font-size: 12.5px;
-  cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-  transition: border-color 0.12s, background 0.12s;
-}
-.tb-btn:hover {
-  border-color: var(--accent);
-  background: var(--hover);
 }
 
 /* 画板浮动工具条：加节点按钮（top-center，避开左上角的收起键/节点编辑浮窗） */
@@ -1313,6 +1294,35 @@ button.primary {
 .popup-body {
   overflow: auto;
   min-height: 0;
+}
+/* 节点/连线编辑浮窗：用节点类型色点缀头部，避免纯白无特征(--nc 由 React 按类型注入) */
+.popup-inspector {
+  --nc: #8a93a0;
+  overflow: hidden; /* 让带色头部的圆角跟随浮窗 */
+}
+.popup-inspector .popup-head {
+  background: color-mix(in srgb, var(--nc) 13%, var(--panel));
+  border-bottom: 1px solid color-mix(in srgb, var(--nc) 42%, var(--border));
+  color: var(--text);
+  padding: 9px 11px;
+}
+.pi-head-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.pi-head-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 23px;
+  height: 23px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--nc) 24%, var(--card));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nc) 35%, transparent);
+  font-size: 13px;
+  flex-shrink: 0;
 }
 .small {
   font-size: 11px;

@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
@@ -185,6 +186,25 @@ const ADD_GROUPS: {
     items: [{ kind: "soul", label: "人格", icon: "🎭", color: "#9d7bc9" }],
   },
 ];
+// kind → 代表色 / 图标(节点检视浮窗的彩色头部用，避免纯白无特征)
+const NODE_COLOR: Record<string, string> = {
+  "feishu-group": "#3b9b70",
+  route: "#8167b2",
+  "intent-switch": "#c68a32",
+  "claude-session": "#d96745",
+  cron: "#3a8fa0",
+  webhook: "#b7791f",
+  soul: "#9d7bc9",
+};
+const NODE_ICON: Record<string, string> = {
+  "feishu-group": "💬",
+  route: "🔀",
+  "intent-switch": "🧠",
+  "claude-session": "🤖",
+  cron: "⏰",
+  webhook: "🪝",
+  soul: "🎭",
+};
 
 // 从某类节点的「输出口」拖到空白处时，能落地的目标类型（与 FlowCanvas 连线校验同源）。
 // handle=目标节点上要落的入口(claude-session 的人格口为 "fork")，默认走主入口。
@@ -647,52 +667,6 @@ function Inner() {
     [setNodes],
   );
 
-  // 自动布局：按拓扑「最长路径」分层成列(输入源→分流/路由→会话，从左到右)，列内纵向排开，
-  // 同类自然纵向对齐、少交叉。人格(soul)特殊放到所连会话上方。改完 fitView；旧布局靠 Ctrl+Z 撤销。
-  const autoLayout = useCallback(() => {
-    setNodes((ns) => {
-      if (ns.length === 0) return ns;
-      const preds = new Map<string, string[]>();
-      for (const e of edges) {
-        if (!preds.has(e.target)) preds.set(e.target, []);
-        preds.get(e.target)!.push(e.source);
-      }
-      const layerOf = new Map<string, number>();
-      const compute = (id: string, stack: Set<string>): number => {
-        if (layerOf.has(id)) return layerOf.get(id)!;
-        if (stack.has(id)) return 0; // 防环
-        stack.add(id);
-        const ps = preds.get(id) ?? [];
-        const l = ps.length ? Math.max(...ps.map((p) => compute(p, stack))) + 1 : 0;
-        stack.delete(id);
-        layerOf.set(id, l);
-        return l;
-      };
-      for (const n of ns) compute(n.id, new Set());
-      const byLayer = new Map<number, string[]>();
-      for (const n of ns) {
-        if (n.type === "soul") continue; // soul 单独贴到会话上方
-        const l = layerOf.get(n.id) ?? 0;
-        if (!byLayer.has(l)) byLayer.set(l, []);
-        byLayer.get(l)!.push(n.id);
-      }
-      const COL = 320;
-      const ROW = 150;
-      const X0 = 60;
-      const Y0 = 80;
-      const pos = new Map<string, { x: number; y: number }>();
-      for (const [l, ids] of byLayer) ids.forEach((id, i) => pos.set(id, { x: X0 + l * COL, y: Y0 + i * ROW }));
-      for (const n of ns) {
-        if (n.type !== "soul") continue;
-        const tgt = edges.find((e) => e.source === n.id)?.target;
-        const t = tgt ? pos.get(tgt) : undefined;
-        pos.set(n.id, t ? { x: t.x, y: t.y - 120 } : { x: X0, y: Y0 });
-      }
-      return ns.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }));
-    });
-    window.setTimeout(() => rf.fitView({ duration: 400, padding: 0.18 }), 60);
-  }, [edges, setNodes, rf]);
-
   // 复制/粘贴：内部剪贴板存「选中节点 + 完全内部的连线」，粘贴时换新 id、清身份、递增偏移。
   const clipboardRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
   const pasteCountRef = useRef(0);
@@ -970,8 +944,9 @@ function Inner() {
       // 节点检视：点节点不关(让 onNodeClick 切换/拖动保持)，点真正的外部(空白/面板/侧栏)才关
       if (!t.closest(".react-flow__node")) setInspectorOpen(false);
     };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    // 用捕获阶段：React Flow 会吞掉画布上的 mousedown 冒泡，捕获能先收到，保证点画布也能关
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
   }, [feishuOpen, settingsOpen, inspectorOpen, addMenuOpen]);
 
   // 切到某会话(显示其终端)时：记录"在看谁"，并清掉它的完成红点
@@ -1345,7 +1320,6 @@ function Inner() {
         setEdges((es) => es.filter((e) => !ids.has(e.source) && !ids.has(e.target)));
       },
     },
-    { id: "autolayout", label: "自动整理布局（左→右分层）", hint: "画布", run: () => autoLayout() },
     { id: "fit", label: "适应视图（看全画布）", hint: "视图", run: () => rf.fitView({ duration: 300, padding: 0.2 }) },
     { id: "undo", label: "撤销", hint: "Ctrl+Z", run: undo },
     { id: "redo", label: "重做", hint: "Ctrl+Shift+Z", run: redo },
@@ -1492,9 +1466,12 @@ function Inner() {
 
           {/* 浮窗：连线条件编辑（条件分流） */}
           {inspectorOpen && selectedEdgeObj && (
-            <div className="popup popup-inspector">
+            <div className="popup popup-inspector" style={{ "--nc": "#cf6f2e" } as CSSProperties}>
               <div className="popup-head">
-                <span>连线条件（分流）</span>
+                <span className="pi-head-title">
+                  <span className="pi-head-icon">🎯</span>
+                  连线意图（分流）
+                </span>
                 <button className="popup-x" onClick={() => setSelectedEdge(null)} title="隐藏">
                   ×
                 </button>
@@ -1534,7 +1511,7 @@ function Inner() {
 
           {/* 节点编辑浮窗已移到 main 层级（见下），画布收起时也能编辑选中的会话 */}
 
-          {/* 左上角工具条：分类「＋ 添加节点」下拉 + 自动布局（参考美术稿） */}
+          {/* 左上角工具条：分类「＋ 添加节点」下拉（参考美术稿） */}
           <div className="canvas-toolbar">
             <div className="add-node-wrap">
               <button
@@ -1571,9 +1548,6 @@ function Inner() {
                 </div>
               )}
             </div>
-            <button className="tb-btn" onClick={() => autoLayout()} title="按链路自动排成左→右分层布局">
-              ⌗ 自动布局
-            </button>
           </div>
 
           {/* 加节点：左上角工具条 / 右键空白处 / 从端口拖到空白；底部留一行淡提示 */}
@@ -1667,9 +1641,15 @@ function Inner() {
         {/* 节点编辑浮窗：挂在 main 层级，画布收起(终端为主)时也能编辑选中的会话——不再是死胡同。
             多选(≥2)时不显单节点检视，避免"显示一个却以为操作全局"的误导(改由对齐工具条主导)。 */}
         {inspectorOpen && selectedNode && multiSelectCount < 2 && (
-          <div className="popup popup-inspector">
+          <div
+            className="popup popup-inspector"
+            style={{ "--nc": NODE_COLOR[selectedNode.type ?? ""] ?? "#8a93a0" } as CSSProperties}
+          >
             <div className="popup-head">
-              <span>节点编辑{canvasCollapsed ? "（画布已收起）" : ""}</span>
+              <span className="pi-head-title">
+                <span className="pi-head-icon">{NODE_ICON[selectedNode.type ?? ""] ?? "▦"}</span>
+                {NODE_LABEL[selectedNode.type ?? ""] ?? "节点"} 设置{canvasCollapsed ? "（画布已收起）" : ""}
+              </span>
               <button className="popup-x" onClick={() => setInspectorOpen(false)} title="隐藏">
                 ×
               </button>
@@ -1915,16 +1895,6 @@ function Inner() {
                     </button>
                   ))}
                   <div className="ctx-sep" />
-                  <button
-                    className="ctx-item"
-                    title="按链路自动排成左→右分层布局（可 Ctrl+Z 撤销）"
-                    onClick={() => {
-                      autoLayout();
-                      setCtxMenu(null);
-                    }}
-                  >
-                    ⌗ 自动整理布局
-                  </button>
                   <button
                     className="ctx-item"
                     onClick={() => {
