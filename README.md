@@ -35,9 +35,11 @@
 - Rust 工具链（[rustup](https://rustup.rs)，构建桌面壳用）
 - 已登录的 [Claude Code](https://claude.com/claude-code) CLI（`claude` 在 PATH 里）
 - 一个飞书企业自建应用机器人：
-  开通 `im:message` / `im:message:send_as_bot` / `im:chat` / `im:resource` 权限，
-  事件订阅选**长连接（WebSocket）**并订阅 `im.message.receive_v1`（无需公网回调），
-  添加「机器人」能力并发布
+  - 收发与读资源：`im:message` / `im:message:send_as_bot` / `im:chat` / `im:resource`
+  - 显示发送者**真实姓名**：`contact:user.base:readonly`（并把「通讯录权限范围/数据范围」设为包含相关成员，否则查名返回 400）。
+    不加也能跑——会退回用群成员列表（`im:chat`）取名，再不行才显示 open_id。
+  - 事件订阅选**长连接（WebSocket）**并订阅 `im.message.receive_v1`（无需公网回调），
+    添加「机器人」能力并发布
 
 ### 构建
 
