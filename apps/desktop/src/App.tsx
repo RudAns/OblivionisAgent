@@ -976,6 +976,10 @@ function Inner() {
               setSelectedEdge(id);
               setInspectorOpen(true);
             }}
+            onDeleteEdge={(id) => {
+              setEdges((es) => es.filter((x) => x.id !== id));
+              setSelectedEdge((s) => (s === id ? null : s));
+            }}
             onPaneClick={onPaneClick}
             onNodeContextMenu={onNodeContextMenu}
             onEdgeContextMenu={onEdgeContextMenu}

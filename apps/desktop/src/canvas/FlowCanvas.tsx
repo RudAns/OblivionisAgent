@@ -41,6 +41,8 @@ interface Props {
   onEdgeClick: EdgeMouseHandler;
   /** 点连线上的"意图徽标"时打开条件编辑 */
   onEditEdge: (id: string) => void;
+  /** 点连线 hover 出现的「×」一键删除连线 */
+  onDeleteEdge: (id: string) => void;
   onPaneClick: () => void;
   onNodeContextMenu: NodeMouseHandler;
   onEdgeContextMenu: EdgeMouseHandler;
@@ -113,7 +115,7 @@ export function FlowCanvas(props: Props) {
   );
 
   return (
-    <EdgeActionContext.Provider value={{ editEdge: props.onEditEdge }}>
+    <EdgeActionContext.Provider value={{ editEdge: props.onEditEdge, deleteEdge: props.onDeleteEdge }}>
     <ReactFlow
       nodes={props.nodes}
       edges={props.edges}
