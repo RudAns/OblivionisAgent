@@ -838,18 +838,27 @@ function TerminalView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 切换深/浅主题：整套替换 xterm 配色。WebGL 渲染器会缓存旧底色的字形图集，
-  // 必须 clearTextureAtlas() 再 refresh，否则已绘制的单元格背景仍是旧主题色(深色残留)。
+  // 切换深/浅主题：整套替换 xterm 配色。WebGL 渲染器会缓存旧底色的字形图集，必须
+  // clearTextureAtlas() 再 refresh，否则残留旧色/花屏。
+  // ⚠️ 但对【隐藏(display:none，0 尺寸)】的终端 clearTextureAtlas 会把图集搞坏，切回来就乱码——
+  // 所以隐藏的只更新 theme 并记"脏"，等它变可见时(下面的可见 effect)再清图集重画。
+  const themeDirtyRef = useRef(false);
   useEffect(() => {
     const t = termRef.current;
     if (!t) return;
     t.options.theme = termTheme(theme);
-    try {
-      webglRef.current?.clearTextureAtlas();
-      t.refresh(0, t.rows - 1);
-    } catch {
-      /* ignore */
+    if (active) {
+      try {
+        webglRef.current?.clearTextureAtlas();
+        t.refresh(0, t.rows - 1);
+      } catch {
+        /* ignore */
+      }
+      themeDirtyRef.current = false;
+    } else {
+      themeDirtyRef.current = true;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);
 
   // 变为可见时：等布局稳定后重新拟合尺寸并重绘缓冲。
@@ -871,6 +880,15 @@ function TerminalView({
       }
       // 统一入口：尺寸真变了才会发(内部比对)，且发前清缓冲迎接 ConPTY 重放
       ptySizeRef.current?.send(t.cols, t.rows);
+      // 隐藏期间切过主题(themeDirty)：此刻可见了，安全地清图集再重画，避免乱码
+      if (themeDirtyRef.current) {
+        try {
+          webglRef.current?.clearTextureAtlas();
+        } catch {
+          /* ignore */
+        }
+        themeDirtyRef.current = false;
+      }
       try {
         t.refresh(0, t.rows - 1);
       } catch {
