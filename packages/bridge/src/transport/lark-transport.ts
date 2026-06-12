@@ -286,7 +286,17 @@ export class LarkTransport implements FeishuTransport {
       this.nameCache.set(openId, name ?? null);
       return name;
     } catch (e) {
-      this.opts.log("warn", `查用户姓名失败(${openId.slice(0, 12)}…): ${(e as Error).message}`);
+      // 把飞书真正的错误码/原因带出来（光看 "status code 400" 没法判断是缺权限还是参数问题）
+      const err = e as { response?: { data?: { code?: number; msg?: string } }; message?: string };
+      const fb = err.response?.data;
+      const detail = fb?.code != null ? `code=${fb.code} msg=${fb.msg}` : err.message;
+      this.opts.log(
+        "warn",
+        `查用户姓名失败(${openId.slice(0, 12)}…): ${detail}` +
+          (fb?.code === 99991672 || fb?.code === 99991661
+            ? "（多半是应用缺通讯录权限 contact:user.base:readonly，或机器人「数据权限范围」没包含该用户）"
+            : ""),
+      );
       this.nameCache.set(openId, null); // 失败也缓存，避免每条消息都打一次 API
       return undefined;
     }

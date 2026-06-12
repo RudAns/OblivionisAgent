@@ -387,53 +387,6 @@ button.primary {
   background: var(--border);
   flex-shrink: 0;
 }
-/* 「＋ 添加节点」下拉：收纳 7 个加节点按钮，工具条不再过载 */
-.pal-add {
-  position: relative;
-}
-.pal-add-btn {
-  white-space: nowrap;
-}
-.pal-add .pal-caret {
-  font-size: 9px;
-  opacity: 0.7;
-}
-.pal-add-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-}
-.pal-add-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 21;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 140px;
-  padding: 5px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
-  animation: ctx-pop 0.09s ease-out;
-}
-.pal-add-menu button {
-  text-align: left;
-  padding: 6px 9px;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text);
-  font-size: 12.5px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.pal-add-menu button:hover {
-  background: rgba(79, 140, 255, 0.16);
-}
-
 /* ---- 多选对齐/分布工具条（画布底部居中浮出）---- */
 .canvas-align-bar {
   position: absolute;
@@ -875,22 +828,21 @@ button.primary {
   }
 }
 
-/* 完成红点（小旗）：跑完但还没切过去看 */
+/* 完成小红旗：终端任务跑完但还没切过去看 */
 .rail-flag {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #ff4d4f;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  filter: drop-shadow(0 0 2px rgba(255, 90, 77, 0.55));
   animation: flag-pulse 1.6s ease-in-out infinite;
 }
 @keyframes flag-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.5);
+    opacity: 1;
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(255, 77, 79, 0);
+    opacity: 0.55;
   }
 }
 
@@ -2190,11 +2142,17 @@ button.primary {
   padding: 6px 10px;
   font-family: Consolas, monospace;
   font-size: 11px;
+  user-select: text; /* 允许选中日志文本复制 */
+  cursor: text;
 }
 .logline {
   display: flex;
   gap: 6px;
   padding: 1px 0;
+}
+.log-text {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .log-ts {
   color: var(--muted);

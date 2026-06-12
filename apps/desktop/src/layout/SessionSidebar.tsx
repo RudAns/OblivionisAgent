@@ -61,7 +61,14 @@ export function SessionSidebar({
               <div className="rail-card-top">
                 <span className={`rail-dot status-${d.status ?? "idle"}`} />
                 <span className="rail-label">{d.label || "会话"}</span>
-                {done && <span className="rail-flag" title="有已完成的回复，还没查看" />}
+                {done && (
+                  <span className="rail-flag" title="终端任务已完成，还没查看">
+                    <svg width="11" height="13" viewBox="0 0 12 14" fill="none">
+                      <path d="M2.6 1 V13.2" stroke="#ff5a4d" strokeWidth="1.5" strokeLinecap="round" />
+                      <path d="M2.6 1.7 H10.2 L7.9 4 L10.2 6.3 H2.6 Z" fill="#ff5a4d" />
+                    </svg>
+                  </span>
+                )}
                 {open && (
                   <span className="rail-open" title="终端已打开">
                     <svg

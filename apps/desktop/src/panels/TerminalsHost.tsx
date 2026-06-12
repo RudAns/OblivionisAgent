@@ -604,13 +604,17 @@ function TerminalView({
       },
     });
 
-    // 输出活动 → running：有数据就标记运行中，停 700ms 判定空闲（只在状态翻转时上报）
+    // 输出活动 → running：有数据就标记运行中，停 700ms 判定空闲（只在状态翻转时上报）。
+    // ⚠️ 只算"AI 在执行"的输出：用户打字时终端会把每个按键回显成输出，那不算运行——
+    // 用"距上次用户输入的时间"区分：紧跟输入(<320ms)的输出=回显，跳过；否则=AI 在吐。
+    let lastInputAt = 0;
     const reportActive = (v: boolean) => {
       if (actReportRef.current === v) return;
       actReportRef.current = v;
       onActivityRef.current?.(v);
     };
     const bumpActivity = () => {
+      if (performance.now() - lastInputAt < 320) return; // 这波输出是用户打字的回显，不刷光
       reportActive(true);
       if (actTimerRef.current) window.clearTimeout(actTimerRef.current);
       actTimerRef.current = window.setTimeout(() => reportActive(false), 700);
@@ -680,6 +684,7 @@ function TerminalView({
     })();
 
     const inputDisp = term.onData((data) => {
+      lastInputAt = performance.now(); // 记下用户输入时刻：紧随其后的输出当作回显，不刷光
       if (ptyId) invoke("pty_write", { id: ptyId, data }).catch(() => {});
     });
     // 给 PTY 发 resize 的唯一入口：尺寸没变就不发（防冗余重绘）。

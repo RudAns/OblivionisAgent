@@ -190,8 +190,6 @@ function Inner() {
   const [cmdkIndex, setCmdkIndex] = useState(0);
   // 剪贴板里是否有内容（驱动右键菜单的「粘贴」是否出现）
   const [hasClipboard, setHasClipboard] = useState(false);
-  // 工具条「＋ 添加节点」下拉是否展开
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("transcript");
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [inbox, setInbox] = useState<AuditItem[]>([]);
@@ -306,12 +304,7 @@ function Inner() {
           break;
         }
         case "session-status": {
-          const prev = statusRef.current[msg.nodeId];
           statusRef.current[msg.nodeId] = msg.status;
-          // 飞书 fork 跑完(running→非running)而我没在看这个会话 → 点完成红点
-          if (prev === "running" && msg.status !== "running" && activeTermRef.current !== msg.nodeId) {
-            setUnseenDone((m) => (m[msg.nodeId] ? m : { ...m, [msg.nodeId]: true }));
-          }
           setNodes((cur) =>
             cur.map((nd) =>
               nd.id === msg.nodeId ? { ...nd, data: { ...nd.data, status: msg.status } } : nd,
@@ -663,6 +656,8 @@ function Inner() {
         return;
       const k = e.key.toLowerCase();
       const mod = e.ctrlKey || e.metaKey;
+      // 有文本选区时，把复制/剪切交还给浏览器（日志/转录/审计里选中文字复制），不抢去复制节点
+      if (mod && (k === "c" || k === "x") && window.getSelection()?.toString()) return;
       if (!mod) {
         if (k === "f") {
           e.preventDefault();
@@ -1229,41 +1224,11 @@ function Inner() {
               ↷
             </button>
             <span className="pal-sep" />
-            <div className="pal-add">
-              <button className="pal-add-btn" onClick={() => setAddMenuOpen((o) => !o)} title="添加节点">
-                ＋ 添加节点 <span className="pal-caret">▾</span>
+            {PALETTE.map(([kind, label]) => (
+              <button key={kind} onClick={() => addNode(kind)}>
+                + {label}
               </button>
-              {addMenuOpen && (
-                <>
-                  <div className="pal-add-backdrop" onClick={() => setAddMenuOpen(false)} />
-                  <div className="pal-add-menu">
-                    {PALETTE.map(([kind, label]) => (
-                      <button
-                        key={kind}
-                        onClick={() => {
-                          addNode(kind);
-                          setAddMenuOpen(false);
-                        }}
-                      >
-                        ＋ {label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-            <span className="pal-sep" />
-            <button
-              className="pal-icon"
-              title="命令面板：搜索添加节点 / 运行命令 (Ctrl+K)"
-              onClick={() => {
-                setCmdkQuery("");
-                setCmdkIndex(0);
-                setCmdkOpen(true);
-              }}
-            >
-              ⌘K
-            </button>
+            ))}
           </div>
           </div>
           )}
@@ -1362,7 +1327,13 @@ function Inner() {
                   setActiveTerminal((a) => (a === id ? null : a));
                 }}
                 onActivity={(id, r) =>
-                  setTermRunning((m) => (m[id] === r ? m : { ...m, [id]: r }))
+                  setTermRunning((m) => {
+                    // 终端跑完(running→idle)而我没在看这个会话 → 点完成小红旗
+                    if (m[id] && !r && activeTermRef.current !== id) {
+                      setUnseenDone((u) => (u[id] ? u : { ...u, [id]: true }));
+                    }
+                    return m[id] === r ? m : { ...m, [id]: r };
+                  })
                 }
               />
             </div>
