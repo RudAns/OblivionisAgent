@@ -850,6 +850,7 @@ function Inner() {
     setActiveTerminal(nodeId);
     setOpenedTerminals((o) => (o.includes(nodeId) ? o : [...o, nodeId]));
     setTab("terminal");
+    setCanvasCollapsed(true); // 打开终端 → 退出节点视图，终端占满
   }, []);
 
   // 双击「Claude 会话」节点：打开它的开发终端
@@ -1057,11 +1058,11 @@ function Inner() {
     }
   };
 
-  /** 左侧图标竖栏动作分发 */
+  /** 左侧图标竖栏动作分发：节点图与面板视图互斥切换 */
   const onRailAction = (key: RailKey) => {
     switch (key) {
       case "canvas":
-        setCanvasCollapsed(!canvasCollapsed);
+        setCanvasCollapsed(false); // 进入节点视图(画布占满)
         break;
       case "feishu":
         setFeishuOpen((o) => !o);
@@ -1071,6 +1072,7 @@ function Inner() {
         break;
       default:
         setTab(key);
+        setCanvasCollapsed(true); // 切到终端/转录/审计/日志/收件箱面板 → 退出节点视图
     }
   };
 
@@ -1301,9 +1303,8 @@ function Inner() {
           </div>
           )}
 
-        {!canvasCollapsed && (
-          <div className="resizer" onMouseDown={startResize} title="拖动调整宽度" />
-        )}
+        {/* 节点视图与面板视图互斥(全宽)：画布展开=只看画布，便于编辑；切面板=只看终端/转录等。
+            resizer 不再需要(两视图各自占满)。 */}
 
         {/* 浮窗：飞书连接（挂在 main 层级，画布收起时也能用） */}
         {feishuOpen && (
@@ -1407,7 +1408,8 @@ function Inner() {
           </div>
         )}
 
-        <aside className="side" style={canvasCollapsed ? { flex: 1, minWidth: 0 } : { width: panelWidth }}>
+        {/* 画布展开时隐藏面板(但保持挂载，终端不掉)；收起时面板占满 */}
+        <aside className="side" style={canvasCollapsed ? { flex: 1, minWidth: 0 } : { display: "none" }}>
           <div className="panel-title">{TAB_TITLE[tab]}</div>
 
           <div className="panel">

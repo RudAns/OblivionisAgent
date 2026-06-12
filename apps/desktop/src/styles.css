@@ -50,6 +50,16 @@
 :root[data-theme="light"] .lvl-error .log-text {
   color: #cf222e;
 }
+/* 浅色下连线上的意图标签:橙字太淡、"＋意图"太隐——压深、提清晰 */
+:root[data-theme="light"] .edge-badge.has-cond {
+  background: rgba(217, 119, 6, 0.13);
+  border-color: rgba(217, 119, 6, 0.5);
+  color: #9a5b00;
+}
+:root[data-theme="light"] .edge-badge.no-cond {
+  color: #8a8680;
+  opacity: 0.9;
+}
 
 * {
   box-sizing: border-box;
