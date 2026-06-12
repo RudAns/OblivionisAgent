@@ -199,6 +199,16 @@ function Inner() {
     window.clearTimeout(savedTimer.current);
     savedTimer.current = window.setTimeout(() => setSavedFlash(false), 1600);
   }, []);
+  // 撤销/重做：记录画布"settled"状态历史。防抖记录，仅实质变化(节点/连线/位置/条件)入栈，纯选中不记。
+  type GraphSnap = { nodes: Node[]; edges: Edge[]; sig: string };
+  const historyRef = useRef<{ past: GraphSnap[]; future: GraphSnap[]; lastSnap: GraphSnap | null; applying: boolean }>(
+    { past: [], future: [], lastSnap: null, applying: false },
+  );
+  const [histState, setHistState] = useState({ canUndo: false, canRedo: false });
+  const syncHist = useCallback(() => {
+    const h = historyRef.current;
+    setHistState({ canUndo: h.past.length > 0, canRedo: h.future.length > 0 });
+  }, []);
   // 每个会话节点的"专属终端会话 id"：避免去 resume 正在用的开发/访客会话(否则报 already in use)
   const termIds = useRef<Map<string, string>>(new Map());
 
@@ -336,6 +346,107 @@ function Inner() {
     }, 800);
     return () => window.clearTimeout(t);
   }, [nodes, edges, client]);
+
+  // 撤销/重做历史：图实质变化 settle 后入栈（防抖，避免每帧/纯选中入栈）
+  useEffect(() => {
+    if (!graphInit.current) return;
+    const h = historyRef.current;
+    if (h.applying) {
+      h.applying = false; // undo/redo 自己的变更，不再入栈
+      return;
+    }
+    const t = window.setTimeout(() => {
+      let sig: string;
+      try {
+        sig = JSON.stringify(rfToGraph(nodes, edges));
+      } catch {
+        return;
+      }
+      if (!h.lastSnap) {
+        h.lastSnap = { nodes, edges, sig };
+        return;
+      }
+      if (sig === h.lastSnap.sig) return; // 无实质变化(如仅选中)
+      h.past.push(h.lastSnap);
+      if (h.past.length > 80) h.past.shift();
+      h.future = [];
+      h.lastSnap = { nodes, edges, sig };
+      syncHist();
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [nodes, edges, syncHist]);
+
+  const undo = useCallback(() => {
+    const h = historyRef.current;
+    if (!h.past.length || !h.lastSnap) return;
+    const prev = h.past.pop()!;
+    h.future.push(h.lastSnap);
+    h.lastSnap = prev;
+    h.applying = true;
+    setNodes(prev.nodes);
+    setEdges(prev.edges);
+    syncHist();
+  }, [setNodes, setEdges, syncHist]);
+
+  const redo = useCallback(() => {
+    const h = historyRef.current;
+    if (!h.future.length || !h.lastSnap) return;
+    const next = h.future.pop()!;
+    h.past.push(h.lastSnap);
+    h.lastSnap = next;
+    h.applying = true;
+    setNodes(next.nodes);
+    setEdges(next.edges);
+    syncHist();
+  }, [setNodes, setEdges, syncHist]);
+
+  const duplicateSelected = useCallback(() => {
+    const sel = nodes.find((n) => n.selected) ?? (selected ? nodes.find((n) => n.id === selected) : undefined);
+    if (!sel) return;
+    const id = crypto.randomUUID();
+    // 复制配置但清掉"身份"字段，避免和原节点冲突(同一会话/群/token)
+    const data: Record<string, unknown> = { ...(sel.data as Record<string, unknown>) };
+    if (sel.type === "claude-session") delete data.sessionId;
+    if (sel.type === "feishu-group") data.chatId = "";
+    if (sel.type === "webhook") data.token = crypto.randomUUID().replace(/-/g, "");
+    if (typeof data.label === "string") data.label = `${data.label} 副本`;
+    const copy: Node = {
+      ...sel,
+      id,
+      position: { x: sel.position.x + 36, y: sel.position.y + 36 },
+      selected: true,
+      data,
+    };
+    setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), copy]);
+    setSelected(id);
+  }, [nodes, selected, setNodes]);
+
+  // 画布快捷键：Ctrl+Z 撤销 / Ctrl+Shift+Z·Ctrl+Y 重做 / Ctrl+D 复制节点。
+  // 焦点在输入框或终端时不接管(终端的 Ctrl+Z 要交给 claude)。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const ae = document.activeElement as HTMLElement | null;
+      if (
+        ae &&
+        (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable || ae.closest(".terminal-host"))
+      )
+        return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if (k === "y" || (k === "z" && e.shiftKey)) {
+        e.preventDefault();
+        redo();
+      } else if (k === "d") {
+        e.preventDefault();
+        duplicateSelected();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo, duplicateSelected]);
 
   const onConnect = useCallback(
     (c: Connection) => setEdges((eds) => addEdge({ ...c, id: crypto.randomUUID() }, eds)),
@@ -718,6 +829,23 @@ function Inner() {
 
           {/* 画板浮动工具条：加节点（画板收起时自然隐藏） */}
           <div className="canvas-palette">
+            <button
+              className="pal-icon"
+              title="撤销 (Ctrl+Z)"
+              disabled={!histState.canUndo}
+              onClick={undo}
+            >
+              ↶
+            </button>
+            <button
+              className="pal-icon"
+              title="重做 (Ctrl+Shift+Z)"
+              disabled={!histState.canRedo}
+              onClick={redo}
+            >
+              ↷
+            </button>
+            <span className="pal-sep" />
             <button onClick={() => addNode("feishu-group")}>+ 飞书群</button>
             <button onClick={() => addNode("route")}>+ 路由</button>
             <button onClick={() => addNode("intent-switch")}>+ 意图分流</button>

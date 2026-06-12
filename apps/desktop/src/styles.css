@@ -369,6 +369,24 @@ button.primary {
   white-space: nowrap;
   flex-shrink: 0;
 }
+/* 撤销/重做图标按钮：方形、字号大一点、禁用态变淡 */
+.canvas-palette .pal-icon {
+  min-width: 30px;
+  padding: 3px 8px;
+  font-size: 15px;
+  line-height: 1;
+}
+.canvas-palette .pal-icon:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+.canvas-palette .pal-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 3px;
+  background: var(--border);
+  flex-shrink: 0;
+}
 
 /* ---- 折叠态：左侧 Claude 会话卡片窄菜单 ---- */
 .canvas-collapse {
