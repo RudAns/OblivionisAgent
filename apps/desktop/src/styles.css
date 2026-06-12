@@ -144,6 +144,27 @@ body {
   background: var(--bg);
   color: var(--text);
   font-size: 13px;
+  /* 默认整界面文字不可选：标题/标签/拖拽区被误选会妨碍点击和窗口拖动。
+     真正需要复制的内容(终端/转录/日志/审计/输入框/路径)在下方单独放开。 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.xterm,
+.transcript,
+.logs,
+.audit,
+.evt-text,
+.ti-cwd,
+.log-text,
+.audit-text,
+.owner-id,
+.si-preview,
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .app {
@@ -1040,10 +1061,10 @@ button.primary {
 }
 .rail-card.active {
   border-color: var(--border);
-  border-left-color: var(--accent); /* 当前会话:3px 品牌色左条——「有颜色」的就这一条 */
-  /* 白底为主，只留极淡暖意；不再整卡染橙(美术稿:左侧着色占比要小) */
-  background: color-mix(in srgb, var(--accent) 4%, var(--card));
-  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.1);
+  border-left: 4px solid var(--accent); /* 当前会话:品牌色左条，略加粗 */
+  /* 左侧多一点颜色：从左到右橙→白渐变(只染左半，右半回到白)，颜色集中在左侧 */
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 16%, var(--card)) 0%, var(--card) 46%);
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.12);
 }
 .rail-dot {
   width: 8px;
@@ -2195,6 +2216,13 @@ button.primary {
   color: var(--text);
   box-shadow: inset 0 2px 0 var(--accent);
 }
+/* 拖拽排序：被拖的页签半透明，落点页签左侧亮一条品牌色提示插入位置 */
+.term-tab.dragging {
+  opacity: 0.45;
+}
+.term-tab.drop-target {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .term-tab-label {
   max-width: 140px;
   overflow: hidden;
@@ -2249,20 +2277,21 @@ button.primary {
   flex-shrink: 0;
   user-select: none;
 }
-.ti-label {
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
+.ti-cwd-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 .ti-cwd {
   flex: 1;
   min-width: 0;
-  color: var(--muted);
+  color: var(--text); /* 工作目录现在是信息栏主角，提亮一档 */
   font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 10.5px;
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  user-select: text; /* 路径允许选中复制 */
 }
 .ti-sid {
   color: var(--accent);

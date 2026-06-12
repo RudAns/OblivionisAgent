@@ -1708,6 +1708,15 @@ function Inner() {
                   setOpenedTerminals((o) => o.filter((x) => x !== id));
                   setActiveTerminal((a) => (a === id ? null : a));
                 }}
+                onReorder={(dragId, dropId) =>
+                  setOpenedTerminals((o) => {
+                    const a = o.filter((x) => x !== dragId);
+                    const ti = a.indexOf(dropId);
+                    if (ti < 0) return o;
+                    a.splice(ti, 0, dragId); // 放到落点页签之前
+                    return a;
+                  })
+                }
                 theme={resolvedTheme}
                 onActivity={(id, r) =>
                   setTermRunning((m) => (m[id] === r ? m : { ...m, [id]: r }))

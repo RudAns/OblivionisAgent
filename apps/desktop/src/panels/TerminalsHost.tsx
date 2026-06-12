@@ -961,9 +961,10 @@ function TerminalView({
 
   return (
     <div className="term-view" style={{ display: active ? "flex" : "none" }}>
+      {/* 信息栏不再重复页签上的会话名，只显示「工作目录」(页签里没有)+会话短 id */}
       <div className="term-info">
-        <span className="ti-label" title={info.label}>
-          {info.label}
+        <span className="ti-cwd-icon" aria-hidden>
+          📁
         </span>
         <span className="ti-cwd" title={info.cwd}>
           {info.cwd || "(默认目录)"}
@@ -1050,6 +1051,7 @@ export function TerminalsHost({
   theme,
   onActivate,
   onClose,
+  onReorder,
   onActivity,
   onTaskDone,
 }: {
@@ -1058,6 +1060,8 @@ export function TerminalsHost({
   theme: "dark" | "light";
   onActivate: (nodeId: string) => void;
   onClose: (nodeId: string) => void;
+  /** 拖动页签改变顺序：把 dragId 放到 dropId 的位置 */
+  onReorder?: (dragId: string, dropId: string) => void;
   /** 某终端运行/空闲变化 → 上抛给 App 驱动侧栏扫光 */
   onActivity?: (nodeId: string, running: boolean) => void;
   /** 某终端一次正式任务跑完 → 上抛给 App 插完成红旗 */
@@ -1067,6 +1071,9 @@ export function TerminalsHost({
   const [repaintTick, setRepaintTick] = useState(0);
   // 各终端是否正在运行（输出活动），用于给标签页加扫光
   const [running, setRunning] = useState<Record<string, boolean>>({});
+  // 页签拖拽排序：记录正在拖的 id 与悬停落点 id
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   if (!inTauri()) return <div className="panel-empty">真实终端仅在桌面应用中可用（浏览器开发版不支持）。</div>;
   if (terminals.length === 0)
     return (
@@ -1080,7 +1087,30 @@ export function TerminalsHost({
         {terminals.map((t) => (
           <div
             key={t.nodeId}
-            className={`term-tab ${t.nodeId === activeId ? "on" : ""} ${running[t.nodeId] ? "term-busy" : ""}`}
+            className={`term-tab ${t.nodeId === activeId ? "on" : ""} ${running[t.nodeId] ? "term-busy" : ""} ${
+              dragId === t.nodeId ? "dragging" : ""
+            } ${overId === t.nodeId && dragId && dragId !== t.nodeId ? "drop-target" : ""}`}
+            draggable
+            onDragStart={(e) => {
+              setDragId(t.nodeId);
+              e.dataTransfer.effectAllowed = "move";
+            }}
+            onDragOver={(e) => {
+              if (!dragId || dragId === t.nodeId) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              if (overId !== t.nodeId) setOverId(t.nodeId);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (dragId && dragId !== t.nodeId) onReorder?.(dragId, t.nodeId);
+              setDragId(null);
+              setOverId(null);
+            }}
+            onDragEnd={() => {
+              setDragId(null);
+              setOverId(null);
+            }}
             onClick={() => onActivate(t.nodeId)}
             title={t.cwd || t.nodeId}
           >
