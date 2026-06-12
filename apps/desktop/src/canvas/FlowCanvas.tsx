@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import {
   ReactFlow,
   Background,
@@ -9,12 +9,14 @@ import {
   MarkerType,
   type Node,
   type Edge,
+  type Connection,
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
   type NodeMouseHandler,
   type EdgeMouseHandler,
   type DefaultEdgeOptions,
+  type IsValidConnection,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { FeishuGroupNode } from "./nodes/FeishuGroupNode.js";
@@ -58,6 +60,12 @@ const NODE_COLORS: Record<string, string> = {
 };
 const miniMapNodeColor = (node: Node) => NODE_COLORS[node.type ?? ""] ?? "#3a4250";
 
+// 合法连线语法（像专业节点编辑器一样，连错当场拒绝）：
+//   群/路由/分流/定时/Webhook → 路由/分流/会话（cron/webhook 只直连会话）
+//   人格(soul) → 会话的「人格口」(targetHandle=fork)；人格口也只接 soul
+const ROUTING_SRC = new Set(["feishu-group", "route", "intent-switch", "cron", "webhook"]);
+const ROUTING_TGT = new Set(["route", "intent-switch", "claude-session"]);
+
 export function FlowCanvas(props: Props) {
   const nodeTypes = useMemo(
     () => ({
@@ -72,6 +80,26 @@ export function FlowCanvas(props: Props) {
     [],
   );
 
+  const kindById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const n of props.nodes) m.set(n.id, n.type ?? "");
+    return m;
+  }, [props.nodes]);
+
+  const isValidConnection = useCallback<IsValidConnection>(
+    (c: Connection | Edge) => {
+      const sk = kindById.get(c.source ?? "");
+      const tk = kindById.get(c.target ?? "");
+      if (!sk || !tk || c.source === c.target) return false;
+      if (sk === "soul") return tk === "claude-session" && c.targetHandle === "fork"; // 人格只连人格口
+      if (c.targetHandle === "fork") return false; // 人格口只接 soul（上面已放行）
+      if (!ROUTING_SRC.has(sk) || !ROUTING_TGT.has(tk)) return false;
+      if ((sk === "cron" || sk === "webhook") && tk !== "claude-session") return false; // 触发节点只直连会话
+      return true;
+    },
+    [kindById],
+  );
+
   return (
     <ReactFlow
       nodes={props.nodes}
@@ -80,6 +108,7 @@ export function FlowCanvas(props: Props) {
       onNodesChange={props.onNodesChange}
       onEdgesChange={props.onEdgesChange}
       onConnect={props.onConnect}
+      isValidConnection={isValidConnection}
       onNodeClick={props.onNodeClick}
       onNodeDoubleClick={props.onNodeDoubleClick}
       onEdgeClick={props.onEdgeClick}
@@ -103,6 +132,20 @@ export function FlowCanvas(props: Props) {
         maskColor="rgba(0,0,0,0.6)"
         style={{ backgroundColor: "#1b1e24" }}
       />
+      {props.nodes.length === 0 && (
+        <div className="canvas-empty-guide">
+          <div className="ceg-title">空画布 · 开始搭一条链路</div>
+          <div className="ceg-body">从上方 <b>＋ 工具条</b> 建节点。典型搭法:</div>
+          <div className="ceg-flow">
+            <span className="ceg-chip fg">飞书群</span>
+            <span className="ceg-arrow">→</span>
+            <span className="ceg-chip rt">路由</span>
+            <span className="ceg-arrow">→</span>
+            <span className="ceg-chip cs">Claude 会话</span>
+          </div>
+          <div className="ceg-hint">连好后，在飞书群 @机器人 即可对话。连线会自动校验，连错会被拒绝。</div>
+        </div>
+      )}
     </ReactFlow>
   );
 }

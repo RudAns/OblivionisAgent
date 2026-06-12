@@ -802,21 +802,103 @@ button.primary {
     0 6px 20px rgba(0, 0, 0, 0.45);
 }
 
-/* 连线圆圈：放大到 2 倍，更好点选 */
+/* 连线圆圈：放大、悬停高亮、连线时实时反馈（像专业节点编辑器） */
 .react-flow__handle {
   width: 14px;
   height: 14px;
   border: 2px solid #1b1e24;
   background: #5a6b8c;
+  transition: background 0.12s, box-shadow 0.12s;
 }
 .react-flow__handle:hover {
   background: var(--accent);
+  box-shadow: 0 0 0 5px rgba(79, 140, 255, 0.16);
+}
+/* 拖动连线时：起点高亮，合法落点变绿——连错就不会高亮，一眼看出连不连得上 */
+.react-flow__handle.connectingfrom,
+.react-flow__handle.connectingto {
+  background: var(--accent);
+}
+.react-flow__handle.react-flow__handle-valid,
+.react-flow__handle-valid {
+  background: #57c66a !important;
+  box-shadow: 0 0 0 5px rgba(87, 198, 106, 0.18);
 }
 .react-flow__handle-left {
   left: -7px;
 }
 .react-flow__handle-right {
   right: -7px;
+}
+.react-flow__connectionline .react-flow__edge-path,
+.react-flow__connection-path {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+
+/* 空画布引导（专业软件该有的空状态） */
+.canvas-empty-guide {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  text-align: center;
+  padding: 22px 30px;
+  border-radius: 14px;
+  background: rgba(23, 26, 33, 0.72);
+  border: 1px dashed var(--border);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+  max-width: 440px;
+}
+.ceg-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ceg-body {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.ceg-flow {
+  margin: 12px 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.ceg-chip {
+  padding: 4px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid;
+}
+.ceg-chip.fg {
+  color: #4fd6a8;
+  border-color: rgba(0, 179, 134, 0.5);
+  background: rgba(0, 179, 134, 0.12);
+}
+.ceg-chip.rt {
+  color: #c9a8f5;
+  border-color: rgba(192, 140, 255, 0.5);
+  background: rgba(192, 140, 255, 0.12);
+}
+.ceg-chip.cs {
+  color: #7fb0ff;
+  border-color: rgba(79, 140, 255, 0.5);
+  background: rgba(79, 140, 255, 0.12);
+}
+.ceg-arrow {
+  color: var(--muted);
+  font-size: 13px;
+}
+.ceg-hint {
+  font-size: 11.5px;
+  color: #6b7686;
+  line-height: 1.6;
 }
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:hover .react-flow__edge-path {
