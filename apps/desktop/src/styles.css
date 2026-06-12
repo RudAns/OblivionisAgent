@@ -1026,6 +1026,21 @@ button.primary {
   background: var(--accent);
   color: #fff;
 }
+.notice-btn {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.notice-btn:hover {
+  background: rgba(var(--accent-rgb), 0.2);
+}
 .popup-head {
   display: flex;
   align-items: center;

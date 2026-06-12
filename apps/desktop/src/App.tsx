@@ -853,6 +853,18 @@ function Inner() {
     setCanvasCollapsed(true); // 打开终端 → 退出节点视图，终端占满
   }, []);
 
+  // 一键重开所有终端(卸载→重挂)：claude 以 --resume 重启，按新主题整屏重渲染(含 diff/语法色)，
+  // 会话/历史靠 resume 保留。用于切主题后让已开终端里 Claude 的配色也跟着变。
+  const reopenAllTerminals = () => {
+    const ids = openedTerminals;
+    if (ids.length === 0) return;
+    setOpenedTerminals([]); // 先全卸载(关 PTY/杀 claude)
+    window.setTimeout(() => {
+      setOpenedTerminals(ids); // 再重挂(新 claude --resume，用新主题)
+      setCanvasCollapsed(true);
+    }, 80);
+  };
+
   // 双击「Claude 会话」节点：打开它的开发终端
   const onNodeDoubleClick: NodeMouseHandler = useCallback(
     (_, node) => {
@@ -1359,9 +1371,23 @@ function Inner() {
                 ))}
               </div>
               {themeNotice ? (
-                <div className="hint settings-notice" style={{ marginTop: 10 }}>
-                  已同步 Claude 终端主题（写入 ~/.claude/settings.json）。<b>已开着的终端需重开</b>、
-                  或重启软件后才生效。
+                <div className="settings-notice" style={{ marginTop: 10 }}>
+                  <div className="hint">
+                    已同步 Claude 终端主题（写入 <code>~/.claude/settings.json</code>）。但<b>已开着的终端里
+                    Claude 已画出的内容</b>(diff/语法色)还是旧色，需重开终端才会按新主题重渲染。
+                  </div>
+                  {openedTerminals.length > 0 && (
+                    <button
+                      className="notice-btn"
+                      style={{ marginTop: 8 }}
+                      onClick={() => {
+                        reopenAllTerminals();
+                        setThemeNotice(false);
+                      }}
+                    >
+                      🔄 重开所有终端（{openedTerminals.length}）—— 会话保留
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="hint" style={{ marginTop: 10 }}>
