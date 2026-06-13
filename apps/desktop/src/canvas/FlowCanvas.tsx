@@ -29,7 +29,6 @@ import { WebhookNode } from "./nodes/WebhookNode.js";
 import { SoulNode } from "./nodes/SoulNode.js";
 import { ConditionEdge } from "./edges/ConditionEdge.js";
 import { HelperLines } from "./HelperLines.js";
-import { ZoomIndicator } from "./ZoomIndicator.js";
 import { EdgeActionContext } from "./edge-context.js";
 import { EdgeRuntimeContext } from "./edge-runtime-context.js";
 import { NodeMetaContext } from "./node-meta-context.js";
@@ -72,17 +71,11 @@ interface Props {
 
 const edgeTypes = { default: ConditionEdge };
 
-// 劲道连线：贝塞尔曲线但收紧曲率(0.5)——出入口方向感强、中段绷直不软塌，配箭头收尾。
-// pathOptions 会被 ReactFlow 浅合并进每条边、由 BezierEdge 读取；类型定义没收录故断言。
-// 连线：低饱和蓝灰(美术稿 #7186A3)，细一点不喧宾夺主
-const defaultEdgeOptions = {
-  type: "default",
-  pathOptions: { curvature: 0.5 },
-  style: { stroke: "#7186a3", strokeWidth: 1.8 },
-  markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: "#7186a3" },
-} as unknown as DefaultEdgeOptions;
+// 连线静息色：深色画布用低饱和蓝灰(#7186A3)，浅色画布上它太淡 → 用更深的板岩蓝(#46566F)，
+// 默认就清晰、不必 hover 才显形。随主题切换由 useMemo 重算(连箭头一起变色)。
+const REST_EDGE = { dark: "#7186a3", light: "#46566f" } as const;
 
-// 各类节点的代表色(美术稿)：输入绿/意图琥珀/路由紫/Claude 珊瑚橙。只用于图标/顶部细条/边框
+// 各类节点的代表色(美术稿)：输入绿/意图琥珀/路由紫/Claude 珊瑚橙。图标/顶部细条/边框/缩略图共用
 const NODE_COLORS: Record<string, string> = {
   "feishu-group": "#3b9b70",
   route: "#8167b2",
@@ -92,8 +85,9 @@ const NODE_COLORS: Record<string, string> = {
   webhook: "#b7791f",
   soul: "#8167b2",
 };
-// 缩略图降饱和：只突出选中节点(用本色)，其余统一灰，避免一堆彩点喧宾夺主
-const miniMapNodeColor = (node: Node) => (node.selected ? NODE_COLORS[node.type ?? ""] ?? "#888" : "#c3bdb0");
+// 缩略图用各节点代表色（选中再描品牌色圈），这样一眼分得清哪个是哪个
+const miniMapNodeColor = (node: Node) => NODE_COLORS[node.type ?? ""] ?? "#9aa3b2";
+const miniMapStroke = (node: Node) => (node.selected ? "#d96745" : NODE_COLORS[node.type ?? ""] ?? "#9aa3b2");
 
 // 合法连线语法（像专业节点编辑器一样，连错当场拒绝）：
 //   群/路由/分流/定时/Webhook → 路由/分流/会话（cron/webhook 只直连会话）
@@ -135,9 +129,20 @@ export function FlowCanvas(props: Props) {
     [kindById],
   );
 
+  // 连线默认样式随主题变色（静息就深、清晰），曲率 0.5 收紧出入口方向感
+  const defaultEdgeOptions = useMemo(() => {
+    const c = REST_EDGE[props.theme];
+    return {
+      type: "default",
+      pathOptions: { curvature: 0.5 },
+      style: { stroke: c, strokeWidth: 1.8 },
+      markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: c },
+    } as unknown as DefaultEdgeOptions;
+  }, [props.theme]);
+
   const runtimeValue = useMemo(
-    () => ({ activeEdges: props.activeEdges, focusEdges: props.focusEdges }),
-    [props.activeEdges, props.focusEdges],
+    () => ({ activeEdges: props.activeEdges, focusEdges: props.focusEdges, theme: props.theme }),
+    [props.activeEdges, props.focusEdges, props.theme],
   );
   const metaValue = useMemo(() => ({ metas: props.nodeMetas }), [props.nodeMetas]);
   const actionValue = useMemo(
@@ -181,20 +186,19 @@ export function FlowCanvas(props: Props) {
         color={props.theme === "light" ? "#e4e0d8" : "#2c323d"}
       />
       <HelperLines horizontal={props.helperLines?.horizontal} vertical={props.helperLines?.vertical} />
-      <ZoomIndicator />
-      {/* 右下角控制条：− / + / 适应视图，做成干净的横向白条(去掉交互锁) */}
+      {/* 右下角控制条：− / + / 适应视图，做成干净的横向白条(去掉交互锁；缩放百分比指示器已撤) */}
       <Controls position="bottom-right" showInteractive={false} />
       <MiniMap
         pannable
         zoomable
         nodeColor={miniMapNodeColor}
-        nodeStrokeColor={miniMapNodeColor}
-        nodeStrokeWidth={3}
-        nodeBorderRadius={3}
+        nodeStrokeColor={miniMapStroke}
+        nodeStrokeWidth={2}
+        nodeBorderRadius={2}
         maskColor={props.theme === "light" ? "rgba(214,210,200,0.28)" : "rgba(0,0,0,0.55)"}
         maskStrokeColor="#d96745"
         maskStrokeWidth={props.theme === "light" ? 2.5 : 2}
-        style={{ backgroundColor: props.theme === "light" ? "#ffffff" : "#1b1e24" }}
+        style={{ width: 150, height: 104, backgroundColor: props.theme === "light" ? "#ffffff" : "#1b1e24" }}
       />
       {props.nodes.length === 0 && (
         <div className="canvas-empty-guide">
