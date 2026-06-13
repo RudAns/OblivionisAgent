@@ -19,6 +19,19 @@ export interface InboundMessage {
   raw?: unknown;
 }
 
+/**
+ * 流式回复句柄：先发一张"思考中"占位卡，随回复增量刷新，最后定稿。
+ * update 内部应自带节流(飞书卡片更新有频率上限)；任何一步失败都不应抛给主链路。
+ */
+export interface ReplyStreamHandle {
+  /** 增量刷新（内部节流；text 为累计全文，不是 delta） */
+  update(text: string): void;
+  /** 定稿：把最终全文写定 */
+  finish(text: string): Promise<void>;
+  /** 出错收尾（可选附一句错误提示） */
+  fail(note?: string): Promise<void>;
+}
+
 export interface FeishuTransport {
   readonly name: string;
   start(): Promise<void>;
@@ -29,6 +42,14 @@ export interface FeishuTransport {
     text: string,
     opts?: { replyToMessageId?: string; atUserId?: string },
   ): Promise<void>;
+  /**
+   * 开一张流式卡片并返回刷新句柄（可选；仅真实传输实现）。
+   * 返回 null = 当前发不了流式卡（调用方应回退到一次性 reply()）。
+   */
+  replyStream?(
+    chatId: string,
+    opts?: { replyToMessageId?: string; atUserId?: string },
+  ): Promise<ReplyStreamHandle | null>;
   /** 注册入站消息回调 */
   onMessage(cb: (msg: InboundMessage) => void): void;
   /** 用手机号/邮箱查 open_id（可选，仅真实传输实现） */

@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import type { FeishuStatus } from "@oblivionis/shared";
-import type { FeishuTransport, InboundMessage } from "./transport.js";
+import type { FeishuTransport, InboundMessage, ReplyStreamHandle } from "./transport.js";
 
 /** 按图片二进制头嗅探真实格式，给 claude 正确后缀(它按扩展名识别图片) */
 function sniffImageExt(b: Buffer): string {
@@ -382,24 +382,120 @@ export class LarkTransport implements FeishuTransport {
     await this.sendContent(chatId, opts?.replyToMessageId, "text", JSON.stringify({ text: body }));
   }
 
-  /** 引用回复或直接发送（msgType: text | interactive | post …） */
+  /** 引用回复或直接发送（msgType: text | interactive | post …）；返回新消息的 message_id（流式卡用它来 patch） */
   private async sendContent(
     chatId: string,
     replyToMessageId: string | undefined,
     msgType: string,
     content: string,
-  ): Promise<void> {
+  ): Promise<string | undefined> {
+    let res: { data?: { message_id?: string } };
     if (replyToMessageId) {
-      await this.client.im.message.reply({
+      res = await this.client.im.message.reply({
         path: { message_id: replyToMessageId },
         data: { msg_type: msgType, content },
       });
     } else {
-      await this.client.im.message.create({
+      res = await this.client.im.message.create({
         params: { receive_id_type: "chat_id" },
         data: { receive_id: chatId, msg_type: msgType, content },
       });
     }
+    return res?.data?.message_id;
+  }
+
+  /** 流式卡片用的卡 JSON：update_multi 必须为 true 才允许之后 patch；running 时尾部缀一个输入指示 */
+  private answerCard(text: string, atUserId?: string, running?: boolean): string {
+    const at = atUserId ? `<at id=${atUserId}></at> ` : "";
+    const body = (text || "…") + (running ? " ▍" : "");
+    return JSON.stringify({
+      config: { wide_screen_mode: true, update_multi: true },
+      elements: [
+        { tag: "markdown", content: at + body },
+        ...(running
+          ? [{ tag: "note", elements: [{ tag: "plain_text", content: "正在输入…" }] }]
+          : []),
+      ],
+    });
+  }
+
+  /** 开一张流式卡片：先发"思考中"占位，返回 update/finish/fail 句柄（内部节流 patch） */
+  async replyStream(
+    chatId: string,
+    opts?: { replyToMessageId?: string; atUserId?: string },
+  ): Promise<ReplyStreamHandle | null> {
+    if (!this.client) return null;
+    let messageId: string | undefined;
+    try {
+      messageId = await this.sendContent(
+        chatId,
+        opts?.replyToMessageId,
+        "interactive",
+        this.answerCard("🤔 正在思考…", opts?.atUserId, true),
+      );
+    } catch (e) {
+      this.opts.log("warn", `流式卡占位发送失败，回退一次性回复: ${(e as Error).message}`);
+      return null;
+    }
+    if (!messageId) return null;
+
+    const MIN_INTERVAL = 900; // 飞书卡片更新有频率上限，至少隔 900ms 刷一次
+    let lastAt = 0;
+    let latest = "";
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let done = false;
+    let chain: Promise<void> = Promise.resolve(); // 串行化所有 patch，保证最终卡一定停在定稿态
+
+    const patch = (text: string, running: boolean): Promise<void> => {
+      chain = chain.then(async () => {
+        try {
+          await this.client.im.message.patch({
+            path: { message_id: messageId },
+            data: { content: this.answerCard(text, opts?.atUserId, running) },
+          });
+          lastAt = Date.now();
+        } catch (e) {
+          this.opts.log("warn", `流式卡 patch 失败: ${(e as Error).message}`);
+        }
+      });
+      return chain;
+    };
+
+    return {
+      update: (text: string) => {
+        if (done) return;
+        latest = text;
+        const wait = MIN_INTERVAL - (Date.now() - lastAt);
+        if (wait <= 0) {
+          lastAt = Date.now(); // 乐观占位：突发多帧时只发一帧、其余靠下面的尾随定时器合并
+          void patch(latest, true);
+        } else if (!timer) {
+          timer = setTimeout(() => {
+            timer = undefined;
+            if (!done) {
+              lastAt = Date.now();
+              void patch(latest, true);
+            }
+          }, wait);
+        }
+      },
+      finish: async (text: string) => {
+        done = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = undefined;
+        }
+        await patch(text || latest, false);
+      },
+      fail: async (note?: string) => {
+        done = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = undefined;
+        }
+        await patch((latest ? latest + "\n\n" : "") + `⚠️ ${note || "处理出错了"}`, false);
+      },
+    };
   }
 
   onMessage(cb: (m: InboundMessage) => void): void {

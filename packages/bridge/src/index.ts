@@ -6,7 +6,7 @@ import { SessionManager } from "./claude/session-manager.js";
 import { PtyManager } from "./pty/pty-manager.js";
 import { ControlServer } from "./server.js";
 import { route } from "./router.js";
-import type { FeishuTransport, InboundMessage } from "./transport/transport.js";
+import type { FeishuTransport, InboundMessage, ReplyStreamHandle } from "./transport/transport.js";
 import { MockTransport } from "./transport/mock-transport.js";
 import { LarkTransport } from "./transport/lark-transport.js";
 import { appendFileSync, mkdirSync, readFileSync, existsSync, statSync } from "node:fs";
@@ -357,19 +357,37 @@ async function main() {
     const replyOpts = { replyToMessageId: inbound.messageId, atUserId: inbound.senderId };
     // 运行时点亮真实链路：把这条消息实际走过的连线告诉 GUI（汇聚会话就不会两条入边都亮）
     hub.broadcast({ type: "session-active-path", nodeId: node.id, edgeIds: resolved.pathEdgeIds });
+    // 出站脱敏函数：访客每一帧都过一遍密钥过滤（流式也不破坏脱敏保证），主人原样
+    const secrets = collectSecrets(cfg.feishu.appSecret);
+    const redact = (t: string) => (isOwner ? t : redactText(t, secrets));
+    let stream: ReplyStreamHandle | null = null;
     try {
-      const reply = await sessions.send(node.id, finalText, permissionMode, appendPrompt, {
-        nodeId: node.id,
-        nodeLabel: node.label,
-        chatId: inbound.chatId,
-        senderId: inbound.senderId,
-        senderName: inbound.senderName,
-      });
-      // 出站脱敏：访客回复发回飞书前，再抹一遍密钥（防 Claude 现读文件把密钥写进回复）
-      const safeReply = isOwner
-        ? reply
-        : redactText(reply, collectSecrets(cfg.feishu.appSecret));
-      if (safeReply && safeReply.trim() && gateway.transport) {
+      // 试着开一张流式卡片(仅真实飞书传输支持；mock/失败 → null → 回退一次性回复)
+      stream = (await gateway.transport?.replyStream?.(inbound.chatId, replyOpts).catch(() => null)) ?? null;
+      const reply = await sessions.send(
+        node.id,
+        finalText,
+        permissionMode,
+        appendPrompt,
+        {
+          nodeId: node.id,
+          nodeLabel: node.label,
+          chatId: inbound.chatId,
+          senderId: inbound.senderId,
+          senderName: inbound.senderName,
+        },
+        // 流式增量：每段新文本即时脱敏后刷进卡片（句柄内部已节流）
+        stream ? (acc) => stream!.update(redact(acc)) : undefined,
+      );
+      const safeReply = redact(reply);
+      if (stream) {
+        if (safeReply && safeReply.trim()) {
+          await stream.finish(safeReply);
+          hub.broadcast({ type: "outbound", chatId: inbound.chatId, text: safeReply, ts: Date.now() });
+        } else {
+          await stream.fail("(本轮没有产生回复)");
+        }
+      } else if (safeReply && safeReply.trim() && gateway.transport) {
         await gateway.transport.reply(inbound.chatId, safeReply, replyOpts);
         hub.broadcast({ type: "outbound", chatId: inbound.chatId, text: safeReply, ts: Date.now() });
       }
@@ -412,7 +430,9 @@ async function main() {
     } catch (e) {
       const errMsg = `⚠️ 处理失败: ${(e as Error).message}`;
       log.error(errMsg);
-      await gateway.transport?.reply(inbound.chatId, errMsg, replyOpts).catch(() => {});
+      // 已开流式卡 → 把错误写进那张卡（避免又冒一条新消息）；否则单独回一条
+      if (stream) await stream.fail((e as Error).message).catch(() => {});
+      else await gateway.transport?.reply(inbound.chatId, errMsg, replyOpts).catch(() => {});
     } finally {
       // 本轮结束(成功或失败)：熄灭该会话的活动链路
       hub.broadcast({ type: "session-active-path", nodeId: node.id, edgeIds: [] });

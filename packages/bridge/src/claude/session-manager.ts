@@ -37,6 +37,7 @@ export class SessionManager {
     permissionMode?: string,
     appendSystemPrompt?: string,
     permCtx?: import("./claude-session.js").PermCtxLite,
+    onText?: (acc: string) => void,
   ): Promise<string> {
     const node = this.findNode(nodeId);
     if (!node) throw new Error(`未找到会话节点: ${nodeId}`);
@@ -56,7 +57,7 @@ export class SessionManager {
       const session = this.ensureSession(fresh, nodeId, fresh.data.sessionId, (id) =>
         this.persistSessionId(nodeId, id),
       );
-      return session.send(text, permissionMode, appendSystemPrompt, permCtx);
+      return session.send(text, permissionMode, appendSystemPrompt, permCtx, onText);
     }
 
     // 无 base：单一会话(sessionId)，主客共用（访客仅靠护栏限制）
@@ -68,7 +69,7 @@ export class SessionManager {
     const session = this.ensureSession(this.findNode(nodeId)!, nodeId, sid, (id) =>
       this.persistSessionId(nodeId, id),
     );
-    return session.send(text, permissionMode, appendSystemPrompt, permCtx);
+    return session.send(text, permissionMode, appendSystemPrompt, permCtx, onText);
   }
 
   /** 从 baseSessionId 重新 fork 出访客会话并脱敏，写回 sessionId（刷新快照 / 首次） */

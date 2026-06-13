@@ -4,7 +4,7 @@ import type { ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import type { ClaudeStreamEvent, SessionStatus } from "@oblivionis/shared";
-import { isResult } from "@oblivionis/shared";
+import { isResult, isAssistant, assistantText } from "@oblivionis/shared";
 import { sessionArgs } from "./session-path.js";
 
 /** 审批请求的上下文（spawn 时经 env 传给 MCP 审批进程，卡片据此发到来源群） */
@@ -57,6 +57,8 @@ interface Job {
   appendSystemPrompt?: string;
   /** 审批上下文（卡片发到来源群） */
   permCtx?: PermCtxLite;
+  /** 增量回调：每出现一段新的 assistant 文本就回传累计文本（用于飞书流式卡片） */
+  onText?: (acc: string) => void;
   resolve: (finalText: string) => void;
   reject: (err: Error) => void;
 }
@@ -94,9 +96,10 @@ export class ClaudeSession {
     permissionMode?: string,
     appendSystemPrompt?: string,
     permCtx?: PermCtxLite,
+    onText?: (acc: string) => void,
   ): Promise<string> {
     return new Promise((resolve, reject) => {
-      this.queue.push({ text, permissionMode, appendSystemPrompt, permCtx, resolve, reject });
+      this.queue.push({ text, permissionMode, appendSystemPrompt, permCtx, onText, resolve, reject });
       void this.pump();
     });
   }
@@ -116,7 +119,7 @@ export class ClaudeSession {
     this.busy = true;
     this.opts.onStatus("running");
     try {
-      const finalText = await this.runOnce(job.text, job.permissionMode, job.appendSystemPrompt, job.permCtx);
+      const finalText = await this.runOnce(job.text, job.permissionMode, job.appendSystemPrompt, job.permCtx, job.onText);
       job.resolve(finalText);
       this.opts.onStatus("idle");
     } catch (err) {
@@ -160,6 +163,7 @@ export class ClaudeSession {
     permissionMode?: string,
     appendSystemPrompt?: string,
     permCtx?: PermCtxLite,
+    onText?: (acc: string) => void,
   ): Promise<string> {
     const o = this.opts;
     const args = this.buildArgs(permissionMode ?? o.permissionMode, appendSystemPrompt);
@@ -197,6 +201,7 @@ export class ClaudeSession {
       resetIdle();
 
       let finalText: string | undefined;
+      let streamAcc = ""; // 流式增量：累计 assistant 文本，喂给 onText
       let stdoutBuf = "";
       let stderrBuf = "";
 
@@ -217,6 +222,18 @@ export class ClaudeSession {
             continue;
           }
           o.onEvent(evt);
+          // 流式：每出现一段 assistant 文本就累计并回传（飞书流式卡片据此实时刷新）
+          if (onText && isAssistant(evt)) {
+            const t = assistantText(evt);
+            if (t) {
+              streamAcc += (streamAcc ? "\n\n" : "") + t;
+              try {
+                onText(streamAcc);
+              } catch {
+                /* 回调不影响主流程 */
+              }
+            }
+          }
           // fork 模式：捕获 claude 分配的新会话 id（首次出现即回填持久化）
           if (!this.runningSessionId) {
             const sid = (evt as { session_id?: unknown }).session_id;
