@@ -69,4 +69,8 @@ export interface FeishuTransport {
   sendPermissionCard?(chatId: string, requestId: string, title: string, detail: string): Promise<boolean>;
   /** 注册卡片按钮回调（可选）。回调返回 toast 文案 */
   onCardAction?(cb: (requestId: string, decision: "allow" | "deny", operatorOpenId: string) => string): void;
+  /** 发送知识收件箱裁决卡片（可选；按钮 value 携带 kind=knowledge + id + action） */
+  sendKnowledgeCard?(chatId: string, knowledgeId: string, rule: string, source?: string): Promise<boolean>;
+  /** 注册知识卡片按钮回调（可选）。回调返回 toast 文案 */
+  onKnowledgeAction?(cb: (id: string, action: "accept" | "dismiss", operatorOpenId: string) => string): void;
 }

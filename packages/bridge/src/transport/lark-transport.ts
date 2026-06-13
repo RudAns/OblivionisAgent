@@ -57,6 +57,9 @@ export class LarkTransport implements FeishuTransport {
   /** 审批卡片按钮回调（PermissionBroker 注入） */
   private cardActionCb: ((requestId: string, decision: "allow" | "deny", operatorOpenId: string) => string) | null =
     null;
+  /** 知识收件箱裁决卡片按钮回调（index 注入） */
+  private knowledgeActionCb: ((id: string, action: "accept" | "dismiss", operatorOpenId: string) => string) | null =
+    null;
 
   constructor(private opts: LarkOptions) {}
 
@@ -100,13 +103,19 @@ export class LarkTransport implements FeishuTransport {
           this.opts.log("error", `解析入站消息失败: ${(e as Error).message}`);
         }
       },
-      // 审批卡片按钮回调（工具权限审批）：校验在 broker 内做（仅主人有效）
+      // 卡片按钮回调：工具权限审批(requestId+decision) / 知识收件箱裁决(kind=knowledge)。校验都在回调内做(仅主人有效)
       "card.action.trigger": async (data: any) => {
         try {
           const value = data?.action?.value ?? {};
+          const operator = String(data?.operator?.open_id ?? "");
+          // 知识收件箱裁决卡
+          if (value.kind === "knowledge" && this.knowledgeActionCb) {
+            const action = value.action === "accept" ? "accept" : "dismiss";
+            const toast = this.knowledgeActionCb(String(value.id ?? ""), action, operator);
+            return { toast: { type: "info", content: toast } };
+          }
           const requestId = String(value.requestId ?? "");
           const decision = value.decision === "allow" ? "allow" : "deny";
-          const operator = String(data?.operator?.open_id ?? "");
           if (requestId && this.cardActionCb) {
             const toast = this.cardActionCb(requestId, decision, operator);
             return { toast: { type: "info", content: toast } };
@@ -529,6 +538,48 @@ export class LarkTransport implements FeishuTransport {
 
   onCardAction(cb: (requestId: string, decision: "allow" | "deny", operatorOpenId: string) => string): void {
     this.cardActionCb = cb;
+  }
+
+  onKnowledgeAction(cb: (id: string, action: "accept" | "dismiss", operatorOpenId: string) => string): void {
+    this.knowledgeActionCb = cb;
+  }
+
+  /** 发送知识收件箱裁决卡片：采纳(写 CLAUDE.md)/忽略 两个按钮，value 携带 kind+id+action */
+  async sendKnowledgeCard(chatId: string, knowledgeId: string, rule: string, source?: string): Promise<boolean> {
+    if (!this.client) return false;
+    const card = {
+      config: { wide_screen_mode: true },
+      header: { title: { tag: "plain_text", content: "📥 新规则候选 · 待裁决" }, template: "blue" },
+      elements: [
+        { tag: "div", text: { tag: "lark_md", content: `**规则**：${rule}` } },
+        ...(source ? [{ tag: "note", elements: [{ tag: "plain_text", content: `来源：${source}` }] }] : []),
+        {
+          tag: "action",
+          actions: [
+            {
+              tag: "button",
+              text: { tag: "plain_text", content: "✅ 采纳（写入 CLAUDE.md）" },
+              type: "primary",
+              value: { kind: "knowledge", id: knowledgeId, action: "accept" },
+            },
+            {
+              tag: "button",
+              text: { tag: "plain_text", content: "🗑 忽略" },
+              type: "default",
+              value: { kind: "knowledge", id: knowledgeId, action: "dismiss" },
+            },
+          ],
+        },
+        { tag: "note", elements: [{ tag: "plain_text", content: "仅主人点击有效 · 也可在桌面收件箱里改文字后再采纳" }] },
+      ],
+    };
+    try {
+      await this.sendContent(chatId, undefined, "interactive", JSON.stringify(card));
+      return true;
+    } catch (e) {
+      this.opts.log("warn", `知识卡片发送失败: ${(e as Error).message}`);
+      return false;
+    }
   }
 
   /** 发送工具审批交互卡片：允许/拒绝按钮，value 携带 requestId+decision */

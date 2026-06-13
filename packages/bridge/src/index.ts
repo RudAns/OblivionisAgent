@@ -209,6 +209,14 @@ async function main() {
         t.onCardAction((requestId, decision, operator) =>
           permBroker.onCardAction(requestId, decision, operator),
         );
+        // 知识卡片裁决（手机端）：仅主人有效；裁决后刷 GUI 收件箱
+        t.onKnowledgeAction((id, action, operator) => {
+          if (!store.get().owners.some((o) => o.openId === operator)) return "仅主人可裁决";
+          const item = knowledge.decide(id, action);
+          hub.broadcast({ type: "knowledge-inbox", items: knowledge.all() });
+          if (!item) return "这条已处理或不存在";
+          return action === "accept" ? "✅ 已采纳，写入 CLAUDE.md" : "已忽略";
+        });
         this.transport = t;
         try {
           await t.start();
@@ -429,8 +437,9 @@ async function main() {
       })
         .then((rules) => {
           if (!rules.length) return;
+          const home = store.get().homeChatId;
           for (const rule of rules) {
-            knowledge.add({
+            const item = knowledge.add({
               nodeId: node.id,
               nodeLabel: node.label,
               cwd: node.data.cwd || cfg.claude.defaultCwd || process.cwd(),
@@ -439,6 +448,12 @@ async function main() {
               rule,
               source: resolved.userText.slice(0, 120),
             });
+            // 真正新入箱(非去重跳过) + 配了 Home Chat → 推卡片让主人在手机上裁决
+            if (home && knowledge.all().some((x) => x.id === item.id)) {
+              void gateway.transport
+                ?.sendKnowledgeCard?.(home, item.id, item.rule, `${node.label} · ${inbound.senderName}`)
+                .catch(() => {});
+            }
           }
           hub.broadcast({ type: "knowledge-inbox", items: knowledge.all() });
         })
