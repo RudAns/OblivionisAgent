@@ -1439,9 +1439,16 @@ function Inner() {
   /** 左侧图标竖栏动作分发：节点图与面板视图互斥切换 */
   const onRailAction = (key: RailKey) => {
     switch (key) {
-      case "canvas":
+      case "canvas": {
+        const opening = canvasCollapsed; // 当前折叠 → 这次是「进节点视图」
         setCanvasCollapsed(!canvasCollapsed); // 切换:节点视图 ⇄ 终端/面板视图
+        if (opening) {
+          // 进节点视图时别带着终端那个选中——否则会触发链路聚焦把其它连线压成半透明
+          setSelected(null);
+          setNodes((ns) => (ns.some((n) => n.selected) ? ns.map((n) => (n.selected ? { ...n, selected: false } : n)) : ns));
+        }
         break;
+      }
       case "feishu":
         setFeishuOpen((o) => !o);
         break;
