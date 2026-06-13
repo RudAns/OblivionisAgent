@@ -47,16 +47,15 @@ export function ConditionEdge({
   };
 
   // 运行时：该连线在"正被处理的链路"上时整条流动起来（上游回溯，见 EdgeRuntimeContext）
-  const { activeEdges, focusEdges, theme } = useContext(EdgeRuntimeContext);
+  const { activeEdges, focusEdges } = useContext(EdgeRuntimeContext);
   const flowing = activeEdges.has(id);
   const dimmed = focusEdges != null && !focusEdges.has(id); // 选中节点时，不在其链路上的连线降透明
 
   const active = hovered || selected;
   // 只在有意图条件时显示标签(不再有重复的"＋意图"占位；加条件走右键菜单)
   const showBadge = !!cond;
-  // 静息色按主题取深浅（浅色画布要更深才默认就清晰，不靠 hover）
-  const restStroke = theme === "light" ? "#46566f" : "#7186a3";
-  const baseStyle = { ...style, stroke: restStroke, ...(dimmed ? { opacity: 0.22 } : null) };
+  // 静息色用 CSS 变量：随 data-theme 在绘制时解析(浅色更深)，不依赖 React 重渲染时机
+  const baseStyle = { ...style, stroke: "var(--edge-rest)", ...(dimmed ? { opacity: 0.22 } : null) };
   // 优先级：群消息流动(橙色虚线动画，最显眼) > hover/选中(蓝) > 静息
   const mergedStyle = flowing
     ? { ...baseStyle, stroke: "#d96745", strokeWidth: 2.4, opacity: 1 } // 运行中：品牌橙，配 .edge-flow 虚线流动

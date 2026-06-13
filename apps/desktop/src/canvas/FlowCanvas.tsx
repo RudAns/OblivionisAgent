@@ -71,9 +71,16 @@ interface Props {
 
 const edgeTypes = { default: ConditionEdge };
 
-// 连线静息色：深色画布用低饱和蓝灰(#7186A3)，浅色画布上它太淡 → 用更深的板岩蓝(#46566F)，
-// 默认就清晰、不必 hover 才显形。随主题切换由 useMemo 重算(连箭头一起变色)。
-const REST_EDGE = { dark: "#7186a3", light: "#46566f" } as const;
+// 连线静息样式：stroke 与箭头都用 CSS 变量 --edge-rest，随 data-theme 在绘制时解析
+// （浅色更深、深色蓝灰），不靠 JS 传主题——避开 React Flow 缓存边组件导致的"切浅色线没变"。
+const defaultEdgeOptions = {
+  type: "default",
+  pathOptions: { curvature: 0.5 },
+  // stroke 走 style 内联 → var() 可解析(随主题)；箭头色 React Flow 可能写成 SVG 属性，
+  // var() 在属性里不解析，故给个两套主题都看得清的固定板岩色，不跟随但够用。
+  style: { stroke: "var(--edge-rest)", strokeWidth: 1.8 },
+  markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: "#52617d" },
+} as unknown as DefaultEdgeOptions;
 
 // 各类节点的代表色(美术稿)：输入绿/意图琥珀/路由紫/Claude 珊瑚橙。图标/顶部细条/边框/缩略图共用
 const NODE_COLORS: Record<string, string> = {
@@ -129,20 +136,9 @@ export function FlowCanvas(props: Props) {
     [kindById],
   );
 
-  // 连线默认样式随主题变色（静息就深、清晰），曲率 0.5 收紧出入口方向感
-  const defaultEdgeOptions = useMemo(() => {
-    const c = REST_EDGE[props.theme];
-    return {
-      type: "default",
-      pathOptions: { curvature: 0.5 },
-      style: { stroke: c, strokeWidth: 1.8 },
-      markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: c },
-    } as unknown as DefaultEdgeOptions;
-  }, [props.theme]);
-
   const runtimeValue = useMemo(
-    () => ({ activeEdges: props.activeEdges, focusEdges: props.focusEdges, theme: props.theme }),
-    [props.activeEdges, props.focusEdges, props.theme],
+    () => ({ activeEdges: props.activeEdges, focusEdges: props.focusEdges }),
+    [props.activeEdges, props.focusEdges],
   );
   const metaValue = useMemo(() => ({ metas: props.nodeMetas }), [props.nodeMetas]);
   const actionValue = useMemo(

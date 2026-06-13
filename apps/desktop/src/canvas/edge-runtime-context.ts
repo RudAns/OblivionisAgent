@@ -9,10 +9,7 @@ export const EdgeRuntimeContext = createContext<{
   activeEdges: Set<string>;
   /** 选中某节点时，它上下游链路上的连线 id；其它连线降透明度。null=未聚焦 */
   focusEdges: Set<string> | null;
-  /** 当前明暗主题：连线静息色按主题取深浅(浅色画布要更深才清晰) */
-  theme: "dark" | "light";
 }>({
   activeEdges: new Set(),
   focusEdges: null,
-  theme: "dark",
 });

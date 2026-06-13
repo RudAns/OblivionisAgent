@@ -22,6 +22,9 @@
   --st-err: #ff5d5d;
   --st-ok: #5fd08a;
   --st-link: #6aa6ff;
+  /* 连线静息色：深色画布低饱和蓝灰即可。用 CSS 变量驱动→随 data-theme 在「绘制时」解析，
+     不依赖 React 重渲染时机(React Flow 会缓存边组件，靠 JS 传 theme 会出现"切了浅色线还是浅的") */
+  --edge-rest: #7186a3;
 }
 :root[data-theme="light"] {
   /* 浅色：以参考图实测像素为准——整套表面去黄、调亮、向近白靠(品牌/节点色不动)。
@@ -47,6 +50,7 @@
   --st-err: #c0392b;
   --st-ok: #2f8f5b;
   --st-link: #4169c1;
+  --edge-rest: #46566f; /* 浅色画布上更深的板岩蓝，默认就清晰不靠 hover */
 }
 /* 浅色下，几处"为深底调的亮色文字"在白底会糊，单独压暗 */
 :root[data-theme="light"] .log-inbound .log-text {
