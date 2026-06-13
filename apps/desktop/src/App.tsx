@@ -1795,9 +1795,7 @@ function Inner() {
                 ))}
               </div>
               <div className="hint" style={{ marginTop: 8 }}>
-                开：终端任务在你最小化/没聚焦时跑完 → 屏幕右下角弹个小人提醒，点它回到对应会话。
-                <br />
-                （另：终端长时间工作时，任务栏图标会自动有流动进度光提示，常驻、不归这个开关管。）
+                后台跑完任务时，右下角弹个小人提醒，点它回到会话。
               </div>
               {completionAlert && (
                 <div style={{ marginTop: 10 }}>
