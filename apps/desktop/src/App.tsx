@@ -1083,6 +1083,62 @@ function Inner() {
     );
   };
 
+  // 画布配置导出：整张图(节点+连线+位置)存成 JSON 下载；抹掉机器相关/敏感字段
+  // (会话身份 sessionId/baseSessionId 导入后会自动重 fork；webhook token 不外泄)。
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const exportCanvas = () => {
+    const g = rfToGraph(nodes, edges);
+    const safeNodes = g.nodes.map((n) => {
+      const d = { ...(n.data as Record<string, unknown>) };
+      if (n.kind === "claude-session") {
+        delete d.sessionId;
+        delete d.baseSessionId;
+      }
+      if (n.kind === "webhook") delete d.token;
+      return { ...n, data: d };
+    });
+    const payload = {
+      app: "OblivionisAgent",
+      kind: "canvas",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      graph: { nodes: safeNodes, edges: g.edges },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `oblivionis-canvas-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const importCanvas = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const obj = JSON.parse(String(reader.result));
+        const g = obj?.graph ?? obj; // 容忍带壳或直接是 graph
+        if (!g || !Array.isArray(g.nodes) || !Array.isArray(g.edges)) {
+          throw new Error("不是有效的画布配置(缺 graph.nodes/edges)");
+        }
+        if (!window.confirm(`导入将替换当前画布（${g.nodes.length} 个节点、${g.edges.length} 条连线），确定？`)) {
+          return;
+        }
+        const { nodes: rn, edges: re } = graphToRf({ graph: g } as unknown as OblivionisConfig, {});
+        setSelected(null);
+        setSelectedEdge(null);
+        setNodes(rn);
+        setEdges(re); // 变更会触发既有的防抖自动存盘
+        window.setTimeout(() => rf.fitView({ duration: 300, padding: 0.2 }), 60);
+      } catch (e) {
+        window.alert(`导入失败：${(e as Error).message}`);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   // 面板宽度跟随窗口收缩：换小屏/缩窗口/跨不同 DPI 屏幕时，把侧栏夹进当前可用宽度，
   // 避免它越出外框(=外框/内部不匹配)、也让终端跟着窗口变窄。留 ~364px 给图标栏+会话栏+最小画布。
   const maxPanelWidth = () => Math.max(280, window.innerWidth - 364);
@@ -1731,6 +1787,33 @@ function Inner() {
                   : reminderMode === "completion"
                     ? "任务在窗口最小化/没聚焦时完成 → 任务栏上方弹个小人动画提醒，点它回到对应会话。"
                     : "不做任何任务栏/桌面提醒。"}
+              </div>
+
+              <div className="settings-label" style={{ marginTop: 16 }}>画布配置</div>
+              <div className="fs-actions">
+                <button onClick={exportCanvas} title="把整张画布导出成 JSON 文件（已抹会话身份/密钥），可分享/进 git">
+                  ⬇ 导出
+                </button>
+                <button
+                  onClick={() => importInputRef.current?.click()}
+                  title="从 JSON 文件导入画布（会替换当前画布）"
+                >
+                  ⬆ 导入
+                </button>
+              </div>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) importCanvas(f);
+                  e.target.value = ""; // 允许再次选同一个文件
+                }}
+              />
+              <div className="hint" style={{ marginTop: 6 }}>
+                导出抹掉会话身份与密钥；导入后会话首次收到飞书消息会自动重新 fork。
               </div>
             </div>
           </div>
