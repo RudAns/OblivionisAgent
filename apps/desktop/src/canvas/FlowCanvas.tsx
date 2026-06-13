@@ -198,7 +198,7 @@ export function FlowCanvas(props: Props) {
         maskColor={props.theme === "light" ? "rgba(214,210,200,0.28)" : "rgba(0,0,0,0.55)"}
         maskStrokeColor="#d96745"
         maskStrokeWidth={props.theme === "light" ? 2.5 : 2}
-        style={{ width: 150, height: 104, backgroundColor: props.theme === "light" ? "#ffffff" : "#1b1e24" }}
+        style={{ width: 132, height: 82, backgroundColor: props.theme === "light" ? "#ffffff" : "#1b1e24" }}
       />
       {props.nodes.length === 0 && (
         <div className="canvas-empty-guide">

@@ -1763,19 +1763,32 @@ button.primary {
   }
 }
 
-/* ---- 控件 / 小地图：统一到暗色面板风格（专业软件的一致感）---- */
-/* 右下角缩略图 + 控制条(参考美术稿)：干净白卡、软阴影；控制条横向 − / + / 适应视图 */
+/* ---- 右下角「缩略图 + 控制条」合成一个面板 ----
+   两块同宽(132px)上下相贴：缩略图圆角朝上、控制条圆角朝下，
+   中间靠缩略图的底边当 1px 分隔线，看起来就是一张卡。 */
+.react-flow__minimap {
+  width: 132px; /* 与 inline 一致，且和控制条同宽 */
+  border: 1px solid var(--border);
+  border-radius: 11px 11px 0 0;
+  overflow: hidden;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.11);
+  /* 抬高，正好给下面的控制条让出位置（=控制条高度，两块严丝合缝相贴） */
+  margin-bottom: 43px !important;
+}
 .react-flow__controls {
   display: flex;
   flex-direction: row;
+  width: 132px;
   border: 1px solid var(--border);
-  border-radius: 11px;
+  border-top: none; /* 顶边由缩略图的底边充当分隔线，避免双线 */
+  border-radius: 0 0 11px 11px;
   overflow: hidden;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.11);
 }
 .react-flow__controls-button {
-  width: 34px;
-  height: 34px;
+  flex: 1; /* 三个按钮平分宽度，撑满与缩略图同宽 */
+  width: auto;
+  height: 28px;
   background: var(--panel);
   border: none;
   border-right: 1px solid var(--border);
@@ -1790,16 +1803,8 @@ button.primary {
 }
 .react-flow__controls-button svg {
   fill: currentColor;
-  max-width: 15px;
-  max-height: 15px;
-}
-.react-flow__minimap {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
-  /* 抬高，给下方横向控制条让位(两者都贴右下角) */
-  margin-bottom: 62px !important;
+  max-width: 14px;
+  max-height: 14px;
 }
 
 /* 空画布引导（专业软件该有的空状态） */
