@@ -1552,7 +1552,7 @@ function Inner() {
           openedTerminals={openedTerminals}
           termRunning={termRunning}
           unseenDone={unseenDone}
-          onReorder={(dragId, dropId) =>
+          onReorder={(dragId, dropId, after) =>
             setNodes((ns) => {
               const from = ns.findIndex((n) => n.id === dragId);
               if (from < 0) return ns;
@@ -1561,7 +1561,7 @@ function Inner() {
               if (!moved) return ns;
               const to = arr.findIndex((n) => n.id === dropId);
               if (to < 0) return ns;
-              arr.splice(to, 0, moved); // 移到落点之前；变更触发既有自动存盘
+              arr.splice(after ? to + 1 : to, 0, moved); // 落点之前/之后；变更触发既有自动存盘
               return arr;
             })
           }
@@ -1931,12 +1931,12 @@ function Inner() {
                   setOpenedTerminals((o) => o.filter((x) => x !== id));
                   setActiveTerminal((a) => (a === id ? null : a));
                 }}
-                onReorder={(dragId, dropId) =>
+                onReorder={(dragId, dropId, after) =>
                   setOpenedTerminals((o) => {
                     const a = o.filter((x) => x !== dragId);
                     const ti = a.indexOf(dropId);
                     if (ti < 0) return o;
-                    a.splice(ti, 0, dragId); // 放到落点页签之前
+                    a.splice(after ? ti + 1 : ti, 0, dragId); // 落点页签之前/之后
                     return a;
                   })
                 }

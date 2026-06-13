@@ -1080,6 +1080,7 @@ button.primary {
   text-align: center;
 }
 .rail-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -1126,12 +1127,26 @@ button.primary {
   background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 16%, var(--card)) 0%, var(--card) 46%);
   box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.12);
 }
-/* 拖拽排序：被拖的卡半透明，落点卡顶部亮一条品牌色提示插入位置 */
+/* 拖拽排序：被拖的卡半透明；落点处在「卡片之间」画一条横线(不描卡片的边) */
 .rail-card.dragging {
-  opacity: 0.45;
+  opacity: 0.4;
 }
-.rail-card.drop-target {
-  box-shadow: inset 0 3px 0 var(--accent);
+.rail-card.drop-before::before,
+.rail-card.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.rail-card.drop-before::before {
+  top: -5px;
+}
+.rail-card.drop-after::after {
+  bottom: -5px;
 }
 .rail-dot {
   width: 8px;
@@ -2265,6 +2280,7 @@ button.primary {
   background: var(--frame);
 }
 .term-tab {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2288,12 +2304,26 @@ button.primary {
   color: var(--text);
   box-shadow: inset 0 2px 0 var(--accent);
 }
-/* 拖拽排序：被拖的页签半透明，落点页签左侧亮一条品牌色提示插入位置 */
+/* 拖拽排序：被拖的页签半透明；落点处在「页签之间」画一条竖线(不描页签的边) */
 .term-tab.dragging {
-  opacity: 0.45;
+  opacity: 0.4;
 }
-.term-tab.drop-target {
-  box-shadow: inset 3px 0 0 var(--accent);
+.term-tab.drop-before::before,
+.term-tab.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.term-tab.drop-before::before {
+  left: -2px;
+}
+.term-tab.drop-after::after {
+  right: -2px;
 }
 .term-tab-label {
   max-width: 140px;

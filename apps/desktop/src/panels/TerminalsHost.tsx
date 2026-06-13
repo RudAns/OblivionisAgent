@@ -1062,7 +1062,7 @@ export function TerminalsHost({
   onActivate: (nodeId: string) => void;
   onClose: (nodeId: string) => void;
   /** 拖动页签改变顺序：把 dragId 放到 dropId 的位置 */
-  onReorder?: (dragId: string, dropId: string) => void;
+  onReorder?: (dragId: string, dropId: string, after: boolean) => void;
   /** 某终端运行/空闲变化 → 上抛给 App 驱动侧栏扫光 */
   onActivity?: (nodeId: string, running: boolean) => void;
   /** 某终端一次正式任务跑完 → 上抛给 App 插完成红旗 */
@@ -1072,8 +1072,8 @@ export function TerminalsHost({
   const [repaintTick, setRepaintTick] = useState(0);
   // 各终端是否正在运行（输出活动），用于给标签页加扫光
   const [running, setRunning] = useState<Record<string, boolean>>({});
-  // 页签拖拽排序（指针拖拽，比 HTML5 draggable 在 WebView2 里稳）
-  const { dragId, overId, itemProps } = usePointerReorder(onReorder);
+  // 页签拖拽排序（指针拖拽，比 HTML5 draggable 在 WebView2 里稳；横向，插入竖线）
+  const { dragId, dropClass, itemProps } = usePointerReorder(onReorder, "horizontal");
   if (!inTauri()) return <div className="panel-empty">真实终端仅在桌面应用中可用（浏览器开发版不支持）。</div>;
   if (terminals.length === 0)
     return (
@@ -1089,7 +1089,7 @@ export function TerminalsHost({
             key={t.nodeId}
             className={`term-tab ${t.nodeId === activeId ? "on" : ""} ${running[t.nodeId] ? "term-busy" : ""} ${
               dragId === t.nodeId ? "dragging" : ""
-            } ${overId === t.nodeId ? "drop-target" : ""}`}
+            } ${dropClass(t.nodeId)}`}
             title={t.cwd || t.nodeId}
             {...itemProps(t.nodeId, () => onActivate(t.nodeId))}
           >
