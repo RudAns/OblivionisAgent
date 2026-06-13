@@ -1094,6 +1094,7 @@ export function TerminalsHost({
             onDragStart={(e) => {
               setDragId(t.nodeId);
               e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", t.nodeId); // WebView2 不调 setData 往往不触发拖拽
             }}
             onDragOver={(e) => {
               if (!dragId || dragId === t.nodeId) return;

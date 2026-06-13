@@ -54,8 +54,6 @@ import { StatusBar } from "./layout/StatusBar.js";
 
 type Tab = "transcript" | "terminal" | "audit" | "logs" | "inbox";
 type ThemePref = "dark" | "light" | "system";
-// 任务提醒方式：无 / 运行时任务栏流光 / 完成时弹小人窗口
-type ReminderMode = "none" | "shimmer" | "completion";
 
 const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">> = {
   "feishu-group": () => ({
@@ -347,8 +345,6 @@ function Inner() {
   const [unseenDone, setUnseenDone] = useState<Record<string, boolean>>({}); // 完成但用户还没切过去看 → 红点
   const [activePaths, setActivePaths] = useState<Record<string, string[]>>({}); // 各会话本轮实际走过的连线(运行时点亮真实链路)
   const [sessionMetas, setSessionMetas] = useState<Record<string, { base?: number; fork?: number }>>({}); // 会话 transcript 最终修改时间
-  // 每会话活动仪表盘：本次软件运行内，各会话处理过多少轮 + 累计输出 token + 最近活跃时刻
-  const [sessionStats, setSessionStats] = useState<Record<string, { msgs: number; outTokens: number; lastTs: number }>>({});
   // 主题：dark/light/system；resolvedTheme 是 system 解析后的实际明暗，传给画布/终端
   const [theme, setTheme] = useState<ThemePref>(() => {
     const t = localStorage.getItem("oblivionis-theme");
@@ -359,14 +355,14 @@ function Inner() {
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themeNotice, setThemeNotice] = useState(false); // 切主题后提示"已同步 Claude、需重开终端"
-  // 任务提醒方式（设置里切换）：默认运行时流光(就是先前实现的那个)
-  const [reminderMode, setReminderMode] = useState<ReminderMode>(() => {
-    const m = localStorage.getItem("oblivionis-reminder-mode");
-    return m === "none" || m === "completion" ? m : "shimmer";
+  // 完成任务桌面提示开关：只管「完成时弹不弹右下角小人」。任务栏流光是常驻能力，不归它管。
+  const [completionAlert, setCompletionAlert] = useState<boolean>(() => {
+    const v = localStorage.getItem("oblivionis-completion-alert");
+    return v == null ? true : v === "1";
   });
   useEffect(() => {
-    localStorage.setItem("oblivionis-reminder-mode", reminderMode);
-  }, [reminderMode]);
+    localStorage.setItem("oblivionis-completion-alert", completionAlert ? "1" : "0");
+  }, [completionAlert]);
   const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
@@ -435,15 +431,6 @@ function Inner() {
           const arr = eventsRef.current[msg.nodeId] ?? [];
           arr.push(msg.event);
           eventsRef.current[msg.nodeId] = arr;
-          // 仪表盘：每完成一轮(result)累计「处理条数 + 输出 token + 活跃时刻」
-          const ev = msg.event as { type?: string; usage?: { output_tokens?: number } };
-          if (ev?.type === "result") {
-            const out = ev.usage?.output_tokens ?? 0;
-            setSessionStats((s) => {
-              const cur = s[msg.nodeId] ?? { msgs: 0, outTokens: 0, lastTs: 0 };
-              return { ...s, [msg.nodeId]: { msgs: cur.msgs + 1, outTokens: cur.outTokens + out, lastTs: Date.now() } };
-            });
-          }
           forceRender((x) => x + 1);
           break;
         }
@@ -925,21 +912,22 @@ function Inner() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  // 任务栏进度流光：任意会话/终端在跑时给任务栏图标挂一条流动的 indeterminate 进度光，
-  // 空闲清掉。最小化/没聚焦也能在任务栏看到"还在忙 / 已经停了(=完成)"。
-  const anyRunning = useMemo(
-    () =>
-      Object.values(termRunning).some(Boolean) ||
-      nodes.some((n) => (n.data as { status?: string } | undefined)?.status === "running"),
-    [termRunning, nodes],
-  );
+  // 任务栏进度流光：只看「自己的终端会话」是否在跑，且持续工作超过一段时间(长任务)才亮，
+  // 避免每条短命令都闪。空闲即清。常驻能力，不受「完成提示」开关控制。
+  const anyTermRunning = useMemo(() => Object.values(termRunning).some(Boolean), [termRunning]);
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) return; // 浏览器开发版没有窗口 API
-    const on = reminderMode === "shimmer" && anyRunning;
-    getCurrentWindow()
-      .setProgressBar({ status: on ? ProgressBarStatus.Indeterminate : ProgressBarStatus.None })
-      .catch(() => {});
-  }, [anyRunning, reminderMode]);
+    const win = getCurrentWindow();
+    if (!anyTermRunning) {
+      win.setProgressBar({ status: ProgressBarStatus.None }).catch(() => {});
+      return;
+    }
+    // 终端持续工作满 12 秒才点亮流光(=判定为长任务)
+    const t = window.setTimeout(() => {
+      win.setProgressBar({ status: ProgressBarStatus.Indeterminate }).catch(() => {});
+    }, 12_000);
+    return () => window.clearTimeout(t);
+  }, [anyTermRunning]);
 
   // 主题：解析 system → 实际明暗，写 data-theme（CSS 变量切换），持久化；system 时跟随系统变化
   useEffect(() => {
@@ -1556,7 +1544,6 @@ function Inner() {
           openedTerminals={openedTerminals}
           termRunning={termRunning}
           unseenDone={unseenDone}
-          stats={sessionStats}
           onSelect={(id) => {
             setSelected(id);
             setTab("transcript");
@@ -1782,32 +1769,29 @@ function Inner() {
                 </div>
               )}
 
-              <div className="settings-label" style={{ marginTop: 16 }}>任务提醒</div>
+              <div className="settings-label" style={{ marginTop: 16 }}>完成任务桌面提示</div>
               <div className="seg">
                 {(
                   [
-                    ["none", "无"],
-                    ["shimmer", "运行时流光"],
-                    ["completion", "完成时提醒"],
-                  ] as [ReminderMode, string][]
+                    [false, "关"],
+                    [true, "开"],
+                  ] as [boolean, string][]
                 ).map(([v, label]) => (
                   <button
-                    key={v}
-                    className={`seg-btn ${reminderMode === v ? "on" : ""}`}
-                    onClick={() => setReminderMode(v)}
+                    key={label}
+                    className={`seg-btn ${completionAlert === v ? "on" : ""}`}
+                    onClick={() => setCompletionAlert(v)}
                   >
                     {label}
                   </button>
                 ))}
               </div>
               <div className="hint" style={{ marginTop: 8 }}>
-                {reminderMode === "shimmer"
-                  ? "会话/终端在跑时，任务栏图标挂一条流动进度光；光没了=任务停了。"
-                  : reminderMode === "completion"
-                    ? "任务在窗口最小化/没聚焦时完成 → 任务栏上方弹个小人动画提醒，点它回到对应会话。"
-                    : "不做任何任务栏/桌面提醒。"}
+                开：终端任务在你最小化/没聚焦时跑完 → 屏幕右下角弹个小人提醒，点它回到对应会话。
+                <br />
+                （另：终端长时间工作时，任务栏图标会自动有流动进度光提示，常驻、不归这个开关管。）
               </div>
-              {reminderMode === "completion" && (
+              {completionAlert && (
                 <div className="fs-actions" style={{ marginTop: 8 }}>
                   <button onClick={() => showMascot("", "位置预览")} title="弹一下小人看看效果（屏幕右下角）">
                     👀 预览
@@ -1934,8 +1918,8 @@ function Inner() {
                   if (activeTermRef.current !== id) {
                     setUnseenDone((u) => (u[id] ? u : { ...u, [id]: true }));
                   }
-                  // 「完成时提醒」模式：任务跑完且主窗口没在聚焦/最小化时 → 弹小人窗口
-                  if (reminderMode === "completion") {
+                  // 完成提示开着：任务跑完且主窗口没在聚焦/最小化时 → 右下角弹小人窗口
+                  if (completionAlert) {
                     void (async () => {
                       if (!("__TAURI_INTERNALS__" in window)) return;
                       try {

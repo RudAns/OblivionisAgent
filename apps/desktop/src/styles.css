@@ -1112,20 +1112,6 @@ button.primary {
   padding-left: 16px;
   opacity: 0.85;
 }
-/* 每会话活动统计行：处理轮数 / 输出 token / 最近活跃 */
-.rail-stats {
-  display: flex;
-  gap: 9px;
-  flex-wrap: wrap;
-  padding-left: 16px;
-  margin-top: 3px;
-  font-size: 10px;
-  color: var(--muted);
-  font-family: "Cascadia Mono", Consolas, monospace;
-}
-.rail-stats-ago {
-  opacity: 0.8;
-}
 .rail-card:hover {
   border-color: rgba(var(--accent-rgb), 0.55);
   background: var(--hover);
