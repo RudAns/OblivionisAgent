@@ -1049,11 +1049,18 @@ function Inner() {
     try {
       const w = await WebviewWindow.getByLabel("mascot");
       if (!w) return;
+      const MW = 200; // mascot 窗口宽高(逻辑px)
+      const margin = 12;
       const mon = await currentMonitor();
       if (mon) {
         const sf = mon.scaleFactor || 1;
-        const x = mon.position.x / sf + (mon.size.width / sf - 200) / 2;
-        const y = mon.position.y / sf + mon.size.height / sf - 48 - 200; // 任务栏约 48 高，留在其上缘
+        const leftL = mon.position.x / sf;
+        const topL = mon.position.y / sf;
+        const widthL = mon.size.width / sf;
+        const heightL = mon.size.height / sf;
+        // 固定右下角，仿 Windows 通知：贴右、落在任务栏(约48)上缘
+        const x = leftL + widthL - MW - margin;
+        const y = topL + heightL - 48 - MW;
         await w.setPosition(new LogicalPosition(x, y));
       }
       await w.show();
@@ -1800,6 +1807,13 @@ function Inner() {
                     ? "任务在窗口最小化/没聚焦时完成 → 任务栏上方弹个小人动画提醒，点它回到对应会话。"
                     : "不做任何任务栏/桌面提醒。"}
               </div>
+              {reminderMode === "completion" && (
+                <div className="fs-actions" style={{ marginTop: 8 }}>
+                  <button onClick={() => showMascot("", "位置预览")} title="弹一下小人看看效果（屏幕右下角）">
+                    👀 预览
+                  </button>
+                </div>
+              )}
 
               <div className="settings-label" style={{ marginTop: 16 }}>画布配置</div>
               <div className="fs-actions">
