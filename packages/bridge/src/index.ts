@@ -377,7 +377,7 @@ async function main() {
       replyToMessageId: inbound.messageId,
       atUserId: inbound.senderId,
       fromLabel: node.label, // 标注是哪个会话/脱敏分身作答（多会话群里区分来源）
-      inThread: true, // 回复开成话题，让同群多话题不串
+      // 注：不开 thread——话题里链接不好点；用普通的单独卡片回复(引用原消息)
     };
     // 运行时点亮真实链路：把这条消息实际走过的连线告诉 GUI（汇聚会话就不会两条入边都亮）
     hub.broadcast({ type: "session-active-path", nodeId: node.id, edgeIds: resolved.pathEdgeIds });
