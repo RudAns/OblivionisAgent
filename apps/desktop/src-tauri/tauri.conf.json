@@ -20,6 +20,22 @@
         "minHeight": 640,
         "decorations": false,
         "backgroundColor": "#101216"
+      },
+      {
+        "label": "mascot",
+        "title": "",
+        "width": 200,
+        "height": 200,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "focus": false,
+        "shadow": false,
+        "visible": false
       }
     ],
     "security": {

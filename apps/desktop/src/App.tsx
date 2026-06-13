@@ -35,7 +35,10 @@ import {
   type KnowledgeItem,
 } from "@oblivionis/shared";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
+import { getCurrentWindow, currentMonitor, ProgressBarStatus } from "@tauri-apps/api/window";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { LogicalPosition } from "@tauri-apps/api/dpi";
+import { listen as tauriListen, emit as tauriEmit } from "@tauri-apps/api/event";
 import { BridgeClient } from "./bridge-client.js";
 import { FlowCanvas } from "./canvas/FlowCanvas.js";
 import { TranscriptPanel } from "./panels/TranscriptPanel.js";
@@ -51,6 +54,8 @@ import { StatusBar } from "./layout/StatusBar.js";
 
 type Tab = "transcript" | "terminal" | "audit" | "logs" | "inbox";
 type ThemePref = "dark" | "light" | "system";
+// 任务提醒方式：无 / 运行时任务栏流光 / 完成时弹小人窗口
+type ReminderMode = "none" | "shimmer" | "completion";
 
 const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">> = {
   "feishu-group": () => ({
@@ -352,6 +357,14 @@ function Inner() {
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themeNotice, setThemeNotice] = useState(false); // 切主题后提示"已同步 Claude、需重开终端"
+  // 任务提醒方式（设置里切换）：默认运行时流光(就是先前实现的那个)
+  const [reminderMode, setReminderMode] = useState<ReminderMode>(() => {
+    const m = localStorage.getItem("oblivionis-reminder-mode");
+    return m === "none" || m === "completion" ? m : "shimmer";
+  });
+  useEffect(() => {
+    localStorage.setItem("oblivionis-reminder-mode", reminderMode);
+  }, [reminderMode]);
   const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
@@ -911,10 +924,11 @@ function Inner() {
   );
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) return; // 浏览器开发版没有窗口 API
+    const on = reminderMode === "shimmer" && anyRunning;
     getCurrentWindow()
-      .setProgressBar({ status: anyRunning ? ProgressBarStatus.Indeterminate : ProgressBarStatus.None })
+      .setProgressBar({ status: on ? ProgressBarStatus.Indeterminate : ProgressBarStatus.None })
       .catch(() => {});
-  }, [anyRunning]);
+  }, [anyRunning, reminderMode]);
 
   // 主题：解析 system → 实际明暗，写 data-theme（CSS 变量切换），持久化；system 时跟随系统变化
   useEffect(() => {
@@ -1016,6 +1030,49 @@ function Inner() {
     },
     [openTerminalForNode],
   );
+
+  // 「完成时提醒」：把独立的小人窗口移到主屏任务栏上方居中，显示并发事件让它播放弹出动画。
+  // 任务栏精确按钮位置 Windows 无稳定 API，按用户建议用"主屏底部居中"的稳定方案。
+  const showMascot = useCallback(async (nodeId: string, label: string) => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    try {
+      const w = await WebviewWindow.getByLabel("mascot");
+      if (!w) return;
+      const mon = await currentMonitor();
+      if (mon) {
+        const sf = mon.scaleFactor || 1;
+        const x = mon.position.x / sf + (mon.size.width / sf - 200) / 2;
+        const y = mon.position.y / sf + mon.size.height / sf - 48 - 200; // 任务栏约 48 高，留在其上缘
+        await w.setPosition(new LogicalPosition(x, y));
+      }
+      await w.show();
+      await tauriEmit("mascot-show", { nodeId, label });
+    } catch {
+      /* 弹窗失败不影响主流程 */
+    }
+  }, []);
+
+  // 点小人 → 主窗口聚焦并跳到那个完成的会话
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    let un: (() => void) | undefined;
+    tauriListen<{ nodeId?: string }>("mascot-clicked", async (e) => {
+      try {
+        const w = getCurrentWindow();
+        if (await w.isMinimized()) await w.unminimize();
+        await w.show();
+        await w.setFocus();
+      } catch {
+        /* ignore */
+      }
+      const nid = e.payload?.nodeId;
+      if (nid) {
+        openTerminalForNode(nid);
+        setUnseenDone((u) => (u[nid] ? { ...u, [nid]: false } : u));
+      }
+    }).then((f) => (un = f));
+    return () => un?.();
+  }, [openTerminalForNode]);
 
   /** 设置某条连线的条件(意图描述) */
   const setEdgeCondition = (edgeId: string, condition: string) => {
@@ -1649,6 +1706,32 @@ function Inner() {
                   切换会一并设置 Claude 终端主题；浅色参考 Claude 主页配色，部分细节仍在调。
                 </div>
               )}
+
+              <div className="settings-label" style={{ marginTop: 16 }}>任务提醒</div>
+              <div className="seg">
+                {(
+                  [
+                    ["none", "无"],
+                    ["shimmer", "运行时流光"],
+                    ["completion", "完成时提醒"],
+                  ] as [ReminderMode, string][]
+                ).map(([v, label]) => (
+                  <button
+                    key={v}
+                    className={`seg-btn ${reminderMode === v ? "on" : ""}`}
+                    onClick={() => setReminderMode(v)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="hint" style={{ marginTop: 8 }}>
+                {reminderMode === "shimmer"
+                  ? "会话/终端在跑时，任务栏图标挂一条流动进度光；光没了=任务停了。"
+                  : reminderMode === "completion"
+                    ? "任务在窗口最小化/没聚焦时完成 → 任务栏上方弹个小人动画提醒，点它回到对应会话。"
+                    : "不做任何任务栏/桌面提醒。"}
+              </div>
             </div>
           </div>
         )}
@@ -1741,6 +1824,22 @@ function Inner() {
                   // (打开会话时 claude 启动的输出不算任务，故不会误插)
                   if (activeTermRef.current !== id) {
                     setUnseenDone((u) => (u[id] ? u : { ...u, [id]: true }));
+                  }
+                  // 「完成时提醒」模式：任务跑完且主窗口没在聚焦/最小化时 → 弹小人窗口
+                  if (reminderMode === "completion") {
+                    void (async () => {
+                      if (!("__TAURI_INTERNALS__" in window)) return;
+                      try {
+                        const w = getCurrentWindow();
+                        const [focused, minimized] = await Promise.all([w.isFocused(), w.isMinimized()]);
+                        if (focused && !minimized) return; // 正看着这软件，不打扰
+                      } catch {
+                        /* ignore */
+                      }
+                      const node = nodes.find((n) => n.id === id);
+                      const label = (node?.data as { label?: string } | undefined)?.label || "会话";
+                      showMascot(id, label);
+                    })();
                   }
                 }}
               />

@@ -111,6 +111,62 @@
   box-sizing: border-box;
 }
 
+/* 「完成时提醒」小人弹窗（跑在独立透明窗口里）：从底部(任务栏上缘)弹出，停留几秒缩回 */
+.mascot {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 0 6px 4px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.25), opacity 0.3s ease;
+}
+.mascot.out {
+  transform: translateY(135%);
+  opacity: 0;
+}
+.mascot.in {
+  transform: translateY(0);
+  opacity: 1;
+}
+.mascot-gif {
+  width: 128px;
+  height: 128px;
+  border-radius: 16px;
+  object-fit: cover;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.28));
+  animation: mascot-bob 1.3s ease-in-out infinite;
+}
+@keyframes mascot-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.mascot-bubble {
+  max-width: 176px;
+  background: #ffffff;
+  color: #25231f;
+  border: 1px solid #e4e0da;
+  border-radius: 12px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
 /* 全局滚动条统一样式：WebView2 深色模式默认滚动条近黑，特定窗口高度下
    容器冒出滚动条就成"黑边"。轨道透明=透出容器主题色。 */
 *::-webkit-scrollbar {
