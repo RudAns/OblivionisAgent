@@ -347,6 +347,8 @@ function Inner() {
   const [unseenDone, setUnseenDone] = useState<Record<string, boolean>>({}); // 完成但用户还没切过去看 → 红点
   const [activePaths, setActivePaths] = useState<Record<string, string[]>>({}); // 各会话本轮实际走过的连线(运行时点亮真实链路)
   const [sessionMetas, setSessionMetas] = useState<Record<string, { base?: number; fork?: number }>>({}); // 会话 transcript 最终修改时间
+  // 每会话活动仪表盘：本次软件运行内，各会话处理过多少轮 + 累计输出 token + 最近活跃时刻
+  const [sessionStats, setSessionStats] = useState<Record<string, { msgs: number; outTokens: number; lastTs: number }>>({});
   // 主题：dark/light/system；resolvedTheme 是 system 解析后的实际明暗，传给画布/终端
   const [theme, setTheme] = useState<ThemePref>(() => {
     const t = localStorage.getItem("oblivionis-theme");
@@ -433,6 +435,15 @@ function Inner() {
           const arr = eventsRef.current[msg.nodeId] ?? [];
           arr.push(msg.event);
           eventsRef.current[msg.nodeId] = arr;
+          // 仪表盘：每完成一轮(result)累计「处理条数 + 输出 token + 活跃时刻」
+          const ev = msg.event as { type?: string; usage?: { output_tokens?: number } };
+          if (ev?.type === "result") {
+            const out = ev.usage?.output_tokens ?? 0;
+            setSessionStats((s) => {
+              const cur = s[msg.nodeId] ?? { msgs: 0, outTokens: 0, lastTs: 0 };
+              return { ...s, [msg.nodeId]: { msgs: cur.msgs + 1, outTokens: cur.outTokens + out, lastTs: Date.now() } };
+            });
+          }
           forceRender((x) => x + 1);
           break;
         }
@@ -1538,6 +1549,7 @@ function Inner() {
           openedTerminals={openedTerminals}
           termRunning={termRunning}
           unseenDone={unseenDone}
+          stats={sessionStats}
           onSelect={(id) => {
             setSelected(id);
             setTab("transcript");

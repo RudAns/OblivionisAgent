@@ -10,9 +10,27 @@ interface Props {
   termRunning: Record<string, boolean>;
   /** 完成但还没切过去看的会话 → 小旗红点 */
   unseenDone: Record<string, boolean>;
+  /** 每会话活动统计（本次运行内）：处理轮数 / 累计输出 token / 最近活跃时刻 */
+  stats?: Record<string, { msgs: number; outTokens: number; lastTs: number }>;
   onSelect: (nodeId: string) => void;
   onOpenTerminal: (nodeId: string) => void;
   onAddSession: () => void;
+}
+
+/** token 数紧凑显示：1234→1.2k，1230000→1.2M */
+function fmtTok(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "k";
+  return String(n);
+}
+/** 最近活跃相对时间：刚刚 / N分钟前 / N小时前 */
+function fmtAgo(ts: number): string {
+  if (!ts) return "";
+  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (s < 60) return "刚刚";
+  if (s < 3600) return `${Math.floor(s / 60)}分钟前`;
+  if (s < 86400) return `${Math.floor(s / 3600)}小时前`;
+  return `${Math.floor(s / 86400)}天前`;
 }
 
 /**
@@ -29,6 +47,7 @@ export function SessionSidebar({
   openedTerminals,
   termRunning,
   unseenDone,
+  stats,
   onOpenTerminal,
   onAddSession,
 }: Props) {
@@ -119,6 +138,17 @@ export function SessionSidebar({
                 )}
               </div>
               <div className="rail-cwd">{d.cwd || "(未设置工作区)"}</div>
+              {(() => {
+                const st = stats?.[n.id];
+                if (!st || st.msgs === 0) return null;
+                return (
+                  <div className="rail-stats" title="本次软件运行内的活动统计">
+                    <span>↩ {st.msgs} 轮</span>
+                    <span>⌨ {fmtTok(st.outTokens)} tok</span>
+                    {st.lastTs ? <span className="rail-stats-ago">· {fmtAgo(st.lastTs)}</span> : null}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
