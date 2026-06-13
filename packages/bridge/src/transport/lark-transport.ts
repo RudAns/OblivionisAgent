@@ -4,6 +4,34 @@ import { homedir } from "node:os";
 import type { FeishuStatus } from "@oblivionis/shared";
 import type { FeishuTransport, InboundMessage, ReplyOpts, ReplyStreamHandle } from "./transport.js";
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** 判断飞书错误是否是限频/429（各种可能的表征都兜一下，用于自适应退避） */
+function isFeishuRateLimit(e: unknown): boolean {
+  const err = e as { message?: string; code?: number | string; response?: { status?: number; data?: { code?: number } } };
+  const s = `${err?.message ?? ""} ${err?.code ?? ""} ${err?.response?.status ?? ""} ${err?.response?.data?.code ?? ""}`;
+  return /429|frequen|too\s*many|rate.?limit|限频|频率|230020|11232/i.test(s);
+}
+
+/** 带指数退避的重试：最多 attempts 次。成功 true，全失败记日志并 false（投递尽力而为，不抛、不拖垮主链路） */
+async function retry(fn: () => Promise<unknown>, attempts: number, log: (m: string) => void, what: string): Promise<boolean> {
+  let delay = 500;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await fn();
+      return true;
+    } catch (e) {
+      if (i === attempts - 1) {
+        log(`${what} 重试 ${attempts} 次仍失败: ${(e as Error).message}`);
+        return false;
+      }
+      await sleep(isFeishuRateLimit(e) ? delay * 2 : delay); // 限频退更久
+      delay *= 2;
+    }
+  }
+  return false;
+}
+
 /** 按图片二进制头嗅探真实格式，给 claude 正确后缀(它按扩展名识别图片) */
 function sniffImageExt(b: Buffer): string {
   if (b.length >= 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "png";
@@ -370,23 +398,31 @@ export class LarkTransport implements FeishuTransport {
 
   async reply(chatId: string, text: string, opts?: ReplyOpts): Promise<void> {
     if (!this.client) throw new Error("LarkTransport 未启动");
+    const log = (m: string) => this.opts.log("warn", m);
 
-    // 优先发交互卡片(markdown)，渲染粗体/列表/代码块/链接；失败则回退纯文本
-    try {
-      await this.sendContent(
-        chatId,
-        opts?.replyToMessageId,
-        "interactive",
-        this.answerCard(text, opts?.atUserId, false, opts?.fromLabel),
-        opts?.inThread,
-      );
-      return;
-    } catch (e) {
-      this.opts.log("warn", `卡片发送失败，回退纯文本: ${(e as Error).message}`);
-    }
+    // 优先发交互卡片(markdown)，带退避重试投递；都失败再回退纯文本(也重试)
+    const cardOk = await retry(
+      () =>
+        this.sendContent(
+          chatId,
+          opts?.replyToMessageId,
+          "interactive",
+          this.answerCard(text, opts?.atUserId, false, opts?.fromLabel),
+          opts?.inThread,
+        ),
+      2,
+      log,
+      "回复卡片",
+    );
+    if (cardOk) return;
     // 回退纯文本：不带 thread(threading 出错时也能发出去)
     const body = opts?.atUserId ? `<at user_id="${opts.atUserId}"></at> ${text}` : text;
-    await this.sendContent(chatId, opts?.replyToMessageId, "text", JSON.stringify({ text: body }));
+    await retry(
+      () => this.sendContent(chatId, opts?.replyToMessageId, "text", JSON.stringify({ text: body })),
+      2,
+      log,
+      "回复纯文本",
+    );
   }
 
   /** 引用回复或直接发送（msgType: text | interactive | post …）；返回新消息的 message_id（流式卡用它来 patch） */
@@ -446,23 +482,34 @@ export class LarkTransport implements FeishuTransport {
     }
     if (!messageId) return null;
 
-    const MIN_INTERVAL = 900; // 飞书卡片更新有频率上限，至少隔 900ms 刷一次
+    // 自适应节流：起步 900ms；被飞书限流就退避(加大间隔)，顺利就慢慢恢复。合并突发帧。
+    const MIN = 900;
+    const MAX = 5000;
+    let interval = MIN;
     let lastAt = 0;
     let latest = "";
     let timer: ReturnType<typeof setTimeout> | undefined;
     let done = false;
     let chain: Promise<void> = Promise.resolve(); // 串行化所有 patch，保证最终卡一定停在定稿态
 
-    const patch = (text: string, running: boolean): Promise<void> => {
+    const patchOnce = (text: string, running: boolean) =>
+      this.client.im.message.patch({
+        path: { message_id: messageId },
+        data: { content: this.answerCard(text, opts?.atUserId, running, opts?.fromLabel) },
+      });
+
+    // 把一次中间帧刷新排进串行链：成功则缓降间隔、失败(尤其限流)则退避
+    const enqueue = (text: string, running: boolean): Promise<void> => {
       chain = chain.then(async () => {
         try {
-          await this.client.im.message.patch({
-            path: { message_id: messageId },
-            data: { content: this.answerCard(text, opts?.atUserId, running, opts?.fromLabel) },
-          });
+          await patchOnce(text, running);
           lastAt = Date.now();
+          interval = Math.max(MIN, Math.round(interval * 0.85));
         } catch (e) {
-          this.opts.log("warn", `流式卡 patch 失败: ${(e as Error).message}`);
+          lastAt = Date.now();
+          const rl = isFeishuRateLimit(e);
+          interval = Math.min(MAX, Math.round(interval * (rl ? 2 : 1.4)));
+          this.opts.log("warn", `流式卡 patch ${rl ? "被限流" : "失败"}，退避到 ${interval}ms: ${(e as Error).message}`);
         }
       });
       return chain;
@@ -472,27 +519,29 @@ export class LarkTransport implements FeishuTransport {
       update: (text: string) => {
         if (done) return;
         latest = text;
-        const wait = MIN_INTERVAL - (Date.now() - lastAt);
+        const wait = interval - (Date.now() - lastAt);
         if (wait <= 0) {
-          lastAt = Date.now(); // 乐观占位：突发多帧时只发一帧、其余靠下面的尾随定时器合并
-          void patch(latest, true);
+          lastAt = Date.now(); // 乐观占位：突发多帧只发一帧、其余靠尾随定时器合并
+          void enqueue(latest, true);
         } else if (!timer) {
           timer = setTimeout(() => {
             timer = undefined;
             if (!done) {
               lastAt = Date.now();
-              void patch(latest, true);
+              void enqueue(latest, true);
             }
           }, wait);
         }
       },
+      // 定稿是最重要的一帧：等掉链上待发的，再带退避重试最多 3 次，尽量落定
       finish: async (text: string) => {
         done = true;
         if (timer) {
           clearTimeout(timer);
           timer = undefined;
         }
-        await patch(text || latest, false);
+        await chain.catch(() => {});
+        await retry(() => patchOnce(text || latest, false), 3, (m) => this.opts.log("warn", m), "定稿流式卡");
       },
       fail: async (note?: string) => {
         done = true;
@@ -500,7 +549,9 @@ export class LarkTransport implements FeishuTransport {
           clearTimeout(timer);
           timer = undefined;
         }
-        await patch((latest ? latest + "\n\n" : "") + `⚠️ ${note || "处理出错了"}`, false);
+        await chain.catch(() => {});
+        const body = (latest ? latest + "\n\n" : "") + `⚠️ ${note || "处理出错了"}`;
+        await retry(() => patchOnce(body, false), 2, (m) => this.opts.log("warn", m), "出错流式卡");
       },
     };
   }
