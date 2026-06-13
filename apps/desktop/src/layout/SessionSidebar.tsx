@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Node } from "@xyflow/react";
+import { usePointerReorder } from "../usePointerReorder.js";
 
 interface Props {
   claudeNodes: Node[];
@@ -10,6 +11,8 @@ interface Props {
   termRunning: Record<string, boolean>;
   /** 完成但还没切过去看的会话 → 小旗红点 */
   unseenDone: Record<string, boolean>;
+  /** 拖动会话卡片改变顺序：把 dragId 移到 dropId 之前 */
+  onReorder?: (dragId: string, dropId: string) => void;
   onSelect: (nodeId: string) => void;
   onOpenTerminal: (nodeId: string) => void;
   onAddSession: () => void;
@@ -29,9 +32,12 @@ export function SessionSidebar({
   openedTerminals,
   termRunning,
   unseenDone,
+  onReorder,
   onOpenTerminal,
   onAddSession,
 }: Props) {
+  // 会话卡片拖拽排序（指针拖拽）
+  const { dragId, overId, itemProps } = usePointerReorder(onReorder);
   // 会话多时才露出搜索框：按名称/工作区过滤，找会话不用一路滚
   const [q, setQ] = useState("");
   const showSearch = claudeNodes.length > 6;
@@ -84,9 +90,9 @@ export function SessionSidebar({
               key={n.id}
               className={`rail-card ${activeTerminalId === n.id ? "active" : ""} ${
                 selected === n.id && activeTerminalId !== n.id ? "sel" : ""
-              } ${sweep}`}
-              title={`${d.cwd || ""}\n单击=打开/聚焦开发终端`}
-              onClick={() => onOpenTerminal(n.id)}
+              } ${sweep} ${dragId === n.id ? "dragging" : ""} ${overId === n.id ? "drop-target" : ""}`}
+              title={`${d.cwd || ""}\n单击=打开/聚焦开发终端 · 拖动可排序`}
+              {...itemProps(n.id, () => onOpenTerminal(n.id))}
             >
               <div className="rail-card-top">
                 <span className={`rail-dot status-${d.status ?? "idle"}`} />

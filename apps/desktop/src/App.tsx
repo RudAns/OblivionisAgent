@@ -1552,6 +1552,19 @@ function Inner() {
           openedTerminals={openedTerminals}
           termRunning={termRunning}
           unseenDone={unseenDone}
+          onReorder={(dragId, dropId) =>
+            setNodes((ns) => {
+              const from = ns.findIndex((n) => n.id === dragId);
+              if (from < 0) return ns;
+              const arr = [...ns];
+              const [moved] = arr.splice(from, 1);
+              if (!moved) return ns;
+              const to = arr.findIndex((n) => n.id === dropId);
+              if (to < 0) return ns;
+              arr.splice(to, 0, moved); // 移到落点之前；变更触发既有自动存盘
+              return arr;
+            })
+          }
           onSelect={(id) => {
             setSelected(id);
             setTab("transcript");

@@ -9,6 +9,7 @@ import "@xterm/xterm/css/xterm.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { usePointerReorder } from "../usePointerReorder.js";
 
 /** 终端配色：深色(GitHub Dark Dimmed 系) / 浅色(GitHub Light 系)。切主题时整套替换。 */
 const TERM_THEME_DARK = {
@@ -1071,9 +1072,8 @@ export function TerminalsHost({
   const [repaintTick, setRepaintTick] = useState(0);
   // 各终端是否正在运行（输出活动），用于给标签页加扫光
   const [running, setRunning] = useState<Record<string, boolean>>({});
-  // 页签拖拽排序：记录正在拖的 id 与悬停落点 id
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
+  // 页签拖拽排序（指针拖拽，比 HTML5 draggable 在 WebView2 里稳）
+  const { dragId, overId, itemProps } = usePointerReorder(onReorder);
   if (!inTauri()) return <div className="panel-empty">真实终端仅在桌面应用中可用（浏览器开发版不支持）。</div>;
   if (terminals.length === 0)
     return (
@@ -1089,35 +1089,14 @@ export function TerminalsHost({
             key={t.nodeId}
             className={`term-tab ${t.nodeId === activeId ? "on" : ""} ${running[t.nodeId] ? "term-busy" : ""} ${
               dragId === t.nodeId ? "dragging" : ""
-            } ${overId === t.nodeId && dragId && dragId !== t.nodeId ? "drop-target" : ""}`}
-            draggable
-            onDragStart={(e) => {
-              setDragId(t.nodeId);
-              e.dataTransfer.effectAllowed = "move";
-              e.dataTransfer.setData("text/plain", t.nodeId); // WebView2 不调 setData 往往不触发拖拽
-            }}
-            onDragOver={(e) => {
-              if (!dragId || dragId === t.nodeId) return;
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "move";
-              if (overId !== t.nodeId) setOverId(t.nodeId);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (dragId && dragId !== t.nodeId) onReorder?.(dragId, t.nodeId);
-              setDragId(null);
-              setOverId(null);
-            }}
-            onDragEnd={() => {
-              setDragId(null);
-              setOverId(null);
-            }}
-            onClick={() => onActivate(t.nodeId)}
+            } ${overId === t.nodeId ? "drop-target" : ""}`}
             title={t.cwd || t.nodeId}
+            {...itemProps(t.nodeId, () => onActivate(t.nodeId))}
           >
             <span className="term-tab-label">{t.label}</span>
             <button
               className="term-tab-x"
+              data-noreorder
               title="关闭此终端"
               onClick={(e) => {
                 e.stopPropagation();
