@@ -363,6 +363,14 @@ function Inner() {
   useEffect(() => {
     localStorage.setItem("oblivionis-completion-alert", completionAlert ? "1" : "0");
   }, [completionAlert]);
+  // 完成小人停留时长(秒)，可调；经 mascot-show 事件传给小人窗口
+  const [mascotSec, setMascotSec] = useState<number>(() => {
+    const v = Number(localStorage.getItem("oblivionis-mascot-sec"));
+    return Number.isFinite(v) && v >= 2 && v <= 30 ? v : 5;
+  });
+  useEffect(() => {
+    localStorage.setItem("oblivionis-mascot-sec", String(mascotSec));
+  }, [mascotSec]);
   const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
@@ -1052,11 +1060,11 @@ function Inner() {
         await w.setPosition(new LogicalPosition(x, y));
       }
       await w.show();
-      await tauriEmit("mascot-show", { nodeId, label });
+      await tauriEmit("mascot-show", { nodeId, label, durationMs: mascotSec * 1000 });
     } catch {
       /* 弹窗失败不影响主流程 */
     }
-  }, []);
+  }, [mascotSec]);
 
   // 点小人 → 主窗口聚焦并跳到那个完成的会话
   useEffect(() => {
@@ -1792,10 +1800,23 @@ function Inner() {
                 （另：终端长时间工作时，任务栏图标会自动有流动进度光提示，常驻、不归这个开关管。）
               </div>
               {completionAlert && (
-                <div className="fs-actions" style={{ marginTop: 8 }}>
-                  <button onClick={() => showMascot("", "位置预览")} title="弹一下小人看看效果（屏幕右下角）">
-                    👀 预览
-                  </button>
+                <div style={{ marginTop: 10 }}>
+                  <div className="settings-label" style={{ marginBottom: 6 }}>
+                    小人停留时长：{mascotSec} 秒
+                  </div>
+                  <input
+                    type="range"
+                    min={2}
+                    max={20}
+                    value={mascotSec}
+                    onChange={(e) => setMascotSec(Number(e.target.value))}
+                    style={{ width: "100%" }}
+                  />
+                  <div className="fs-actions" style={{ marginTop: 6 }}>
+                    <button onClick={() => showMascot("", "位置预览")} title="按当前时长弹一下小人看看效果（屏幕右下角）">
+                      👀 预览
+                    </button>
+                  </div>
                 </div>
               )}
 

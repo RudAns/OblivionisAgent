@@ -26,15 +26,17 @@ export function Mascot() {
     const hideWin = () => window.setTimeout(() => getCurrentWindow().hide().catch(() => {}), 400);
 
     let un: (() => void) | undefined;
-    listen<{ nodeId?: string; label?: string }>("mascot-show", (e) => {
+    listen<{ nodeId?: string; label?: string; durationMs?: number }>("mascot-show", (e) => {
       nodeRef.current = e.payload?.nodeId;
       setLabel(e.payload?.label ?? "");
       setShown(true);
       if (hideT.current) window.clearTimeout(hideT.current);
+      // 停留时长由主窗口经事件传来(秒×1000)，缺省 4.8s；夹紧到 1.5~30s
+      const dur = Math.min(30000, Math.max(1500, e.payload?.durationMs ?? 4800));
       hideT.current = window.setTimeout(() => {
         setShown(false);
         hideWin();
-      }, 4800);
+      }, dur);
     }).then((f) => (un = f));
 
     return () => {
