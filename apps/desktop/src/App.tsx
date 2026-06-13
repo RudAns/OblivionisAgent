@@ -922,17 +922,43 @@ function Inner() {
 
   // 任务栏进度流光：只看「自己的终端会话」是否在跑，且持续工作超过一段时间(长任务)才亮，
   // 避免每条短命令都闪。空闲即清。常驻能力，不受「完成提示」开关控制。
+  // 启动时探一遍关键窗口能力：哪个不可用(能力标识符不对/缺权限)就在控制台明确报出来，
+  // 别让小人/流光/定位这些 .catch 吞掉的调用静默失效——以前完全看不出是没生效还是没触发。
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    void (async () => {
+      const w = getCurrentWindow();
+      const probe = async (name: string, fn: () => Promise<unknown>) => {
+        try {
+          await fn();
+          console.info(`[cap] ✓ ${name}`);
+        } catch (e) {
+          console.warn(`[cap] ✗ ${name} —— ${(e as Error)?.message ?? e}（能力可能缺失/标识符不对，需重新部署 rebuild-deploy）`);
+        }
+      };
+      await probe("window:set-progress-bar", () => w.setProgressBar({ status: ProgressBarStatus.None }));
+      await probe("window:current-monitor", () => currentMonitor());
+      await probe("window:is-focused", () => w.isFocused());
+      await probe("window:is-minimized", () => w.isMinimized());
+      await probe("mascot 窗口存在", async () => {
+        const m = await WebviewWindow.getByLabel("mascot");
+        if (!m) throw new Error("找不到 mascot 窗口(tauri.conf 未生效?)");
+      });
+    })();
+  }, []);
+
   const anyTermRunning = useMemo(() => Object.values(termRunning).some(Boolean), [termRunning]);
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) return; // 浏览器开发版没有窗口 API
     const win = getCurrentWindow();
+    const fail = (e: unknown) => console.warn(`[cap] setProgressBar 失败: ${(e as Error)?.message ?? e}`);
     if (!anyTermRunning) {
-      win.setProgressBar({ status: ProgressBarStatus.None }).catch(() => {});
+      win.setProgressBar({ status: ProgressBarStatus.None }).catch(fail);
       return;
     }
     // 终端持续工作满 12 秒才点亮流光(=判定为长任务)
     const t = window.setTimeout(() => {
-      win.setProgressBar({ status: ProgressBarStatus.Indeterminate }).catch(() => {});
+      win.setProgressBar({ status: ProgressBarStatus.Indeterminate }).catch(fail);
     }, 12_000);
     return () => window.clearTimeout(t);
   }, [anyTermRunning]);
@@ -1061,8 +1087,8 @@ function Inner() {
       }
       await w.show();
       await tauriEmit("mascot-show", { nodeId, label, durationMs: mascotSec * 1000 });
-    } catch {
-      /* 弹窗失败不影响主流程 */
+    } catch (e) {
+      console.warn(`[cap] 小人弹窗失败: ${(e as Error)?.message ?? e}（窗口/能力问题，需重新部署）`);
     }
   }, [mascotSec]);
 
@@ -1076,8 +1102,8 @@ function Inner() {
         if (await w.isMinimized()) await w.unminimize();
         await w.show();
         await w.setFocus();
-      } catch {
-        /* ignore */
+      } catch (err) {
+        console.warn(`[cap] 点小人后聚焦主窗口失败: ${(err as Error)?.message ?? err}`);
       }
       const nid = e.payload?.nodeId;
       if (nid) {
