@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import type { FeishuStatus } from "@oblivionis/shared";
-import type { FeishuTransport, InboundMessage, ReplyStreamHandle } from "./transport.js";
+import type { FeishuTransport, InboundMessage, ReplyOpts, ReplyStreamHandle } from "./transport.js";
 
 /** 按图片二进制头嗅探真实格式，给 claude 正确后缀(它按扩展名识别图片) */
 function sniffImageExt(b: Buffer): string {
@@ -359,25 +359,23 @@ export class LarkTransport implements FeishuTransport {
     return undefined;
   }
 
-  async reply(
-    chatId: string,
-    text: string,
-    opts?: { replyToMessageId?: string; atUserId?: string },
-  ): Promise<void> {
+  async reply(chatId: string, text: string, opts?: ReplyOpts): Promise<void> {
     if (!this.client) throw new Error("LarkTransport 未启动");
 
     // 优先发交互卡片(markdown)，渲染粗体/列表/代码块/链接；失败则回退纯文本
-    const cardAt = opts?.atUserId ? `<at id=${opts.atUserId}></at> ` : "";
-    const card = {
-      config: { wide_screen_mode: true },
-      elements: [{ tag: "markdown", content: cardAt + text }],
-    };
     try {
-      await this.sendContent(chatId, opts?.replyToMessageId, "interactive", JSON.stringify(card));
+      await this.sendContent(
+        chatId,
+        opts?.replyToMessageId,
+        "interactive",
+        this.answerCard(text, opts?.atUserId, false, opts?.fromLabel),
+        opts?.inThread,
+      );
       return;
     } catch (e) {
       this.opts.log("warn", `卡片发送失败，回退纯文本: ${(e as Error).message}`);
     }
+    // 回退纯文本：不带 thread(threading 出错时也能发出去)
     const body = opts?.atUserId ? `<at user_id="${opts.atUserId}"></at> ${text}` : text;
     await this.sendContent(chatId, opts?.replyToMessageId, "text", JSON.stringify({ text: body }));
   }
@@ -388,12 +386,13 @@ export class LarkTransport implements FeishuTransport {
     replyToMessageId: string | undefined,
     msgType: string,
     content: string,
+    inThread?: boolean,
   ): Promise<string | undefined> {
     let res: { data?: { message_id?: string } };
     if (replyToMessageId) {
       res = await this.client.im.message.reply({
         path: { message_id: replyToMessageId },
-        data: { msg_type: msgType, content },
+        data: { msg_type: msgType, content, ...(inThread ? { reply_in_thread: true } : {}) },
       });
     } else {
       res = await this.client.im.message.create({
@@ -404,26 +403,24 @@ export class LarkTransport implements FeishuTransport {
     return res?.data?.message_id;
   }
 
-  /** 流式卡片用的卡 JSON：update_multi 必须为 true 才允许之后 patch；running 时尾部缀一个输入指示 */
-  private answerCard(text: string, atUserId?: string, running?: boolean): string {
+  /** 回复卡 JSON：update_multi=true 才允许之后 patch；running 时尾部缀输入指示；fromLabel 标注作答会话 */
+  private answerCard(text: string, atUserId?: string, running?: boolean, fromLabel?: string): string {
     const at = atUserId ? `<at id=${atUserId}></at> ` : "";
     const body = (text || "…") + (running ? " ▍" : "");
+    const notes: string[] = [];
+    if (running) notes.push("正在输入…");
+    if (fromLabel) notes.push(`🔹 由「${fromLabel}」作答`);
     return JSON.stringify({
       config: { wide_screen_mode: true, update_multi: true },
       elements: [
         { tag: "markdown", content: at + body },
-        ...(running
-          ? [{ tag: "note", elements: [{ tag: "plain_text", content: "正在输入…" }] }]
-          : []),
+        ...(notes.length ? [{ tag: "note", elements: [{ tag: "plain_text", content: notes.join("  ·  ") }] }] : []),
       ],
     });
   }
 
   /** 开一张流式卡片：先发"思考中"占位，返回 update/finish/fail 句柄（内部节流 patch） */
-  async replyStream(
-    chatId: string,
-    opts?: { replyToMessageId?: string; atUserId?: string },
-  ): Promise<ReplyStreamHandle | null> {
+  async replyStream(chatId: string, opts?: ReplyOpts): Promise<ReplyStreamHandle | null> {
     if (!this.client) return null;
     let messageId: string | undefined;
     try {
@@ -431,7 +428,8 @@ export class LarkTransport implements FeishuTransport {
         chatId,
         opts?.replyToMessageId,
         "interactive",
-        this.answerCard("🤔 正在思考…", opts?.atUserId, true),
+        this.answerCard("🤔 正在思考…", opts?.atUserId, true, opts?.fromLabel),
+        opts?.inThread,
       );
     } catch (e) {
       this.opts.log("warn", `流式卡占位发送失败，回退一次性回复: ${(e as Error).message}`);
@@ -451,7 +449,7 @@ export class LarkTransport implements FeishuTransport {
         try {
           await this.client.im.message.patch({
             path: { message_id: messageId },
-            data: { content: this.answerCard(text, opts?.atUserId, running) },
+            data: { content: this.answerCard(text, opts?.atUserId, running, opts?.fromLabel) },
           });
           lastAt = Date.now();
         } catch (e) {

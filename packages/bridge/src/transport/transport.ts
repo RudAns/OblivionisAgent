@@ -32,24 +32,27 @@ export interface ReplyStreamHandle {
   fail(note?: string): Promise<void>;
 }
 
+/** 回复选项：引用某条消息(replyToMessageId)、@某人(atUserId)、标注作答会话(fromLabel)、是否进线程(inThread) */
+export interface ReplyOpts {
+  replyToMessageId?: string;
+  atUserId?: string;
+  /** 卡片底部标注是哪个会话/脱敏分身作答（多会话群里区分来源） */
+  fromLabel?: string;
+  /** 引用回复时是否开成话题(thread)，让同群多话题不串 */
+  inThread?: boolean;
+}
+
 export interface FeishuTransport {
   readonly name: string;
   start(): Promise<void>;
   stop(): Promise<void>;
-  /** 把回复发回某会话。opts 可指定引用某条消息(replyToMessageId)并 @某人(atUserId, open_id) */
-  reply(
-    chatId: string,
-    text: string,
-    opts?: { replyToMessageId?: string; atUserId?: string },
-  ): Promise<void>;
+  /** 把回复发回某会话 */
+  reply(chatId: string, text: string, opts?: ReplyOpts): Promise<void>;
   /**
    * 开一张流式卡片并返回刷新句柄（可选；仅真实传输实现）。
    * 返回 null = 当前发不了流式卡（调用方应回退到一次性 reply()）。
    */
-  replyStream?(
-    chatId: string,
-    opts?: { replyToMessageId?: string; atUserId?: string },
-  ): Promise<ReplyStreamHandle | null>;
+  replyStream?(chatId: string, opts?: ReplyOpts): Promise<ReplyStreamHandle | null>;
   /** 注册入站消息回调 */
   onMessage(cb: (msg: InboundMessage) => void): void;
   /** 用手机号/邮箱查 open_id（可选，仅真实传输实现） */

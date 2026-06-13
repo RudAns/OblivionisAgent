@@ -365,7 +365,12 @@ async function main() {
 
     log.info(`处理消息 from=${inbound.senderId} owner=${isOwner} perm=${permissionMode}${inbound.quoted ? " (含引用)" : ""}`);
 
-    const replyOpts = { replyToMessageId: inbound.messageId, atUserId: inbound.senderId };
+    const replyOpts = {
+      replyToMessageId: inbound.messageId,
+      atUserId: inbound.senderId,
+      fromLabel: node.label, // 标注是哪个会话/脱敏分身作答（多会话群里区分来源）
+      inThread: true, // 回复开成话题，让同群多话题不串
+    };
     // 运行时点亮真实链路：把这条消息实际走过的连线告诉 GUI（汇聚会话就不会两条入边都亮）
     hub.broadcast({ type: "session-active-path", nodeId: node.id, edgeIds: resolved.pathEdgeIds });
     // 出站脱敏函数：访客每一帧都过一遍密钥过滤（流式也不破坏脱敏保证），主人原样
