@@ -498,6 +498,33 @@ export class LarkTransport implements FeishuTransport {
     };
   }
 
+  /**
+   * 读飞书云文档正文。首版只支持新版云文档(/docx/ 或 /docs/)，拉 raw_content 纯文本。
+   * 拿不到(无权限/非协作者/类型不支持)就返回 undefined，让调用方优雅降级(不带文档内容继续答)。
+   */
+  async fetchDocContent(url: string): Promise<{ title?: string; text: string } | undefined> {
+    if (!this.client) return undefined;
+    const m = url.match(/\/(docx|docs|wiki|sheets|base)\/([A-Za-z0-9]+)/);
+    if (!m) return undefined;
+    const [, type, token] = m;
+    try {
+      if (type === "docx" || type === "docs") {
+        const res: any = await this.client.docx.document.rawContent({
+          path: { document_id: token },
+          params: { lang: 0 },
+        });
+        const text: string = res?.data?.content ?? res?.content ?? "";
+        return text ? { text: text.slice(0, 8000) } : undefined; // 截断，避免塞爆上下文
+      }
+      // wiki/sheets/base 首版暂不支持（各需独立接口/权限），让用户改贴内容
+      this.opts.log("info", `飞书文档类型 ${type} 暂不支持自动读取，已跳过`);
+      return undefined;
+    } catch (e) {
+      this.opts.log("warn", `读飞书文档失败(${type}/${String(token).slice(0, 8)}…): ${(e as Error).message}`);
+      return undefined;
+    }
+  }
+
   onMessage(cb: (m: InboundMessage) => void): void {
     this.cb = cb;
   }

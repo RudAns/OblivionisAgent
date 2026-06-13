@@ -57,6 +57,11 @@ export interface FeishuTransport {
     mobile?: string,
     email?: string,
   ): Promise<Array<{ label: string; openId: string }>>;
+  /**
+   * 读取用户在消息里粘的飞书云文档正文（可选；仅真实传输）。当前仅支持新版云文档(docx/docs)。
+   * 需 docx:document:readonly 权限，且机器人被加为该文档协作者，否则返回 undefined(优雅降级)。
+   */
+  fetchDocContent?(url: string): Promise<{ title?: string; text: string } | undefined>;
   /** 发送工具审批交互卡片（可选；按钮 value 携带 requestId+decision） */
   sendPermissionCard?(chatId: string, requestId: string, title: string, detail: string): Promise<boolean>;
   /** 注册卡片按钮回调（可选）。回调返回 toast 文案 */

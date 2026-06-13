@@ -350,7 +350,18 @@ async function main() {
     const imageBlock = inbound.images?.length
       ? `${baseText ? "\n\n" : ""}【随消息发来了 ${inbound.images.length} 张图片，请先用 Read 工具逐张查看，再结合上面的内容回答】\n${inbound.images.join("\n")}`
       : "";
-    const finalText = baseText + imageBlock;
+    // 消息里粘了飞书云文档链接 → 拉正文一并喂给 claude（拿不到就静默跳过，不影响回答）
+    let docBlock = "";
+    const docUrls = (inbound.text.match(/https?:\/\/[^\s)）]+\/(?:docx|docs)\/[A-Za-z0-9]+/g) ?? []).slice(0, 3);
+    if (docUrls.length && gateway.transport?.fetchDocContent) {
+      const parts: string[] = [];
+      for (const u of docUrls) {
+        const doc = await gateway.transport.fetchDocContent(u).catch(() => undefined);
+        if (doc?.text) parts.push(`【飞书文档内容 ${u}】\n${doc.text}`);
+      }
+      if (parts.length) docBlock = `\n\n${parts.join("\n\n")}`;
+    }
+    const finalText = baseText + imageBlock + docBlock;
 
     log.info(`处理消息 from=${inbound.senderId} owner=${isOwner} perm=${permissionMode}${inbound.quoted ? " (含引用)" : ""}`);
 
