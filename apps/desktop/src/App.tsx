@@ -35,7 +35,7 @@ import {
   type KnowledgeItem,
 } from "@oblivionis/shared";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
 import { BridgeClient } from "./bridge-client.js";
 import { FlowCanvas } from "./canvas/FlowCanvas.js";
 import { TranscriptPanel } from "./panels/TranscriptPanel.js";
@@ -900,6 +900,21 @@ function Inner() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  // 任务栏进度流光：任意会话/终端在跑时给任务栏图标挂一条流动的 indeterminate 进度光，
+  // 空闲清掉。最小化/没聚焦也能在任务栏看到"还在忙 / 已经停了(=完成)"。
+  const anyRunning = useMemo(
+    () =>
+      Object.values(termRunning).some(Boolean) ||
+      nodes.some((n) => (n.data as { status?: string } | undefined)?.status === "running"),
+    [termRunning, nodes],
+  );
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) return; // 浏览器开发版没有窗口 API
+    getCurrentWindow()
+      .setProgressBar({ status: anyRunning ? ProgressBarStatus.Indeterminate : ProgressBarStatus.None })
+      .catch(() => {});
+  }, [anyRunning]);
 
   // 主题：解析 system → 实际明暗，写 data-theme（CSS 变量切换），持久化；system 时跟随系统变化
   useEffect(() => {
