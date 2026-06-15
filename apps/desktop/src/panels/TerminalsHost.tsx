@@ -514,6 +514,19 @@ function TerminalView({
         }
         return true;
       }
+      // 其余 Ctrl+字母：WebView2 把 Ctrl+O/P/R/S/W/T/N… 当浏览器加速键吞掉，claude 永远收不到
+      // (Ctrl+O 看历史、Ctrl+R 等都失灵)。终端就该把 Ctrl+字母当控制字符送给程序 → 这里自己算出
+      // ^X 字节(A=^A=0x01 … O=^O=0x0f)直送 PTY，并 preventDefault 掐掉浏览器加速键。上面的
+      // F/A/V/C/X 已各自 return，不会落到这里；Shift/Alt 组合也放行不动。
+      if (ctrl && !e.shiftKey && !e.altKey && e.key.length === 1) {
+        const code = e.key.toUpperCase().charCodeAt(0);
+        if (code >= 65 && code <= 90) {
+          e.preventDefault();
+          const id = ptyIdRef.current;
+          if (id) invoke("pty_write", { id, data: String.fromCharCode(code - 64) }).catch(() => {});
+          return false;
+        }
+      }
       // Delete / Backspace：有选区时删除选区(否则放行给 claude 正常逐字符编辑)
       if (!ctrl && !e.altKey && (e.key === "Delete" || e.key === "Backspace")) {
         if (term.hasSelection() && editSelection(false)) {
