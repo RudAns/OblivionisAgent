@@ -93,8 +93,9 @@ export const ClaudeSessionData = z.object({
   /**
    * 敏感操作飞书审批：开启后，工具调用需要授权时（按 permissionMode 规则）
    * 往来源群发交互卡片，主人点[允许/拒绝]决定放行（官方 Channels 没有的能力）。
+   * 默认开启：默认访客护栏已允许访客尝试改文件/执行命令，必须由审批卡兜底，否则会无人把关地执行。
    */
-  approvalMode: z.boolean().default(false),
+  approvalMode: z.boolean().default(true),
   /** 是否开启 --include-partial-messages（逐 token 流式，GUI 转录更顺滑） */
   includePartialMessages: z.boolean().default(true),
   /** 透传给 claude 的额外参数 */
