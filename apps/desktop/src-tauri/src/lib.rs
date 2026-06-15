@@ -308,11 +308,17 @@ pub fn run() {
             // 闪屏(splashscreen)/小人(mascot)窗各自关闭也会触发 Destroyed，绝不能误杀 sidecar——
             // 曾导致闪屏 3s 后自动关闭就把刚起来的后台服务杀掉，表现为"刚连上又断了、再也起不来"。
             if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "main" {
-                if let Some(state) = window.app_handle().try_state::<BridgeProc>() {
+                let app = window.app_handle();
+                if let Some(state) = app.try_state::<BridgeProc>() {
                     if let Some(child) = state.0.lock().unwrap().take() {
                         let _ = child.kill();
                     }
                 }
+                // 关主窗=用户要退出整个 App。但 mascot 是「隐藏常驻窗」(启动即建、只 show/hide
+                // 从不销毁)，只要它还在，进程就不退出 → 留下没有可见窗口的僵尸进程：单实例锁没释放，
+                // 下次启动只会去聚焦这个僵尸 → 表现为"打不开"。所以这里显式退出，连带关掉 mascot、
+                // 结束进程、释放单实例锁。（这也是之前反复攒出多个实例、互抢端口的总根子。）
+                app.exit(0);
             }
         })
         .run(tauri::generate_context!())
