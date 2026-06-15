@@ -88,6 +88,8 @@ export class LarkTransport implements FeishuTransport {
   /** 知识收件箱裁决卡片按钮回调（index 注入） */
   private knowledgeActionCb: ((id: string, action: "accept" | "dismiss", operatorOpenId: string) => string) | null =
     null;
+  /** 已发出的审批卡：requestId -> {消息id, 标题, 详情}，裁决/超时后据此把卡更新成已决状态 */
+  private permCards = new Map<string, { messageId: string; title: string; detail: string }>();
 
   constructor(private opts: LarkOptions) {}
 
@@ -665,11 +667,38 @@ export class LarkTransport implements FeishuTransport {
       ],
     };
     try {
-      await this.sendContent(chatId, undefined, "interactive", JSON.stringify(card));
+      const messageId = await this.sendContent(chatId, undefined, "interactive", JSON.stringify(card));
+      if (messageId) this.permCards.set(requestId, { messageId, title, detail });
       return true;
     } catch (e) {
       this.opts.log("warn", `审批卡片发送失败: ${(e as Error).message}`);
       return false;
+    }
+  }
+
+  /** 裁决/超时后把审批卡更新成已决状态：换成绿色/红色头、去掉按钮、底部标注结果。失败静默(不影响审批)。 */
+  async updatePermissionCard(requestId: string, state: "allow" | "deny" | "timeout"): Promise<void> {
+    const meta = this.permCards.get(requestId);
+    if (!meta || !this.client) return;
+    this.permCards.delete(requestId);
+    const label =
+      state === "allow" ? "✅ 主人已允许" : state === "deny" ? "❌ 主人已拒绝" : "⏱ 超时未处理，已自动拒绝";
+    const template = state === "allow" ? "green" : "red";
+    const card = {
+      config: { wide_screen_mode: true },
+      header: { title: { tag: "plain_text", content: meta.title }, template },
+      elements: [
+        { tag: "div", text: { tag: "lark_md", content: meta.detail } },
+        { tag: "note", elements: [{ tag: "plain_text", content: label }] },
+      ],
+    };
+    try {
+      await this.client.im.message.patch({
+        path: { message_id: meta.messageId },
+        data: { content: JSON.stringify(card) },
+      });
+    } catch (e) {
+      this.opts.log("warn", `更新审批卡状态失败: ${(e as Error).message}`);
     }
   }
 

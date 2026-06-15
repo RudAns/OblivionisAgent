@@ -501,6 +501,10 @@ async function main() {
         : null;
     },
     homeChatId: () => store.get().homeChatId,
+    // 裁决/超时后把对应审批卡更新成已决态(去按钮)；交给当前传输层处理，失败不影响审批
+    updateCard: (rid, state) => {
+      void gateway.transport?.updatePermissionCard?.(rid, state);
+    },
   });
   try {
     // command=当前可执行 + 原样参数 + --mcp-perm：pkg 单 exe 与 dev(tsx) 两种形态都成立

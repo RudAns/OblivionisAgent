@@ -36,6 +36,8 @@ export class PermissionBroker {
       isOwner: (openId: string) => boolean;
       sender: () => PermCardSender | null;
       homeChatId: () => string;
+      /** 裁决/超时后把对应审批卡更新成已决状态（去掉按钮）；失败不影响审批结果 */
+      updateCard?: (requestId: string, state: "allow" | "deny" | "timeout") => void;
     },
   ) {}
 
@@ -68,6 +70,7 @@ export class PermissionBroker {
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(requestId);
+        this.deps.updateCard?.(requestId, "timeout");
         resolve({ behavior: "deny", message: "审批超时(100s)" });
       }, 100_000);
       this.pending.set(requestId, { resolve, timer, toolName, ctx });
@@ -89,6 +92,7 @@ export class PermissionBroker {
         ? { behavior: "allow" }
         : { behavior: "deny", message: "主人拒绝了该操作" },
     );
+    this.deps.updateCard?.(requestId, decision);
     this.deps.log.info(`审批${decision === "allow" ? "✅通过" : "❌拒绝"}: ${p.toolName}`);
     return decision === "allow" ? "已允许 ✅" : "已拒绝";
   }
