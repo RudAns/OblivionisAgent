@@ -26,6 +26,7 @@
       {
         "label": "splashscreen",
         "title": "",
+        "url": "splash.html",
         "width": 270,
         "height": 300,
         "decorations": false,
