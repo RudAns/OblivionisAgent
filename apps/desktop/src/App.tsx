@@ -371,6 +371,21 @@ function Inner() {
   useEffect(() => {
     localStorage.setItem("oblivionis-mascot-sec", String(mascotSec));
   }, [mascotSec]);
+  // 终端字号：设置界面滑杆 + 终端内 Ctrl+/- 共用一个存档；改动广播给所有已开终端实时生效
+  const [termFontSize, setTermFontSize] = useState<number>(() => {
+    const s = parseInt(localStorage.getItem("oblivionis-term-fontsize") || "", 10);
+    return Number.isFinite(s) ? Math.max(9, Math.min(28, s)) : 14;
+  });
+  useEffect(() => {
+    localStorage.setItem("oblivionis-term-fontsize", String(termFontSize));
+    window.dispatchEvent(new CustomEvent("oblivionis-term-fontsize", { detail: termFontSize }));
+  }, [termFontSize]);
+  // 打开设置时重新读一次：终端里用 Ctrl+/- 改过后，滑杆显示最新值
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const s = parseInt(localStorage.getItem("oblivionis-term-fontsize") || "", 10);
+    if (Number.isFinite(s)) setTermFontSize(Math.max(9, Math.min(28, s)));
+  }, [settingsOpen]);
   const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
@@ -1888,6 +1903,19 @@ function Inner() {
                   </div>
                 </div>
               )}
+
+              <div className="settings-label" style={{ marginTop: 16 }}>终端字号：{termFontSize}px</div>
+              <input
+                type="range"
+                min={9}
+                max={28}
+                value={termFontSize}
+                onChange={(e) => setTermFontSize(Number(e.target.value))}
+                style={{ width: "100%" }}
+              />
+              <div className="hint" style={{ marginTop: 6 }}>
+                拖动调整所有终端字号；终端里也可 Ctrl + +/− 调整、Ctrl+0 复位。
+              </div>
 
               <div className="settings-label" style={{ marginTop: 16 }}>画布配置</div>
               <div className="fs-actions">

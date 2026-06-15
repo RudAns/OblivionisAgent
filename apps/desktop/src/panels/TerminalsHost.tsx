@@ -513,6 +513,8 @@ function TerminalView({
             /* ignore */
           }
           ptySizeRef.current?.send(term.cols, term.rows);
+          // 广播给设置滑杆 + 其它终端同步
+          window.dispatchEvent(new CustomEvent("oblivionis-term-fontsize", { detail: next }));
         }
         return false;
       }
@@ -828,6 +830,19 @@ function TerminalView({
       }, 250);
     };
     window.addEventListener("resize", onResize);
+    // 设置界面滑杆/其它终端改字号 → 本终端实时跟随(与 Ctrl+/- 共用同一存档)
+    const onExtFontSize = (ev: Event) => {
+      const n = clampFs(Number((ev as CustomEvent).detail));
+      if (!Number.isFinite(n) || n === (term.options.fontSize ?? 14)) return;
+      term.options.fontSize = n;
+      try {
+        fit.fit();
+      } catch {
+        /* ignore */
+      }
+      ptySizeRef.current?.send(term.cols, term.rows);
+    };
+    window.addEventListener("oblivionis-term-fontsize", onExtFontSize);
     // RO 回调放进 rAF 并合并，避免 "ResizeObserver loop" 与同帧多次 fit
     let roPending = false;
     const ro = new ResizeObserver(() => {
@@ -847,6 +862,7 @@ function TerminalView({
       if (actTimerRef.current) window.clearTimeout(actTimerRef.current);
       onActivityRef.current?.(false);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("oblivionis-term-fontsize", onExtFontSize);
       window.removeEventListener("focus", onWinFocus);
       document.removeEventListener("visibilitychange", onVisibility);
       unlistenTauriFocus?.();
