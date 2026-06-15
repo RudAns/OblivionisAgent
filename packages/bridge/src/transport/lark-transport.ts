@@ -427,6 +427,31 @@ export class LarkTransport implements FeishuTransport {
     );
   }
 
+  /** 把一段文本作为飞书文件发出(长报告/补丁/CSV 用，避免塞进巨大气泡)。失败返回 false。 */
+  async sendTextFile(
+    chatId: string,
+    fileName: string,
+    content: string,
+    replyToMessageId?: string,
+  ): Promise<boolean> {
+    if (!this.client) return false;
+    try {
+      const { Readable } = await import("node:stream");
+      const buf = Buffer.from(content, "utf8");
+      // im.file.create(file_type=stream) → file_key → 发 file 消息(链路已验证)
+      const up: any = await this.client.im.file.create({
+        data: { file_type: "stream", file_name: fileName, file: Readable.from(buf) as any },
+      });
+      const fileKey = up?.file_key ?? up?.data?.file_key;
+      if (!fileKey) return false;
+      await this.sendContent(chatId, replyToMessageId, "file", JSON.stringify({ file_key: fileKey }));
+      return true;
+    } catch (e) {
+      this.opts.log("warn", `发送文件失败: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
   /** 发送一张交互卡片(通用，供 /status 等富卡复用)；可选引用回复。失败返回 false。 */
   async sendCard(chatId: string, card: unknown, replyToMessageId?: string): Promise<boolean> {
     if (!this.client) return false;

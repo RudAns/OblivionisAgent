@@ -490,15 +490,24 @@ async function main() {
         stream ? (acc) => stream!.update(redact(acc)) : undefined,
       );
       const safeReply = redact(reply);
+      // 回复过长(>2800字)→ 作为飞书 .md 文件回传,避免塞进巨大气泡(链路已验证)。文件发失败则回退全文。
+      const LONG = 2800;
+      const sendAsFile = async (replyTo?: string): Promise<boolean> => {
+        if (safeReply.length <= LONG || !gateway.transport?.sendTextFile) return false;
+        const fname = `回复-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.md`;
+        return await gateway.transport.sendTextFile(inbound.chatId, fname, safeReply, replyTo).catch(() => false);
+      };
       if (stream) {
         if (safeReply && safeReply.trim()) {
-          await stream.finish(safeReply);
+          const filed = await sendAsFile(inbound.messageId);
+          await stream.finish(filed ? "📄 回复较长，完整内容见上方文件 👆" : safeReply);
           hub.broadcast({ type: "outbound", chatId: inbound.chatId, text: safeReply, ts: Date.now() });
         } else {
           await stream.fail("(本轮没有产生回复)");
         }
       } else if (safeReply && safeReply.trim() && gateway.transport) {
-        await gateway.transport.reply(inbound.chatId, safeReply, replyOpts);
+        const filed = await sendAsFile(inbound.messageId);
+        if (!filed) await gateway.transport.reply(inbound.chatId, safeReply, replyOpts);
         hub.broadcast({ type: "outbound", chatId: inbound.chatId, text: safeReply, ts: Date.now() });
       }
       // 群记忆提炼（异步、绝不影响主链路）：把这轮里值得长期记住的群信息写进 GROUP.md
