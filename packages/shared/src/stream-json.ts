@@ -91,6 +91,13 @@ export function assistantText(e: StreamAssistantEvent): string {
     .join("");
 }
 
+/** 从一个 assistant 事件里抽取本次调用的工具名（tool_use block 的 name），用于"逐工具进度"展示 */
+export function assistantTools(e: StreamAssistantEvent): string[] {
+  return e.message.content
+    .filter((b) => b.type === "tool_use" && typeof b.name === "string")
+    .map((b) => b.name as string);
+}
+
 export function isResult(e: ClaudeStreamEvent): e is StreamResultEvent {
   return e.type === "result";
 }

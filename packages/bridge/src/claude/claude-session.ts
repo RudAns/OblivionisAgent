@@ -4,7 +4,24 @@ import type { ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import type { ClaudeStreamEvent, SessionStatus } from "@oblivionis/shared";
-import { isResult, isAssistant, assistantText } from "@oblivionis/shared";
+import { isResult, isAssistant, assistantText, assistantTools } from "@oblivionis/shared";
+
+// B2 逐工具进度：工具名 → 友好中文(在流式卡上显示"正在 运行命令…")
+const TOOL_LABEL: Record<string, string> = {
+  Bash: "运行命令",
+  Read: "读取文件",
+  Write: "写文件",
+  Edit: "改文件",
+  MultiEdit: "改文件",
+  NotebookEdit: "改 Notebook",
+  Glob: "查找文件",
+  Grep: "搜索代码",
+  WebFetch: "抓取网页",
+  WebSearch: "联网搜索",
+  Task: "调度子代理",
+  Agent: "调度子代理",
+};
+const toolLabel = (n: string): string => TOOL_LABEL[n] ?? n;
 import { sessionArgs } from "./session-path.js";
 
 /** 审批请求的上下文（spawn 时经 env 传给 MCP 审批进程，卡片据此发到来源群） */
@@ -234,6 +251,21 @@ export class ClaudeSession {
                 onText(streamAcc);
               } catch {
                 /* 回调不影响主流程 */
+              }
+            } else {
+              // B2 逐工具进度：本段没有新文本但调了工具 → 显示一行临时进度
+              //（下次有文本/定稿就被替换，不会留在最终回复里）
+              const tools = assistantTools(evt);
+              if (tools.length) {
+                try {
+                  onText(
+                    streamAcc +
+                      (streamAcc ? "\n\n" : "") +
+                      `🔧 正在 ${[...new Set(tools.map(toolLabel))].join("、")}…`,
+                  );
+                } catch {
+                  /* 回调不影响主流程 */
+                }
               }
             }
           }
