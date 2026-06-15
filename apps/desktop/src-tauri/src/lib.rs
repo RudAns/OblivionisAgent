@@ -280,6 +280,15 @@ fn open_path(path: String, base: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // 单实例：必须第一个注册。再次双击/打开只把已有主窗拉到前台，绝不开第二个 App——
+        // 否则两个实例各自拉起 sidecar 抢 8920 端口 + 抢同一飞书长连接登录，会把后台服务整崩。
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .manage(BridgeProc::default())
         .manage(PtyState::default())
@@ -295,7 +304,10 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if matches!(event, tauri::WindowEvent::Destroyed) {
+            // 只有「主窗」销毁才等于应用退出 → 才杀后台服务。
+            // 闪屏(splashscreen)/小人(mascot)窗各自关闭也会触发 Destroyed，绝不能误杀 sidecar——
+            // 曾导致闪屏 3s 后自动关闭就把刚起来的后台服务杀掉，表现为"刚连上又断了、再也起不来"。
+            if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "main" {
                 if let Some(state) = window.app_handle().try_state::<BridgeProc>() {
                     if let Some(child) = state.0.lock().unwrap().take() {
                         let _ = child.kill();
