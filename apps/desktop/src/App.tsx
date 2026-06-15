@@ -947,7 +947,7 @@ function Inner() {
     })();
   }, []);
 
-  // 启动闪屏：固定 3 秒(进度条走满)后显示主窗、关掉闪屏小窗。引擎慢/没起来也照常弹主窗(不会卡住)。
+  // 启动闪屏：固定 4 秒(进度条走满)后显示主窗、关掉闪屏小窗。引擎慢/没起来也照常弹主窗(不会卡住)。
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) return;
     let done = false;
@@ -968,7 +968,7 @@ function Inner() {
         console.warn(`[splash] 关闭闪屏失败: ${(e as Error)?.message ?? e}`);
       }
     };
-    const t = window.setTimeout(reveal, 3000);
+    const t = window.setTimeout(reveal, 4000);
     return () => window.clearTimeout(t);
   }, []);
 

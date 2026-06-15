@@ -32,25 +32,25 @@
         content: "";
         position: absolute;
         border-radius: 50%;
-        filter: blur(44px);
+        filter: blur(40px);
         pointer-events: none;
         z-index: 0;
       }
       body::before {
-        width: 280px;
-        height: 280px;
-        left: -60px;
-        top: -50px;
-        background: radial-gradient(circle, rgba(217, 103, 69, 0.32), rgba(217, 103, 69, 0) 70%);
-        animation: blob-a 9s ease-in-out infinite;
+        width: 300px;
+        height: 300px;
+        left: -40px;
+        top: -30px;
+        background: radial-gradient(circle, rgba(217, 103, 69, 0.42), rgba(217, 103, 69, 0) 68%);
+        animation: blob-a 5s ease-in-out infinite;
       }
       body::after {
         width: 320px;
         height: 320px;
-        right: -70px;
-        bottom: -60px;
-        background: radial-gradient(circle, rgba(235, 154, 112, 0.28), rgba(235, 154, 112, 0) 70%);
-        animation: blob-b 11s ease-in-out infinite;
+        right: -40px;
+        bottom: -40px;
+        background: radial-gradient(circle, rgba(235, 150, 110, 0.38), rgba(235, 150, 110, 0) 68%);
+        animation: blob-b 6.5s ease-in-out infinite;
       }
       .splash-inner {
         position: relative;
@@ -108,36 +108,46 @@
         background: linear-gradient(90deg, #e88a64, #d96745 50%, #e88a64);
         background-size: 200% 100%;
         transform-origin: left center;
-        /* 3 秒走满(与主窗 3s 后弹出对齐) + 高光流动 */
-        animation: splash-fill 3s linear forwards, bar-shine 1.8s linear infinite;
+        /* 4 秒走满(与主窗 4s 后弹出对齐) + 高光流动 */
+        animation: splash-fill 4s linear forwards, bar-shine 1.8s linear infinite;
       }
       @keyframes blob-a {
-        0%,
-        100% {
+        0% {
           transform: translate(0, 0) scale(1);
         }
-        50% {
-          transform: translate(46px, 54px) scale(1.18);
+        33% {
+          transform: translate(95px, 60px) scale(1.22);
+        }
+        66% {
+          transform: translate(55px, 135px) scale(1.1);
+        }
+        100% {
+          transform: translate(0, 0) scale(1);
         }
       }
       @keyframes blob-b {
-        0%,
-        100% {
+        0% {
           transform: translate(0, 0) scale(1);
         }
-        50% {
-          transform: translate(-52px, -42px) scale(1.12);
+        33% {
+          transform: translate(-85px, -55px) scale(1.2);
+        }
+        66% {
+          transform: translate(-120px, -5px) scale(1.28);
+        }
+        100% {
+          transform: translate(0, 0) scale(1);
         }
       }
       @keyframes halo {
         0%,
         100% {
-          opacity: 0.7;
-          transform: scale(1);
+          opacity: 0.65;
+          transform: scale(0.96);
         }
         50% {
           opacity: 1;
-          transform: scale(1.08);
+          transform: scale(1.16);
         }
       }
       @keyframes splash-bob {
