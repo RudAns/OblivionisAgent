@@ -47,8 +47,10 @@ export function ConditionEdge({
   };
 
   // 运行时：该连线在"正被处理的链路"上时整条流动起来（上游回溯，见 EdgeRuntimeContext）
-  const { activeEdges, focusEdges } = useContext(EdgeRuntimeContext);
+  const { activeEdges, focusEdges, edgeStats } = useContext(EdgeRuntimeContext);
   const flowing = activeEdges.has(id);
+  const stat = edgeStats[id]; // C2 运行轨迹：该连线累计触发次数
+  const count = stat?.count ?? 0;
   const dimmed = focusEdges != null && !focusEdges.has(id); // 选中节点时，不在其链路上的连线降透明
 
   const active = hovered || selected;
@@ -83,7 +85,7 @@ export function ConditionEdge({
         onMouseEnter={enter}
         onMouseLeave={leave}
       />
-      {(showBadge || active) && (
+      {(showBadge || active || count > 0) && (
         <EdgeLabelRenderer>
           <div
             className="edge-tools"
@@ -96,6 +98,25 @@ export function ConditionEdge({
             onMouseEnter={enter}
             onMouseLeave={leave}
           >
+            {count > 0 && (
+              <span
+                title={
+                  `运行轨迹：已触发 ${count} 次` +
+                  (stat?.lastTs ? ` · 最近 ${new Date(stat.lastTs).toLocaleString()}` : "")
+                }
+                style={{
+                  fontSize: 10,
+                  padding: "1px 6px",
+                  borderRadius: 999,
+                  background: "rgba(217,103,69,.12)",
+                  color: "#b15532",
+                  border: "1px solid rgba(217,103,69,.3)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ▶ {count}
+              </span>
+            )}
             {showBadge && (
               <button
                 className={`edge-badge has-cond ${selected ? "sel" : ""}`}

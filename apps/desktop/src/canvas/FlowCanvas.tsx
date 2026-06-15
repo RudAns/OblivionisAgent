@@ -63,6 +63,8 @@ interface Props {
   activeEdges: Set<string>;
   /** 选中节点的上下游链路连线集合(其它连线降透明度)；null=未聚焦 */
   focusEdges: Set<string> | null;
+  /** C2 各连线累计触发次数 + 最近触发时间(ms) */
+  edgeStats: Record<string, { count: number; lastTs: number }>;
   /** 当前明暗主题：驱动 React Flow colorMode 与背景点/缩略图配色 */
   theme: "dark" | "light";
   /** 各会话节点 transcript 最终修改时间，供节点卡显示日期 */
@@ -137,8 +139,8 @@ export function FlowCanvas(props: Props) {
   );
 
   const runtimeValue = useMemo(
-    () => ({ activeEdges: props.activeEdges, focusEdges: props.focusEdges }),
-    [props.activeEdges, props.focusEdges],
+    () => ({ activeEdges: props.activeEdges, focusEdges: props.focusEdges, edgeStats: props.edgeStats }),
+    [props.activeEdges, props.focusEdges, props.edgeStats],
   );
   const metaValue = useMemo(() => ({ metas: props.nodeMetas }), [props.nodeMetas]);
   const actionValue = useMemo(

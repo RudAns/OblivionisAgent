@@ -348,6 +348,21 @@ function Inner() {
   const [rtChat, setRtChat] = useState(""); // C3 路由测试：选的群 chatId
   const [rtText, setRtText] = useState(""); // C3 路由测试：样例消息
   const [rtResult, setRtResult] = useState(""); // C3 路由测试：结果文案
+  const [edgeStats, setEdgeStats] = useState<Record<string, { count: number; lastTs: number }>>(() => {
+    // C2 运行轨迹：每条连线累计触发次数，持久化在前端
+    try {
+      return JSON.parse(localStorage.getItem("oblivionis-edge-stats") || "{}");
+    } catch {
+      return {};
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("oblivionis-edge-stats", JSON.stringify(edgeStats));
+    } catch {
+      /* ignore */
+    }
+  }, [edgeStats]);
   const [sessionMetas, setSessionMetas] = useState<Record<string, { base?: number; fork?: number }>>({}); // 会话 transcript 最终修改时间
   // 主题：dark/light/system；resolvedTheme 是 system 解析后的实际明暗，传给画布/终端
   const [theme, setTheme] = useState<ThemePref>(() => {
@@ -474,6 +489,15 @@ function Inner() {
           setSessionMetas(msg.metas);
           break;
         case "session-active-path": {
+          // C2 运行轨迹：非空=本轮真实走过这条链路 → 给每条连线计数(每条消息记一次)
+          if (msg.edgeIds.length) {
+            const now = Date.now();
+            setEdgeStats((s) => {
+              const next = { ...s };
+              for (const eid of msg.edgeIds) next[eid] = { count: (next[eid]?.count ?? 0) + 1, lastTs: now };
+              return next;
+            });
+          }
           // 运行时实际走过的连线：空=熄灭该会话的活动链路
           setActivePaths((m) => {
             if (msg.edgeIds.length === 0) {
@@ -1706,6 +1730,7 @@ function Inner() {
             helperLines={helperLines}
             activeEdges={activeEdgeIds}
             focusEdges={focusEdgeIds}
+            edgeStats={edgeStats}
             theme={resolvedTheme}
             nodeMetas={sessionMetas}
           />

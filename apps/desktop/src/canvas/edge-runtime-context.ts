@@ -9,7 +9,10 @@ export const EdgeRuntimeContext = createContext<{
   activeEdges: Set<string>;
   /** 选中某节点时，它上下游链路上的连线 id；其它连线降透明度。null=未聚焦 */
   focusEdges: Set<string> | null;
+  /** C2 运行轨迹：每条连线累计触发次数 + 最近触发时间(ms)，持久化在前端 */
+  edgeStats: Record<string, { count: number; lastTs: number }>;
 }>({
   activeEdges: new Set(),
   focusEdges: null,
+  edgeStats: {},
 });
