@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "label": "main",
@@ -38,7 +39,7 @@
         "center": true,
         "shadow": true,
         "backgroundColor": "#f1eee6",
-        "visible": true
+        "visible": false
       },
       {
         "label": "mascot",
