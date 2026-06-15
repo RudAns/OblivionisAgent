@@ -19,6 +19,10 @@
     "core:window:allow-is-focused",
     "core:window:allow-is-minimized",
     "core:window:allow-current-monitor",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-unregister-all",
+    "global-shortcut:allow-is-registered",
     "shell:allow-open",
     {
       "identifier": "shell:allow-execute",

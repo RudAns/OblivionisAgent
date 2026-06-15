@@ -363,6 +363,51 @@ function Inner() {
       /* ignore */
     }
   }, [edgeStats]);
+  // E1b 全局唤起热键：默认关(快捷键易和别的软件冲突)；开了才注册，可改键
+  const [hotkeyEnabled, setHotkeyEnabled] = useState<boolean>(
+    () => localStorage.getItem("oblivionis-hotkey-enabled") === "1",
+  );
+  const [hotkeyKey, setHotkeyKey] = useState<string>(
+    () => localStorage.getItem("oblivionis-hotkey-key") || "CommandOrControl+Shift+O",
+  );
+  useEffect(() => {
+    localStorage.setItem("oblivionis-hotkey-enabled", hotkeyEnabled ? "1" : "0");
+  }, [hotkeyEnabled]);
+  useEffect(() => {
+    localStorage.setItem("oblivionis-hotkey-key", hotkeyKey);
+  }, [hotkeyKey]);
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window) || !hotkeyEnabled || !hotkeyKey.trim()) return;
+    const key = hotkeyKey.trim();
+    void (async () => {
+      try {
+        const gs = await import("@tauri-apps/plugin-global-shortcut");
+        try {
+          if (await gs.isRegistered(key)) await gs.unregister(key);
+        } catch {
+          /* ignore */
+        }
+        await gs.register(key, (e) => {
+          if (e.state !== "Pressed") return;
+          void (async () => {
+            try {
+              const w = getCurrentWindow();
+              await w.show();
+              await w.unminimize();
+              await w.setFocus();
+            } catch {
+              /* ignore */
+            }
+          })();
+        });
+      } catch (err) {
+        console.warn(`[hotkey] 注册「${key}」失败(可能被别的软件占用)：${(err as Error)?.message ?? err}`);
+      }
+    })();
+    return () => {
+      void import("@tauri-apps/plugin-global-shortcut").then((gs) => gs.unregister(key).catch(() => {}));
+    };
+  }, [hotkeyEnabled, hotkeyKey]);
   const [sessionMetas, setSessionMetas] = useState<Record<string, { base?: number; fork?: number }>>({}); // 会话 transcript 最终修改时间
   // 主题：dark/light/system；resolvedTheme 是 system 解析后的实际明暗，传给画布/终端
   const [theme, setTheme] = useState<ThemePref>(() => {
@@ -2002,6 +2047,38 @@ function Inner() {
                 <div className="hint" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
                   {rtResult}
                 </div>
+              )}
+
+              <div className="settings-label" style={{ marginTop: 16 }}>全局唤起热键（默认关）</div>
+              <div className="seg">
+                {(
+                  [
+                    [false, "关"],
+                    [true, "开"],
+                  ] as [boolean, string][]
+                ).map(([v, label]) => (
+                  <button
+                    key={label}
+                    className={`seg-btn ${hotkeyEnabled === v ? "on" : ""}`}
+                    onClick={() => setHotkeyEnabled(v)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {hotkeyEnabled && (
+                <>
+                  <input
+                    value={hotkeyKey}
+                    onChange={(e) => setHotkeyKey(e.target.value)}
+                    placeholder="如 CommandOrControl+Shift+O"
+                    style={{ width: "100%", marginTop: 6 }}
+                  />
+                  <div className="hint" style={{ marginTop: 6 }}>
+                    按组合键把窗口唤到最前。格式如 <code>CommandOrControl+Shift+O</code>、<code>Alt+Space</code>；
+                    不生效多半是被别的软件占用了，换一个。
+                  </div>
+                </>
               )}
 
               <div className="settings-label" style={{ marginTop: 16 }}>画布配置</div>

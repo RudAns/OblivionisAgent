@@ -290,6 +290,8 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_shell::init())
+        // 全局唤起热键：默认不注册，由前端按设置(默认关)动态 register/unregister(避免与别的软件撞键)
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(BridgeProc::default())
         .manage(PtyState::default())
         .invoke_handler(tauri::generate_handler![
