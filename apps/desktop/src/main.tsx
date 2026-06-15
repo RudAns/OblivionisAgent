@@ -14,6 +14,9 @@ try {
   /* 浏览器开发版没有 Tauri，按主窗口走 */
 }
 
+// 小人窗口是透明小窗，不要闪屏：立刻把它从 DOM 抠掉
+if (label === "mascot") document.getElementById("splash")?.remove();
+
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 root.render(
   label === "mascot" ? (

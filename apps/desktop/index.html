@@ -17,9 +17,143 @@
         } catch (e) {}
       })();
     </script>
+    <style>
+      /* 启动闪屏：随窗口一出现就盖住，遮住 React 挂载 + 引擎连接的 2-3s 空窗，加载好后由 JS 淡出移除 */
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(120% 120% at 50% 30%, #1b1f27 0%, #101216 72%);
+        transition: opacity 0.5s ease;
+      }
+      :root[data-theme="light"] #splash {
+        background: radial-gradient(120% 120% at 50% 30%, #fbfaf7 0%, #f1eee6 75%);
+      }
+      #splash.splash-hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .splash-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        animation: splash-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+      }
+      .splash-img {
+        width: 124px;
+        height: 124px;
+        border-radius: 26px;
+        object-fit: cover;
+        box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+        animation: splash-bob 2.4s ease-in-out infinite;
+      }
+      :root[data-theme="light"] .splash-img {
+        box-shadow: 0 14px 40px rgba(60, 55, 45, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
+      }
+      .splash-name {
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 21px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        color: #e6e6e6;
+      }
+      .splash-name span {
+        color: #d96745;
+      }
+      :root[data-theme="light"] .splash-name {
+        color: #25231f;
+      }
+      .splash-bar {
+        width: 168px;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(150, 150, 150, 0.22);
+        overflow: hidden;
+      }
+      .splash-bar i {
+        display: block;
+        height: 100%;
+        width: 40%;
+        border-radius: 2px;
+        background: #d96745;
+        animation: splash-load 1.1s ease-in-out infinite;
+      }
+      @keyframes splash-in {
+        from {
+          opacity: 0;
+          transform: translateY(8px) scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes splash-bob {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+      @keyframes splash-load {
+        0% {
+          transform: translateX(-130%);
+        }
+        100% {
+          transform: translateX(330%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .splash-img,
+        .splash-bar i,
+        .splash-inner {
+          animation: none;
+        }
+      }
+    </style>
+    <script>
+      // 闪屏淡出控制：至少显示 800ms(免得一闪而过)，幂等；React 加载好会调 __hideSplash，
+      // 另设 6s 硬兜底防 React 没起来时卡在闪屏。
+      (function () {
+        var shown = Date.now();
+        var MIN = 800;
+        var hidden = false;
+        window.__hideSplash = function () {
+          if (hidden) return;
+          hidden = true;
+          var go = function () {
+            var el = document.getElementById("splash");
+            if (!el) return;
+            el.classList.add("splash-hide");
+            setTimeout(function () {
+              if (el && el.parentNode) el.parentNode.removeChild(el);
+            }, 520);
+          };
+          var wait = MIN - (Date.now() - shown);
+          if (wait > 0) setTimeout(go, wait);
+          else go();
+        };
+        setTimeout(function () {
+          window.__hideSplash();
+        }, 6000);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <div id="splash">
+      <div class="splash-inner">
+        <img class="splash-img" src="/splash-icon.png" alt="" />
+        <div class="splash-name">Oblivionis<span>Agent</span></div>
+        <div class="splash-bar"><i></i></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -947,6 +947,17 @@ function Inner() {
     })();
   }, []);
 
+  // 撤启动闪屏：配置到位(=UI 就绪)即淡出；引擎慢/没起来则 3s 兜底，别一直盖着(index.html 还有 6s 硬兜底)
+  useEffect(() => {
+    const hide = () => (window as { __hideSplash?: () => void }).__hideSplash?.();
+    if (config) {
+      hide();
+      return;
+    }
+    const t = window.setTimeout(hide, 3000);
+    return () => window.clearTimeout(t);
+  }, [config]);
+
   const anyTermRunning = useMemo(() => Object.values(termRunning).some(Boolean), [termRunning]);
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) return; // 浏览器开发版没有窗口 API
