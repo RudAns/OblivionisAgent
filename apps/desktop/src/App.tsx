@@ -344,6 +344,10 @@ function Inner() {
   const [termRunning, setTermRunning] = useState<Record<string, boolean>>({}); // 各会话终端是否在跑(输出活动)
   const [unseenDone, setUnseenDone] = useState<Record<string, boolean>>({}); // 完成但用户还没切过去看 → 红点
   const [activePaths, setActivePaths] = useState<Record<string, string[]>>({}); // 各会话本轮实际走过的连线(运行时点亮真实链路)
+  const [testPath, setTestPath] = useState<string[]>([]); // C3 干跑路由测试：临时高亮命中的连线
+  const [rtChat, setRtChat] = useState(""); // C3 路由测试：选的群 chatId
+  const [rtText, setRtText] = useState(""); // C3 路由测试：样例消息
+  const [rtResult, setRtResult] = useState(""); // C3 路由测试：结果文案
   const [sessionMetas, setSessionMetas] = useState<Record<string, { base?: number; fork?: number }>>({}); // 会话 transcript 最终修改时间
   // 主题：dark/light/system；resolvedTheme 是 system 解析后的实际明暗，传给画布/终端
   const [theme, setTheme] = useState<ThemePref>(() => {
@@ -480,6 +484,24 @@ function Inner() {
             }
             return { ...m, [msg.nodeId]: msg.edgeIds };
           });
+          break;
+        }
+        case "route-test-result": {
+          // C3 干跑结果：高亮命中链路 + 选中命中会话 + 文案；6 秒后熄灭高亮
+          if (msg.error) {
+            setRtResult(`⚠️ 出错：${msg.error}`);
+          } else if (!msg.matched) {
+            setRtResult("❌ 无匹配链路（检查群是否建了节点、是否需要 @、意图边是否覆盖）");
+            setTestPath([]);
+          } else {
+            setRtResult(
+              `✅ 命中会话「${msg.nodeLabel ?? msg.nodeId}」 · 走过 ${msg.pathEdgeIds.length} 条连线` +
+                (msg.finalText ? `\n→ 发给 Claude：${msg.finalText.slice(0, 100)}${msg.finalText.length > 100 ? "…" : ""}` : ""),
+            );
+            setTestPath(msg.pathEdgeIds);
+            if (msg.nodeId) setSelected(msg.nodeId);
+            window.setTimeout(() => setTestPath([]), 6000);
+          }
           break;
         }
         case "log":
@@ -1371,17 +1393,18 @@ function Inner() {
   // 运行时高亮：每个 running 会话——若引擎报来了"本轮真实链路"(activePaths)就只点亮那条，
   // 避免汇聚会话两条入边都亮；否则(cron/webhook 等无路由)回退为沿入边回溯整条上游链路。
   const activeEdgeIds = useMemo(() => {
+    const active = new Set<string>();
+    for (const eid of testPath) active.add(eid); // C3 干跑测试：高亮命中的链路
     const runningIds = nodes
       .filter((n) => (n.data as { status?: string } | undefined)?.status === "running")
       .map((n) => n.id);
-    if (runningIds.length === 0) return new Set<string>();
+    if (runningIds.length === 0) return active;
     const incoming = new Map<string, Edge[]>();
     for (const e of edges) {
       const arr = incoming.get(e.target);
       if (arr) arr.push(e);
       else incoming.set(e.target, [e]);
     }
-    const active = new Set<string>();
     for (const rid of runningIds) {
       const reported = activePaths[rid];
       if (reported && reported.length) {
@@ -1403,7 +1426,7 @@ function Inner() {
       }
     }
     return active;
-  }, [nodes, edges, activePaths]);
+  }, [nodes, edges, activePaths, testPath]);
 
   // 聚焦高亮：选中单个节点时，它上下游链路上的连线集合（其它连线降透明度）。无选中=null。
   const focusEdgeIds = useMemo(() => {
@@ -1916,6 +1939,45 @@ function Inner() {
               <div className="hint" style={{ marginTop: 6 }}>
                 拖动调整所有终端字号；终端里也可 Ctrl + +/− 调整、Ctrl+0 复位。
               </div>
+
+              <div className="settings-label" style={{ marginTop: 16 }}>🧪 路由测试（干跑·不发飞书）</div>
+              <select value={rtChat} onChange={(e) => setRtChat(e.target.value)} style={{ width: "100%", marginBottom: 6 }}>
+                <option value="">选择群（飞书群节点）…</option>
+                {nodes
+                  .filter((n) => n.type === "feishu-group")
+                  .map((n) => {
+                    const cid = (n.data as { chatId?: string })?.chatId ?? "";
+                    return (
+                      <option key={n.id} value={cid}>
+                        {cid || "(未填 chatId)"}
+                      </option>
+                    );
+                  })}
+              </select>
+              <input
+                value={rtText}
+                onChange={(e) => setRtText(e.target.value)}
+                placeholder="输入一句样例消息，看它命中哪条链路"
+                style={{ width: "100%", marginBottom: 6 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && rtChat && rtText.trim())
+                    client.send({ type: "route-test", chatId: rtChat, text: rtText.trim() });
+                }}
+              />
+              <div className="fs-actions">
+                <button
+                  disabled={!rtChat || !rtText.trim()}
+                  onClick={() => client.send({ type: "route-test", chatId: rtChat, text: rtText.trim() })}
+                  title="只跑路由+意图分类，不真发飞书、不真跑会话；命中的连线会在画布上高亮 6 秒"
+                >
+                  ▶ 测试路由
+                </button>
+              </div>
+              {rtResult && (
+                <div className="hint" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+                  {rtResult}
+                </div>
+              )}
 
               <div className="settings-label" style={{ marginTop: 16 }}>画布配置</div>
               <div className="fs-actions">

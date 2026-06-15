@@ -11,6 +11,8 @@ export type ClientMessage =
   | { type: "set-config"; config: OblivionisConfig }
   /** 从 GUI 手动给某个会话节点发一条消息（绕过飞书，便于调试） */
   | { type: "send-to-session"; nodeId: string; text: string }
+  /** 干跑：模拟一条消息走路由(含意图分类)，只看命中哪条链路/会话，不真发飞书、不真跑会话 */
+  | { type: "route-test"; chatId: string; text: string }
   /** 打开某个会话节点的真实交互式终端(PTY) */
   | { type: "pty-open"; nodeId: string }
   | { type: "pty-input"; ptyId: string; data: string }
@@ -121,6 +123,16 @@ export type BridgeMessage =
   /** 运行时实际走过的连线（用于画布"只点亮真实链路"，避免汇聚会话两条入边都亮）。
    *  edgeIds 为空 = 清除该会话的活动链路。 */
   | { type: "session-active-path"; nodeId: string; edgeIds: string[] }
+  /** 干跑路由结果（响应 route-test）：命中哪个会话节点 / 走过哪些连线 / 最终发给 Claude 的文本 */
+  | {
+      type: "route-test-result";
+      matched: boolean;
+      nodeId?: string;
+      nodeLabel?: string;
+      pathEdgeIds: string[];
+      finalText?: string;
+      error?: string;
+    }
   /** 各会话节点的原始(base)/脱敏分身(fork) transcript 最终修改时间(ms)，给节点卡显示"最终修改日期" */
   | { type: "session-meta"; metas: Record<string, { base?: number; fork?: number }> }
   /** 回灌到飞书的出站消息（镜像给 GUI 展示） */

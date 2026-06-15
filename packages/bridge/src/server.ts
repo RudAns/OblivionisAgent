@@ -52,6 +52,8 @@ export interface ServerDeps {
   permBroker: import("./perm/permission-broker.js").PermissionBroker;
   /** 配置(graph)被 GUI 改写后回调 */
   onConfigChanged: () => void;
+  /** 干跑路由(含意图分类)，返回 route-test-result，不真发飞书/不真跑会话 */
+  routeTest: (chatId: string, text: string) => Promise<BridgeMessage>;
 }
 
 /**
@@ -198,6 +200,10 @@ export class ControlServer {
         void sessions
           .send(msg.nodeId, msg.text)
           .catch((e) => log.error(`手动发送失败: ${e.message}`));
+        break;
+      case "route-test":
+        // 干跑：只跑路由+意图分类看命中哪条链路，不真发飞书、不真跑会话
+        void this.deps.routeTest(msg.chatId, msg.text).then((r) => this.send(ws, r));
         break;
       case "pty-open":
         void ptys.open(msg.nodeId);

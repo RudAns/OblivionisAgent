@@ -737,6 +737,33 @@ async function main() {
       // webhook 节点增删/端口改 → 重同步监听
       webhookServer.sync();
     },
+    // 干跑路由：跑真实 route()+意图分类(会 spawn 一次 haiku 分类)，但不发飞书、不真跑会话
+    routeTest: async (chatId, text) => {
+      try {
+        const cfg = store.get();
+        const fakeInbound: InboundMessage = { chatId, text, senderId: "route-test", senderName: "测试", isMention: true };
+        const resolved = await route(cfg, fakeInbound, (t, intents, opts) =>
+          classifyIntent(t, intents, {
+            binPath: cfg.claude.binPath,
+            cwd: cfg.claude.defaultCwd || process.cwd(),
+            model: opts?.model,
+            mode: opts?.mode,
+            log: (m) => log.info(m),
+          }),
+        );
+        if (!resolved) return { type: "route-test-result", matched: false, pathEdgeIds: [] };
+        return {
+          type: "route-test-result",
+          matched: true,
+          nodeId: resolved.sessionNode.id,
+          nodeLabel: resolved.sessionNode.label,
+          pathEdgeIds: resolved.pathEdgeIds,
+          finalText: resolved.text,
+        };
+      } catch (e) {
+        return { type: "route-test-result", matched: false, pathEdgeIds: [], error: (e as Error).message };
+      }
+    },
   });
   server.start();
   await gateway.connect();
