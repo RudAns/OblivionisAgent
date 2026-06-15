@@ -6,7 +6,7 @@ import { Mascot } from "./Mascot.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import "./styles.css";
 
-// 同一份打包同时驱动主窗口和「完成时提醒」小人窗口，按当前窗口 label 分流渲染。
+// 同一份打包驱动多个窗口(主窗 / 小人提醒 / 启动闪屏)，按当前窗口 label 分流渲染。
 let label = "main";
 try {
   if ("__TAURI_INTERNALS__" in window) label = getCurrentWindow().label;
@@ -14,12 +14,14 @@ try {
   /* 浏览器开发版没有 Tauri，按主窗口走 */
 }
 
-// 小人窗口是透明小窗，不要闪屏：立刻把它从 DOM 抠掉
-if (label === "mascot") document.getElementById("splash")?.remove();
+// 只有「闪屏窗」保留 index.html 里的 #splash 当内容；其它窗口立刻把它抠掉。
+if (label !== "splashscreen") document.getElementById("splash")?.remove();
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 root.render(
-  label === "mascot" ? (
+  label === "splashscreen" ? (
+    <></> // 闪屏窗不挂 React，纯静态 #splash 显示
+  ) : label === "mascot" ? (
     <Mascot />
   ) : (
     <React.StrictMode>

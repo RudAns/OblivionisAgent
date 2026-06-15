@@ -19,7 +19,25 @@
         "minWidth": 960,
         "minHeight": 640,
         "decorations": false,
-        "backgroundColor": "#101216"
+        "backgroundColor": "#101216",
+        "visible": false,
+        "center": true
+      },
+      {
+        "label": "splashscreen",
+        "title": "",
+        "width": 300,
+        "height": 360,
+        "decorations": false,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "skipTaskbar": true,
+        "alwaysOnTop": true,
+        "center": true,
+        "shadow": true,
+        "backgroundColor": "#101216",
+        "visible": true
       },
       {
         "label": "mascot",

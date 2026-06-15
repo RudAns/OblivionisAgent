@@ -947,16 +947,30 @@ function Inner() {
     })();
   }, []);
 
-  // 撤启动闪屏：配置到位(=UI 就绪)即淡出；引擎慢/没起来则 3s 兜底，别一直盖着(index.html 还有 6s 硬兜底)
+  // 启动闪屏：固定 3 秒(进度条走满)后显示主窗、关掉闪屏小窗。引擎慢/没起来也照常弹主窗(不会卡住)。
   useEffect(() => {
-    const hide = () => (window as { __hideSplash?: () => void }).__hideSplash?.();
-    if (config) {
-      hide();
-      return;
-    }
-    const t = window.setTimeout(hide, 3000);
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    let done = false;
+    const reveal = async () => {
+      if (done) return;
+      done = true;
+      try {
+        const main = getCurrentWindow();
+        await main.show();
+        await main.setFocus();
+      } catch (e) {
+        console.warn(`[splash] 显示主窗失败: ${(e as Error)?.message ?? e}`);
+      }
+      try {
+        const sp = await WebviewWindow.getByLabel("splashscreen");
+        await sp?.close();
+      } catch (e) {
+        console.warn(`[splash] 关闭闪屏失败: ${(e as Error)?.message ?? e}`);
+      }
+    };
+    const t = window.setTimeout(reveal, 3000);
     return () => window.clearTimeout(t);
-  }, [config]);
+  }, []);
 
   const anyTermRunning = useMemo(() => Object.values(termRunning).some(Boolean), [termRunning]);
   useEffect(() => {
