@@ -472,8 +472,9 @@ function TerminalView({
 
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
-      // 真·按键(非纯修饰键)=用户在用这个终端：之后的 AI 输出才算正式任务(完成红旗用)
-      if (!["Control", "Shift", "Alt", "Meta"].includes(e.key)) typedRef.current = true;
+      // 用户「提交了一次任务」才算正式任务(完成红旗/桌面小人用)：以回车提交为准——
+      // Shift+Enter=换行不算、方向键/滚动/Ctrl+F 等也不算。这样首次打开会话的预热输出(无用户回车)不会误判为任务完成。
+      if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) typedRef.current = true;
       const ctrl = e.ctrlKey || e.metaKey;
       // Ctrl+F → 打开搜索条（专业 CLI 标配）
       if (ctrl && !e.shiftKey && (e.key === "f" || e.key === "F")) {
