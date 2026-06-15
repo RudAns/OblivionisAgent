@@ -152,6 +152,9 @@ export class ClaudeSession {
             join(homedir(), ".oblivionis", "perm-mcp.json"),
             "--permission-prompt-tool",
             "mcp__oblivionis_perm__approve",
+            // 把 Bash/Write/Edit 等改动类工具强制成"询问"→走审批卡；压过全局 settings 的 allow(*)
+            "--settings",
+            join(homedir(), ".oblivionis", "fork-settings.json"),
           ]
         : []),
       ...o.extraArgs,

@@ -513,8 +513,21 @@ async function main() {
       },
     };
     writeFileSync(join(homedir(), ".oblivionis", "perm-mcp.json"), JSON.stringify(permCfg, null, 2), "utf8");
+    // 访客 fork 专用 settings：把会改动环境的工具强制成"询问"。压过用户全局 ~/.claude/settings.json
+    // 里的 allow(Bash/Write/Edit…)——否则那些工具被直接放行、审批卡永远不弹(ask 优先级高于 allow)。
+    // 主人会话是 bypassPermissions，无视 ask 不受影响；只有挂了审批(approval)的会话才加载这份。
+    const forkSettings = {
+      permissions: {
+        ask: ["Write(*)", "Edit(*)", "MultiEdit(*)", "NotebookEdit(*)", "Bash(*)"],
+      },
+    };
+    writeFileSync(
+      join(homedir(), ".oblivionis", "fork-settings.json"),
+      JSON.stringify(forkSettings, null, 2),
+      "utf8",
+    );
   } catch (e) {
-    log.warn(`写审批 MCP 配置失败(审批功能不可用): ${(e as Error).message}`);
+    log.warn(`写审批 MCP/settings 配置失败(审批功能不可用): ${(e as Error).message}`);
   }
 
   // 定时任务调度：cron 节点到点 → 下游会话（脱敏分身）跑 prompt → 结果(出站脱敏后)发群
