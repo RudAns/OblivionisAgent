@@ -264,6 +264,81 @@ async function main() {
       ts: Date.now(),
     });
 
+    // 自助命令(仅主人)：/status 状态卡、/doctor 自检卡(允许前面带 @机器人)。路由之前拦截。
+    const cmdMatch = inbound.text.toLowerCase().match(/\/(status|doctor)\b/);
+    if (cmdMatch) {
+      const sub = cmdMatch[1];
+      const c = store.get();
+      if (!c.owners.some((o) => o.openId === inbound.senderId)) {
+        await gateway.transport
+          ?.reply(inbound.chatId, "（该命令仅主人可用）", { replyToMessageId: inbound.messageId })
+          .catch(() => {});
+        return;
+      }
+      const cwd = c.claude.defaultCwd || process.cwd();
+      let branch = "—";
+      try {
+        const head = readFileSync(join(cwd, ".git", "HEAD"), "utf8").trim();
+        const bm = head.match(/ref:\s*refs\/heads\/(.+)/);
+        branch = bm ? bm[1]! : head.slice(0, 10);
+      } catch {
+        /* 非 git 目录 */
+      }
+      const connected = gateway.lastStatus.status === "connected" || gateway.lastStatus.status === "mock";
+      const botName = gateway.lastStatus.bot?.name;
+      const up = Math.round(process.uptime());
+      const upStr =
+        up >= 3600
+          ? `${Math.floor(up / 3600)}h${Math.floor((up % 3600) / 60)}m`
+          : up >= 60
+            ? `${Math.floor(up / 60)}m${up % 60}s`
+            : `${up}s`;
+      const ok = (b: boolean) => (b ? "✅" : "❌");
+      let title: string;
+      let template: string;
+      let lines: string[];
+      if (sub === "status") {
+        title = "📊 OblivionisAgent 状态";
+        template = "blue";
+        lines = [
+          `**传输层**：${connected ? `✅ 已连接${botName ? `（${botName}）` : ""}` : "❌ 未连接"}`,
+          `**模型**：claude 默认（各会话节点可单独设）`,
+          `**工作目录**：\`${cwd}\``,
+          `**git 分支**：${branch}`,
+          `**会话节点**：${c.graph.nodes.filter((n) => n.kind === "claude-session").length} 个`,
+          `**Home Chat**：${c.homeChatId ? "已设置" : "未设置"}`,
+        ];
+      } else {
+        title = "🩺 自检 /doctor";
+        template = "green";
+        lines = [
+          `${ok(connected)} 飞书连接${botName ? `（${botName}）` : ""}`,
+          `${ok(!!(c.feishu.appId && c.feishu.appSecret))} 凭据已配置`,
+          `${ok(c.owners.length > 0)} 主人 ${c.owners.length} 人`,
+          `${c.homeChatId ? "✅" : "⚠️"} Home Chat ${c.homeChatId ? "已设置" : "未设置"}`,
+          `${ok(existsSync(cwd))} 工作目录存在`,
+          `**claude 路径**：\`${c.claude.binPath || "claude"}\``,
+        ];
+      }
+      const card = {
+        config: { wide_screen_mode: true },
+        header: { title: { tag: "plain_text", content: title }, template },
+        elements: [
+          { tag: "div", text: { tag: "lark_md", content: lines.join("\n") } },
+          { tag: "note", elements: [{ tag: "plain_text", content: `运行 ${upStr}` }] },
+        ],
+      };
+      const sent = gateway.transport?.sendCard
+        ? await gateway.transport.sendCard(inbound.chatId, card, inbound.messageId).catch(() => false)
+        : false;
+      if (!sent)
+        await gateway.transport
+          ?.reply(inbound.chatId, lines.join("\n"), { replyToMessageId: inbound.messageId })
+          .catch(() => {});
+      log.info(`自助命令 /${sub} by ${inbound.senderName}`);
+      return;
+    }
+
     // 兜底：route/classify/parseSchedule 等任一步抛错都不再静默丢消息——回一条提示
     try {
     const cfg = store.get();

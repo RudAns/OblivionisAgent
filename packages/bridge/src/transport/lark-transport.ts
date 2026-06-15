@@ -427,6 +427,18 @@ export class LarkTransport implements FeishuTransport {
     );
   }
 
+  /** 发送一张交互卡片(通用，供 /status 等富卡复用)；可选引用回复。失败返回 false。 */
+  async sendCard(chatId: string, card: unknown, replyToMessageId?: string): Promise<boolean> {
+    if (!this.client) return false;
+    try {
+      await this.sendContent(chatId, replyToMessageId, "interactive", JSON.stringify(card));
+      return true;
+    } catch (e) {
+      this.opts.log("warn", `发送卡片失败: ${(e as Error).message}`);
+      return false;
+    }
+  }
+
   /** 引用回复或直接发送（msgType: text | interactive | post …）；返回新消息的 message_id（流式卡用它来 patch） */
   private async sendContent(
     chatId: string,
