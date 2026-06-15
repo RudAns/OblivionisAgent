@@ -254,6 +254,9 @@ async function main() {
     },
   };
 
+  // B3 /retry · /continue：记住每个群最近一条"成功路由"的消息，供重试/继续命令重跑
+  const lastInbound = new Map<string, InboundMessage>();
+
   async function handleInbound(inbound: InboundMessage): Promise<void> {
     hub.broadcast({
       type: "inbound",
@@ -265,9 +268,23 @@ async function main() {
     });
 
     // 自助命令(仅主人)：/status 状态卡、/doctor 自检卡(允许前面带 @机器人)。路由之前拦截。
-    const cmdMatch = inbound.text.toLowerCase().match(/\/(status|doctor)\b/);
+    const cmdMatch = inbound.text.toLowerCase().match(/\/(status|doctor|retry|continue)\b/);
     if (cmdMatch) {
       const sub = cmdMatch[1];
+      // B3 /retry · /continue：重跑/续跑本群最近一条消息(任何人可用；就是重发那条/发一句"继续")
+      if (sub === "retry" || sub === "continue") {
+        if (sub === "continue") {
+          void handleInbound({ ...inbound, text: "继续" });
+        } else {
+          const base = lastInbound.get(inbound.chatId);
+          if (base) void handleInbound(base);
+          else
+            await gateway.transport
+              ?.reply(inbound.chatId, "（没有可重试的上一条消息）", { replyToMessageId: inbound.messageId })
+              .catch(() => {});
+        }
+        return;
+      }
       const c = store.get();
       if (!c.owners.some((o) => o.openId === inbound.senderId)) {
         await gateway.transport
@@ -355,6 +372,7 @@ async function main() {
       log.info(`无匹配路由，忽略来自 ${inbound.chatId} 的消息`);
       return;
     }
+    lastInbound.set(inbound.chatId, inbound); // B3 记住本群最近一条成功路由的消息，供 /retry 重跑
 
     // 主人 vs 访客：决定权限模式
     const isOwner = cfg.owners.some((o) => o.openId === inbound.senderId);
