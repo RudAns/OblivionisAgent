@@ -29,3 +29,6 @@ logs/
 # os
 .DS_Store
 Thumbs.db
+
+# 用户放在根目录的原始图标(已生成进 src-tauri/icons)
+/icon.png
