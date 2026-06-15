@@ -189,8 +189,19 @@ function TerminalView({
     if (!hostRef.current || !inTauri()) return;
     const host = hostRef.current;
 
+    // 终端字号：Ctrl +/-/0 调整并持久化(9–28)；原先写死 14，改成读存档
+    const FS_KEY = "oblivionis-term-fontsize";
+    const clampFs = (n: number) => Math.max(9, Math.min(28, n));
+    let initFs = 14;
+    try {
+      const s = parseInt(localStorage.getItem(FS_KEY) || "", 10);
+      if (Number.isFinite(s)) initFs = clampFs(s);
+    } catch {
+      /* ignore */
+    }
+
     const term = new Terminal({
-      fontSize: 14,
+      fontSize: initFs,
       // 英文等宽 Cascadia Mono；符号(◇✻→等)优先 Segoe UI Symbol(与拉丁字形基线协调，
       // 避免从中文字体取形显得漂浮)；中文 Noto Sans SC(最接近 macOS 苹方)，回退雅黑
       fontFamily:
@@ -481,6 +492,28 @@ function TerminalView({
         e.preventDefault();
         setSearchOpen(true);
         window.setTimeout(() => searchInputRef.current?.select(), 0);
+        return false;
+      }
+      // Ctrl + =/+ 放大、Ctrl + -/_ 缩小、Ctrl + 0 复位：终端字号缩放并持久化；
+      // 同时拦掉 WebView2 的整页缩放(否则会把整个界面缩放，而不是终端字号)
+      if (ctrl && !e.altKey && (e.key === "=" || e.key === "+" || e.key === "-" || e.key === "_" || e.key === "0")) {
+        e.preventDefault();
+        const cur = term.options.fontSize ?? 14;
+        const next = clampFs(e.key === "0" ? 14 : e.key === "-" || e.key === "_" ? cur - 1 : cur + 1);
+        if (next !== cur) {
+          term.options.fontSize = next;
+          try {
+            localStorage.setItem(FS_KEY, String(next));
+          } catch {
+            /* ignore */
+          }
+          try {
+            fit.fit();
+          } catch {
+            /* ignore */
+          }
+          ptySizeRef.current?.send(term.cols, term.rows);
+        }
         return false;
       }
       // Ctrl+A → 选中输入框内容(可接 Ctrl+C 复制)；识别不到则放行 ^A(claude 里=光标回行首)
