@@ -3,25 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <title></title>
-    <script>
-      // 第一帧前定主题，避免深↔浅闪一下(与 index.html 同源 localStorage)
-      (function () {
-        try {
-          var t = localStorage.getItem("oblivionis-theme") || "dark";
-          var r =
-            t === "light" || (t === "system" && window.matchMedia("(prefers-color-scheme: light)").matches)
-              ? "light"
-              : "dark";
-          document.documentElement.setAttribute("data-theme", r);
-        } catch (e) {}
-      })();
-    </script>
     <style>
-      /* html 背景在第一帧就铺好，杜绝 WebView 默认白底闪一下；专属 splash 页，不影响主窗/小人(透明窗) */
+      /* 闪屏固定浅色，与窗口原生 backgroundColor(#f1eee6) 一致。
+         原生底色是静态的、跟不了主题:之前深色原生底 + 浅色网页首帧 = 先闪一下黑。
+         固定浅色后原生↔网页第一帧就一致,不再闪黑;图标已内联 base64,随首帧出现。 */
       html {
-        background: #101216;
-      }
-      :root[data-theme="light"] {
         background: #f1eee6;
       }
       html,
@@ -34,13 +20,10 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: radial-gradient(120% 120% at 50% 30%, #1b1f27 0%, #101216 72%);
+        background: radial-gradient(120% 120% at 50% 30%, #fbfaf7 0%, #f1eee6 75%);
         font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
         user-select: none;
         -webkit-user-select: none;
-      }
-      :root[data-theme="light"] body {
-        background: radial-gradient(120% 120% at 50% 30%, #fbfaf7 0%, #f1eee6 75%);
       }
       .splash-inner {
         display: flex;
@@ -54,23 +37,17 @@
         height: 184px;
         border-radius: 36px;
         object-fit: cover;
-        box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
-        animation: splash-bob 2.4s ease-in-out infinite;
-      }
-      :root[data-theme="light"] .splash-img {
         box-shadow: 0 16px 46px rgba(60, 55, 45, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
+        animation: splash-bob 2.4s ease-in-out infinite;
       }
       .splash-name {
         font-size: 24px;
         font-weight: 700;
         letter-spacing: 0.5px;
-        color: #e6e6e6;
+        color: #25231f;
       }
       .splash-name span {
         color: #d96745;
-      }
-      :root[data-theme="light"] .splash-name {
-        color: #25231f;
       }
       .splash-bar {
         width: 208px;
