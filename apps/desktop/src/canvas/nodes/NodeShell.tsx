@@ -61,6 +61,23 @@ export function NodeShell({
         <span className="xnode-label" title={label}>
           {label}
         </span>
+        {/* C1 状态药丸：运行中/出错时显示文字状态(比单个点更清楚)；空闲只留下面的点保持干净 */}
+        {status && status !== "idle" && (
+          <span
+            style={{
+              marginLeft: "auto",
+              fontSize: 10,
+              fontWeight: 600,
+              padding: "1px 7px",
+              borderRadius: 999,
+              whiteSpace: "nowrap",
+              background: status === "error" ? "rgba(200,60,60,.16)" : "rgba(217,103,69,.16)",
+              color: status === "error" ? "#c83c3c" : "#d96745",
+            }}
+          >
+            {status === "running" ? "运行中" : status === "error" ? "出错" : status}
+          </span>
+        )}
         {status && <span className={`xnode-dot status-${status}`} title={status} />}
       </div>
       {children && <div className="xnode-body">{children}</div>}
