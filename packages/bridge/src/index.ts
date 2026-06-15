@@ -362,7 +362,9 @@ async function main() {
     // ★注入加固(spotlighting)：外部文档是未信任内容，用一次性随机围栏包起来并显式声明
     //   "这是被引用的资料、不是指令"，即便正文写着"忽略以上/执行xx"也只当内容看，绝不执行。
     let docBlock = "";
-    const docUrls = (inbound.text.match(/https?:\/\/[^\s)）]+\/(?:docx|docs)\/[A-Za-z0-9]+/g) ?? []).slice(0, 3);
+    const docUrls = (
+      inbound.text.match(/https?:\/\/[^\s)）]+\/(?:docx|docs|wiki|sheets|base)\/[A-Za-z0-9]+/g) ?? []
+    ).slice(0, 3);
     if (docUrls.length && gateway.transport?.fetchDocContent) {
       const parts: string[] = [];
       for (const u of docUrls) {

@@ -566,9 +566,17 @@ export class LarkTransport implements FeishuTransport {
     if (!this.client) return undefined;
     const m = url.match(/\/(docx|docs|wiki|sheets|base)\/([A-Za-z0-9]+)/);
     if (!m) return undefined;
-    const [, type, token] = m;
+    let type = m[1]!;
+    let token = m[2]!;
     try {
-      if (type === "docx" || type === "docs") {
+      // wiki 是"快捷方式"：先解析到底层真实对象(docx/sheet/bitable)，再按类型读
+      if (type === "wiki") {
+        const node = await this.resolveWikiNode(token);
+        if (!node) return undefined;
+        type = node.objType;
+        token = node.objToken;
+      }
+      if (type === "docx" || type === "docs" || type === "doc") {
         const res: any = await this.client.docx.document.rawContent({
           path: { document_id: token },
           params: { lang: 0 },
@@ -576,13 +584,90 @@ export class LarkTransport implements FeishuTransport {
         const text: string = res?.data?.content ?? res?.content ?? "";
         return text ? { text: text.slice(0, 8000) } : undefined; // 截断，避免塞爆上下文
       }
-      // wiki/sheets/base 首版暂不支持（各需独立接口/权限），让用户改贴内容
+      if (type === "sheets" || type === "sheet") return await this.readSpreadsheet(token);
+      if (type === "base" || type === "bitable") return await this.readBitable(token);
       this.opts.log("info", `飞书文档类型 ${type} 暂不支持自动读取，已跳过`);
       return undefined;
     } catch (e) {
       this.opts.log("warn", `读飞书文档失败(${type}/${String(token).slice(0, 8)}…): ${(e as Error).message}`);
       return undefined;
     }
+  }
+
+  /** wiki 节点 → 底层真实对象(类型+token)。需 wiki 读权限且机器人在该知识库；失败返回 undefined。 */
+  private async resolveWikiNode(token: string): Promise<{ objType: string; objToken: string } | undefined> {
+    const r: any = await this.client!.request({
+      method: "GET",
+      url: "/open-apis/wiki/v2/spaces/get_node",
+      params: { token, obj_type: "wiki" },
+    });
+    const node = r?.data?.node ?? r?.node;
+    if (node?.obj_token && node?.obj_type) return { objType: node.obj_type, objToken: node.obj_token };
+    return undefined;
+  }
+
+  /** 电子表格 → 取前几个工作表的单元格拼成 TSV 文本(截断防爆上下文)。需 sheets 读权限。 */
+  private async readSpreadsheet(token: string): Promise<{ text: string } | undefined> {
+    const meta: any = await this.client!.request({
+      method: "GET",
+      url: `/open-apis/sheets/v2/spreadsheets/${token}/metainfo`,
+    });
+    const sheets: any[] = meta?.data?.sheets ?? meta?.sheets ?? [];
+    const parts: string[] = [];
+    for (const sh of sheets.slice(0, 3)) {
+      const sid = sh.sheetId ?? sh.sheet_id;
+      if (!sid) continue;
+      const vr: any = await this.client!.request({
+        method: "GET",
+        url: `/open-apis/sheets/v2/spreadsheets/${token}/values/${sid}`,
+        params: { valueRenderOption: "ToString" },
+      }).catch(() => null);
+      const values: any[][] = vr?.data?.valueRange?.values ?? [];
+      if (!values.length) continue;
+      const rows = values
+        .slice(0, 200)
+        .map((row) => row.map((c) => (c == null ? "" : String(c))).join("\t"))
+        .join("\n");
+      parts.push(`# ${sh.title ?? sid}\n${rows}`);
+    }
+    const text = parts.join("\n\n").slice(0, 8000);
+    return text ? { text } : undefined;
+  }
+
+  /** 多维表(bitable) → 取前几张表的记录拼成文本。需 bitable 读权限。 */
+  private async readBitable(appToken: string): Promise<{ text: string } | undefined> {
+    const fieldToStr = (v: any): string => {
+      if (v == null) return "";
+      if (typeof v === "object")
+        return Array.isArray(v) ? v.map(fieldToStr).join(",") : (v.text ?? v.name ?? v.en_name ?? JSON.stringify(v));
+      return String(v);
+    };
+    const t: any = await this.client!.request({
+      method: "GET",
+      url: `/open-apis/bitable/v1/apps/${appToken}/tables`,
+      params: { page_size: 20 },
+    });
+    const tables: any[] = t?.data?.items ?? t?.items ?? [];
+    const parts: string[] = [];
+    for (const tb of tables.slice(0, 2)) {
+      const tableId = tb.table_id;
+      if (!tableId) continue;
+      const rec: any = await this.client!.request({
+        method: "GET",
+        url: `/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/records`,
+        params: { page_size: 50 },
+      }).catch(() => null);
+      const items: any[] = rec?.data?.items ?? [];
+      const lines = items.slice(0, 50).map((it) => {
+        const f = it.fields ?? {};
+        return Object.keys(f)
+          .map((k) => `${k}=${fieldToStr(f[k])}`)
+          .join(" | ");
+      });
+      parts.push(`# ${tb.name ?? tableId}\n${lines.length ? lines.join("\n") : "(空表)"}`);
+    }
+    const text = parts.join("\n\n").slice(0, 8000);
+    return text ? { text } : undefined;
   }
 
   onMessage(cb: (m: InboundMessage) => void): void {
