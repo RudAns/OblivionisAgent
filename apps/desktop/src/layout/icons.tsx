@@ -90,6 +90,16 @@ export function IconInbox({ size }: IconProps) {
   );
 }
 
+/** Markdown 文档查看器 */
+export function IconMarkdown({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <rect x="2.5" y="5.5" width="19" height="13" rx="2.2" />
+      <path d="M6 15V9l3 3 3-3v6M17 9v5M15 12l2 2 2-2" />
+    </svg>
+  );
+}
+
 /** 阅读清单（给人看的报告/文档） */
 export function IconReports({ size }: IconProps) {
   return (

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { IconGraph, IconAudit, IconLogs, IconInbox, IconReports, IconSettings } from "./icons.js";
+import { IconGraph, IconAudit, IconLogs, IconInbox, IconReports, IconMarkdown, IconSettings } from "./icons.js";
 import { useT } from "../i18n/index.js";
 
-export type RailKey = "canvas" | "audit" | "logs" | "inbox" | "reports" | "feishu" | "settings";
+export type RailKey = "canvas" | "audit" | "logs" | "inbox" | "reports" | "mdviewer" | "feishu" | "settings";
 
 interface Props {
   /** 画布是否展开（高亮"节点图"项） */
@@ -10,6 +10,8 @@ interface Props {
   /** 右侧面板当前标签 */
   tab: string;
   settingsOpen: boolean;
+  /** Markdown 查看器弹窗是否打开（高亮其入口） */
+  mdViewerOpen?: boolean;
   /** 知识收件箱待裁决数（徽标） */
   inboxBadge?: number;
   onAction: (key: RailKey) => void;
@@ -49,7 +51,7 @@ function RailButton({
  * 主视图=节点图(画布)；终端/转录已改为"左侧选会话 + 面板顶部切换"，不再占图标栏。
  * 这里只放全局面板：收件箱 / 审计 / 服务日志；底部：设置。
  */
-export function IconRail({ canvasOpen, tab, settingsOpen, inboxBadge, onAction }: Props) {
+export function IconRail({ canvasOpen, tab, settingsOpen, mdViewerOpen, inboxBadge, onAction }: Props) {
   const t = useT();
   return (
     <nav className="railbar">
@@ -74,6 +76,14 @@ export function IconRail({ canvasOpen, tab, settingsOpen, inboxBadge, onAction }
         <IconLogs />
       </RailButton>
       <div className="railbar-spacer" />
+      {/* Markdown 查看器：独立弹窗，看各会话项目目录里的 .md（渲染后） */}
+      <RailButton
+        title={t("Markdown 查看器 · 看各项目目录里的 .md（已渲染）")}
+        active={!!mdViewerOpen}
+        onClick={() => onAction("mdviewer")}
+      >
+        <IconMarkdown />
+      </RailButton>
       {/* 阅读清单：Claude 生成的、给人读的报告/文档（放在设置正上方，便于随手翻看） */}
       <RailButton
         title={t("阅读清单 · Claude 生成的报告/文档，点开即读")}

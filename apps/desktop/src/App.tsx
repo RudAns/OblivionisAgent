@@ -47,6 +47,7 @@ import { LogPanel, type LogLine } from "./panels/LogPanel.js";
 import { AuditPanel, type AuditItem } from "./panels/AuditPanel.js";
 import { InboxPanel } from "./panels/InboxPanel.js";
 import { ReportsPanel } from "./panels/ReportsPanel.js";
+import { MarkdownViewer } from "./panels/MarkdownViewer.js";
 import { FeishuPanel, FeishuStatusDot, type FeishuState } from "./panels/FeishuPanel.js";
 import { IconRail, type RailKey } from "./layout/IconRail.js";
 import { useI18n, useT, tStatic, type Lang } from "./i18n/index.js";
@@ -444,6 +445,7 @@ function Inner() {
     () => (document.documentElement.getAttribute("data-theme") as "dark" | "light") || "dark",
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mdViewerOpen, setMdViewerOpen] = useState(false);
   const [themeNotice, setThemeNotice] = useState(false); // 切主题后提示"已同步 Claude、需重开终端"
   // 完成任务桌面提示开关：只管「完成时弹不弹右下角小人」。任务栏流光是常驻能力，不归它管。
   const [completionAlert, setCompletionAlert] = useState<boolean>(() => {
@@ -1596,6 +1598,9 @@ function Inner() {
       case "settings":
         setSettingsOpen((o) => !o);
         break;
+      case "mdviewer":
+        setMdViewerOpen(true); // Markdown 查看器是独立弹窗，不占面板/不退节点视图
+        break;
       default:
         setTab(key);
         setCanvasCollapsed(true); // 切到终端/转录/审计/日志/收件箱面板 → 退出节点视图
@@ -1743,6 +1748,7 @@ function Inner() {
           canvasOpen={!canvasCollapsed}
           tab={tab}
           settingsOpen={settingsOpen}
+          mdViewerOpen={mdViewerOpen}
           inboxBadge={pendingKnowledge}
           onAction={onRailAction}
         />
@@ -2568,6 +2574,8 @@ function Inner() {
           </div>,
           document.body,
         )}
+
+      {mdViewerOpen && <MarkdownViewer nodes={nodes} onClose={() => setMdViewerOpen(false)} />}
     </div>
   );
 }

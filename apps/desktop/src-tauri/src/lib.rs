@@ -336,6 +336,98 @@ fn list_reports() -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({ "dir": dir.to_string_lossy().to_string(), "files": files }))
 }
 
+/// 阅读清单目录的绝对路径——供前端把它作为「公共目录」并进 Markdown 查看器的切换列表。
+#[tauri::command]
+fn reports_dir() -> String {
+    reports_dir_path().to_string_lossy().to_string()
+}
+
+// 递归扫 .md 时要跳过的重目录（Unity / 构建产物 / VCS 噪音）。按名小写匹配。
+// 注意：不黑名单所有点目录——`.claude` / `.oblivionis` 这类含文档，必须保留。
+fn md_skip_dir(name: &str) -> bool {
+    matches!(
+        name.to_lowercase().as_str(),
+        "library" | "temp" | "obj" | "bin" | "logs" | "build" | "builds"
+            | "node_modules" | ".git" | ".svn" | ".hg" | ".vs" | ".idea"
+            | ".gradle" | "target" | "dist" | "__pycache__" | ".next" | ".cache"
+    )
+}
+
+/// 递归列出某目录下所有 .md（跳过重目录、限深度/数量）——防 Unity 工程百万文件把界面拖死。
+#[tauri::command]
+fn list_md_files(dir: String) -> Result<serde_json::Value, String> {
+    let root = std::path::Path::new(&dir);
+    if !root.is_dir() {
+        return Ok(serde_json::json!({ "dir": dir, "files": [], "truncated": false, "exists": false }));
+    }
+    const MAX_FILES: usize = 4000;
+    const MAX_DEPTH: usize = 12;
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    let mut truncated = false;
+    let mut stack: Vec<(std::path::PathBuf, usize)> = vec![(root.to_path_buf(), 0)];
+    while let Some((d, depth)) = stack.pop() {
+        if out.len() >= MAX_FILES {
+            truncated = true;
+            break;
+        }
+        let rd = match std::fs::read_dir(&d) {
+            Ok(x) => x,
+            Err(_) => continue,
+        };
+        for entry in rd.flatten() {
+            let p = entry.path();
+            let fname = entry.file_name().to_string_lossy().to_string();
+            let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            if is_dir {
+                if depth + 1 <= MAX_DEPTH && !md_skip_dir(&fname) {
+                    stack.push((p, depth + 1));
+                }
+                continue;
+            }
+            let lower = fname.to_lowercase();
+            if !(lower.ends_with(".md") || lower.ends_with(".markdown")) {
+                continue;
+            }
+            if out.len() >= MAX_FILES {
+                truncated = true;
+                break;
+            }
+            let meta = entry.metadata().ok();
+            let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+            let modified_ms = meta
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|x| x.as_millis() as u64)
+                .unwrap_or(0);
+            let rel = p
+                .strip_prefix(root)
+                .unwrap_or(&p)
+                .to_string_lossy()
+                .replace('\\', "/");
+            out.push(serde_json::json!({
+                "name": fname, "path": p.to_string_lossy().to_string(),
+                "rel": rel, "size": size, "modifiedMs": modified_ms,
+            }));
+        }
+    }
+    out.sort_by(|a, b| {
+        a["rel"].as_str().unwrap_or("").to_lowercase().cmp(&b["rel"].as_str().unwrap_or("").to_lowercase())
+    });
+    Ok(serde_json::json!({ "dir": dir, "files": out, "truncated": truncated, "exists": true }))
+}
+
+/// 读 .md 文件内容（UTF-8，限大小，防误读巨型文件）。
+#[tauri::command]
+fn read_md(path: String) -> Result<String, String> {
+    let p = std::path::Path::new(&path);
+    let meta = std::fs::metadata(p).map_err(|e| e.to_string())?;
+    const MAX: u64 = 4 * 1024 * 1024;
+    if meta.len() > MAX {
+        return Err(format!("文件过大（{} KB），超过 {} KB 上限", meta.len() / 1024, MAX / 1024));
+    }
+    std::fs::read_to_string(p).map_err(|e| e.to_string())
+}
+
 // ── 飞书 App Secret：存进 Windows 凭据管理器，绝不明文落 config.json ─────────────
 const KEYRING_SERVICE: &str = "OblivionisAgent";
 const KEYRING_ACCOUNT: &str = "feishu-app-secret";
@@ -412,7 +504,8 @@ pub fn run() {
         .manage(PtyState::default())
         .invoke_handler(tauri::generate_handler![
             pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
-            set_feishu_secret, has_feishu_secret, list_reports
+            set_feishu_secret, has_feishu_secret, list_reports,
+            reports_dir, list_md_files, read_md
         ])
         .setup(|app| {
             if std::env::var("OBLIVIONIS_NO_SIDECAR").as_deref() != Ok("1") {

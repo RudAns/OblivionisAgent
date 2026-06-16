@@ -473,4 +473,21 @@ export const EN: Record<string, string> = {
   "打开文件夹": "Open folder",
   "点击打开：{0}": "Click to open: {0}",
   "读取失败：": "Failed to read: ",
+  // Markdown 查看器
+  "Markdown 查看器 · 看各项目目录里的 .md（已渲染）": "Markdown viewer · browse rendered .md across project dirs",
+  "Markdown 查看器": "Markdown viewer",
+  "查看各会话项目目录下的 Markdown 文档（已渲染）": "Browse rendered Markdown docs across each session's project directory",
+  "Markdown 查看器仅在桌面应用中可用（浏览器开发版不支持）。":
+    "The Markdown viewer is only available in the desktop app (not the browser dev build).",
+  "公共 · reports": "Shared · reports",
+  "切换目录": "Directories",
+  "没有可用的会话目录。": "No session directories available.",
+  "文档": "Documents",
+  "（文件过多，已截断）": " (too many files, truncated)",
+  "扫描中…": "Scanning…",
+  "此目录下没有 .md 文件。": "No .md files in this directory.",
+  "（根目录）": "(root)",
+  "← 左侧选一个目录和文件": "← Pick a directory and file on the left",
+  "用 VSCode 打开": "Open in VSCode",
+  "加载中…": "Loading…",
 };
