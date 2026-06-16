@@ -3,6 +3,7 @@ import type { ClaudeSessionNode } from "@oblivionis/shared";
 import { ClaudeSession } from "./claude-session.js";
 import { forkAndSanitize } from "./fork-prepare.js";
 import { collectSecrets } from "../secrets.js";
+import { feishuSecret } from "../secret-store.js";
 import type { ConfigStore } from "../config-store.js";
 import type { Hub } from "../hub.js";
 import type { Logger } from "../logger.js";
@@ -86,7 +87,7 @@ export class SessionManager {
       baseSessionId: node.data.baseSessionId,
       cwd,
       binPath: cfg.claude.binPath,
-      secrets: collectSecrets(cfg.feishu.appSecret),
+      secrets: collectSecrets(feishuSecret.get()),
       log: (lvl, m) => this.log[lvl](m),
     });
     this.persistSessionId(nodeId, forkId);

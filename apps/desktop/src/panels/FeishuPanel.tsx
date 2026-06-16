@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { OblivionisConfig, FeishuStatus, Owner } from "@oblivionis/shared";
 import type { BridgeClient } from "../bridge-client.js";
 import { useT } from "../i18n/index.js";
@@ -70,11 +71,22 @@ export function FeishuPanel({
     }
   }, [config?.feishu.appId, config?.feishu.domain]);
 
-  const hasSavedSecret = !!config?.feishu.appSecret;
+  // App Secret 现在存 OS 凭据管理器(经 Tauri)。这里只问"有没有存过"来决定输入框占位文案，
+  // 不把密钥本身拉到前端。
+  const [hasSavedSecret, setHasSavedSecret] = useState(false);
+  useEffect(() => {
+    invoke<boolean>("has_feishu_secret").then(setHasSavedSecret).catch(() => setHasSavedSecret(false));
+  }, [config?.feishu.appId]);
 
-  const saveConnect = () => {
-    const useSecret = secret || config?.feishu.appSecret || "";
-    client.send({ type: "feishu-set", appId: appId.trim(), appSecret: useSecret, domain });
+  const saveConnect = async () => {
+    const newSecret = secret.trim();
+    // 填了新密钥 → 写进凭据管理器；留空 → 不动凭据管理器(沿用)，让 bridge 用现有密钥重连。
+    if (newSecret) {
+      await invoke("set_feishu_secret", { value: newSecret }).catch(() => {});
+      setHasSavedSecret(true);
+    }
+    client.send({ type: "feishu-set", appId: appId.trim(), appSecret: newSecret, domain });
+    setSecret(""); // 清空输入框：密钥已落凭据管理器，不在前端留存
   };
 
   return (

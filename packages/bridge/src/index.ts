@@ -14,6 +14,7 @@ import { transcriptPath } from "./claude/session-path.js";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { collectSecrets, redactText } from "./secrets.js";
+import { feishuSecret } from "./secret-store.js";
 import { classifyIntent } from "./claude/classify-intent.js";
 import { TranscriptStore } from "./transcript-store.js";
 import { UsageMonitor } from "./usage-monitor.js";
@@ -99,6 +100,9 @@ async function main() {
   const hub = new Hub();
   const log = new Logger(hub);
   const store = new ConfigStore();
+  // 迁移兜底：env 里没有密钥(老外壳/手动起 bridge)但旧 config.json 还残留明文时，先用上它。
+  // 正常路径是 Tauri 外壳已从凭据管理器读出经 env 注入；store.save 之后会把盘上的明文清掉。
+  feishuSecret.seedIfEmpty(store.get().feishu.appSecret);
   const sessions = new SessionManager(store, hub, log);
   const ptys = new PtyManager(store, hub, log);
   // 转录持久化：旁路监听 Hub 上的 session-event，落盘 ~/.oblivionis/transcripts（保留约 3 天）
@@ -196,13 +200,13 @@ async function main() {
       await this.disconnect();
       const cfg = store.get();
       const forced = process.env.OBLIVIONIS_TRANSPORT; // "mock" | "lark"
-      const haveCreds = !!(cfg.feishu.appId && cfg.feishu.appSecret);
+      const haveCreds = !!(cfg.feishu.appId && feishuSecret.get());
       const useLark = forced === "lark" || (forced !== "mock" && haveCreds);
 
       if (useLark) {
         const t = new LarkTransport({
           appId: cfg.feishu.appId,
-          appSecret: cfg.feishu.appSecret,
+          appSecret: feishuSecret.get(),
           domain: cfg.feishu.domain,
           log: (lvl, m) => log[lvl](m),
           onStatus: (s, detail, bot) => this.setStatus(s, detail, bot),
@@ -241,9 +245,11 @@ async function main() {
     },
 
     async setFeishu(appId: string, appSecret: string, domain: "feishu" | "lark") {
+      // 密钥只更新内存(前端已写进 OS 凭据管理器)；空=保持现有密钥(前端"留空则沿用")。
+      // appId/domain 才落 config.json；appSecret 绝不写盘(store.save 也会再兜一道清空)。
+      if (appSecret) feishuSecret.set(appSecret);
       store.update((c) => {
         c.feishu.appId = appId;
-        c.feishu.appSecret = appSecret;
         c.feishu.domain = domain;
       });
       hub.broadcast({ type: "config", config: store.get() });
@@ -332,7 +338,7 @@ async function main() {
         template = "green";
         lines = [
           `${ok(connected)} 飞书连接${botName ? `（${botName}）` : ""}`,
-          `${ok(!!(c.feishu.appId && c.feishu.appSecret))} 凭据已配置`,
+          `${ok(!!(c.feishu.appId && feishuSecret.get()))} 凭据已配置`,
           `${ok(c.owners.length > 0)} 主人 ${c.owners.length} 人`,
           `${c.homeChatId ? "✅" : "⚠️"} Home Chat ${c.homeChatId ? "已设置" : "未设置"}`,
           `${ok(existsSync(cwd))} 工作目录存在`,
@@ -500,7 +506,7 @@ async function main() {
     const runId = inbound.messageId || `${inbound.chatId}:${Date.now()}`;
     hub.broadcast({ type: "session-active-path", runId, nodeId: node.id, edgeIds: resolved.pathEdgeIds });
     // 出站脱敏函数：访客每一帧都过一遍密钥过滤（流式也不破坏脱敏保证），主人原样
-    const secrets = collectSecrets(cfg.feishu.appSecret);
+    const secrets = collectSecrets(feishuSecret.get());
     const redact = (t: string) => (isOwner ? t : redactText(t, secrets));
     let stream: ReplyStreamHandle | null = null;
     try {
@@ -671,7 +677,7 @@ async function main() {
       });
     },
     deliver: async (chatId, text) => {
-      const safe = redactText(text, collectSecrets(store.get().feishu.appSecret));
+      const safe = redactText(text, collectSecrets(feishuSecret.get()));
       if (gateway.transport) {
         await gateway.transport.reply(chatId, safe);
         hub.broadcast({ type: "outbound", chatId, text: safe, ts: Date.now() });
@@ -695,7 +701,7 @@ async function main() {
     });
   };
   const deliverToChat = async (chatId: string, text: string) => {
-    const safe = redactText(text, collectSecrets(store.get().feishu.appSecret));
+    const safe = redactText(text, collectSecrets(feishuSecret.get()));
     if (gateway.transport) {
       await gateway.transport.reply(chatId, safe);
       hub.broadcast({ type: "outbound", chatId, text: safe, ts: Date.now() });

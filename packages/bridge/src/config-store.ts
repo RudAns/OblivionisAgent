@@ -44,6 +44,9 @@ export class ConfigStore {
 
   save(cfg: OblivionisConfig): OblivionisConfig {
     const parsed = OblivionisConfig.parse(cfg);
+    // 安全硬约束：App Secret 只存 OS 凭据管理器，绝不写盘（也不进内存 config / WS 广播）。
+    // 运行时真正用的密钥在 secret-store.ts（来自 Tauri 经 env 注入的凭据管理器值）。
+    parsed.feishu.appSecret = "";
     mkdirSync(dirname(this.path), { recursive: true });
     writeFileSync(this.path, JSON.stringify(parsed, null, 2), "utf8");
     this.current = parsed;

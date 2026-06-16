@@ -284,6 +284,63 @@ fn open_path(path: String, base: String) -> Result<(), String> {
     Ok(())
 }
 
+// ── 飞书 App Secret：存进 Windows 凭据管理器，绝不明文落 config.json ─────────────
+const KEYRING_SERVICE: &str = "OblivionisAgent";
+const KEYRING_ACCOUNT: &str = "feishu-app-secret";
+
+fn secret_entry() -> Result<keyring::Entry, String> {
+    keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT).map_err(|e| e.to_string())
+}
+
+/// 从凭据管理器读密钥；不存在/为空返回 None
+fn read_feishu_secret() -> Option<String> {
+    match secret_entry().ok()?.get_password() {
+        Ok(s) if !s.is_empty() => Some(s),
+        _ => None,
+    }
+}
+
+/// 前端「保存并连接」时调用：把 App Secret 写进凭据管理器（留空=清除）。
+#[tauri::command]
+fn set_feishu_secret(value: String) -> Result<(), String> {
+    let entry = secret_entry()?;
+    if value.is_empty() {
+        let _ = entry.delete_credential();
+        return Ok(());
+    }
+    entry.set_password(&value).map_err(|e| e.to_string())
+}
+
+/// 前端用来决定 Secret 输入框 placeholder（「已保存（留空则沿用）」）——不把密钥本身拉到前端。
+#[tauri::command]
+fn has_feishu_secret() -> bool {
+    read_feishu_secret().is_some()
+}
+
+/// 一次性迁移：旧 config.json 里若有明文 appSecret → 存进凭据管理器 + 把文件里那行清空。
+/// 返回迁移到的密钥（供本次启动用）。仅在凭据管理器还没有密钥时才会走到这里。
+fn migrate_plaintext_secret(cfg_path: &str) -> Option<String> {
+    let raw = std::fs::read_to_string(cfg_path).ok()?;
+    let mut json: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let secret = json.get("feishu")?.get("appSecret")?.as_str()?.to_string();
+    if secret.is_empty() {
+        return None;
+    }
+    secret_entry().ok()?.set_password(&secret).ok()?;
+    if let Some(s) = json.get_mut("feishu").and_then(|f| f.get_mut("appSecret")) {
+        *s = serde_json::Value::String(String::new());
+    }
+    if let Ok(pretty) = serde_json::to_string_pretty(&json) {
+        let _ = std::fs::write(cfg_path, pretty);
+    }
+    Some(secret)
+}
+
+/// 本次启动要交给 bridge 的飞书密钥：凭据管理器优先；没有则尝试从旧 config.json 迁移。
+fn feishu_secret_for_bridge(cfg_path: Option<&str>) -> Option<String> {
+    read_feishu_secret().or_else(|| cfg_path.and_then(migrate_plaintext_secret))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -302,7 +359,8 @@ pub fn run() {
         .manage(BridgeProc::default())
         .manage(PtyState::default())
         .invoke_handler(tauri::generate_handler![
-            pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path
+            pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
+            set_feishu_secret, has_feishu_secret
         ])
         .setup(|app| {
             if std::env::var("OBLIVIONIS_NO_SIDECAR").as_deref() != Ok("1") {
@@ -341,8 +399,13 @@ fn spawn_bridge(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>
         .map(|h| format!("{h}\\.oblivionis\\config.json"));
 
     let mut cmd = app.shell().sidecar("oblivionis-bridge")?;
-    if let Some(path) = cfg {
+    if let Some(path) = &cfg {
         cmd = cmd.env("OBLIVIONIS_CONFIG", path);
+    }
+    // 飞书 App Secret：从 Windows 凭据管理器读出（或首次从旧 config.json 迁移），经 env 交给 bridge。
+    // 这样密钥既不明文落 config.json，也不经 WS 广播；bridge 仅在内存里用。
+    if let Some(secret) = feishu_secret_for_bridge(cfg.as_deref()) {
+        cmd = cmd.env("OBLIVIONIS_FEISHU_SECRET", secret);
     }
     let (mut rx, child) = cmd.spawn()?;
     app.state::<BridgeProc>().0.lock().unwrap().replace(child);
