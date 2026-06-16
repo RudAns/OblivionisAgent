@@ -106,7 +106,7 @@ fn main() {
     cmd.arg("/c");
     cmd.arg("claude");
     for (k, v) in std::env::vars() { cmd.env(k, v); }
-    cmd.cwd("C:/Users/user/Desktop/OblivionisAgent");
+    cmd.cwd(".");
     let mut child = pair.slave.spawn_command(cmd).unwrap();
     drop(pair.slave);
 

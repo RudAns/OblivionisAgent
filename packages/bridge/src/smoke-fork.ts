@@ -5,7 +5,7 @@ import { transcriptPath } from "./claude/session-path.js";
 /** 验证 fork 脱敏：fork 出来的会话抹掉密钥，base 原文不动 */
 async function main() {
   const base = "00000000-0000-0000-0000-000000000000"; // 含暗号「REDACT-ME-TEST-SECRET」
-  const cwd = "C:/Users/user/Desktop/OblivionisAgent";
+  const cwd = process.cwd();
   const secret = "REDACT-ME-TEST-SECRET";
 
   const forkId = await forkAndSanitize({

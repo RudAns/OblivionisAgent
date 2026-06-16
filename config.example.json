@@ -32,7 +32,7 @@
         "position": { "x": 600, "y": 140 },
         "label": "演示会话",
         "data": {
-          "cwd": "C:/Users/user/Desktop/OblivionisAgent",
+          "cwd": "C:/path/to/your/project",
           "permissionMode": "default",
           "includePartialMessages": true,
           "extraArgs": []
