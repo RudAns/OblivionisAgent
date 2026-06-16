@@ -537,6 +537,15 @@ button.primary {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 标题旁的功能说明：更淡更细，不抢标题；和标题同一行 */
+.pt-desc {
+  margin-left: 9px;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0;
+  color: var(--muted);
+  opacity: 0.72;
+}
 .panel-subtabs {
   display: inline-flex;
   gap: 3px;

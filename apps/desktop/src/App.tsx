@@ -324,6 +324,8 @@ function Inner() {
   // 剪贴板里是否有内容（驱动右键菜单的「粘贴」是否出现）
   const [hasClipboard, setHasClipboard] = useState(false);
   const [tab, setTab] = useState<Tab>("transcript");
+  // 会话视图"粘滞"：记住上次在看会话的哪种视图(终端/转录)，切会话时沿用、不强制跳终端
+  const [lastSessionView, setLastSessionView] = useState<"terminal" | "transcript">("terminal");
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [inbox, setInbox] = useState<AuditItem[]>([]);
   const [feishu, setFeishu] = useState<FeishuState>({ status: "disconnected" });
@@ -1178,6 +1180,7 @@ function Inner() {
     setActiveTerminal(nodeId);
     setOpenedTerminals((o) => (o.includes(nodeId) ? o : [...o, nodeId]));
     setTab("terminal");
+    setLastSessionView("terminal"); // 打开终端=选了"终端"这种会话视图 → 之后切会话沿用它(粘滞)
     setCanvasCollapsed(true); // 打开终端 → 退出节点视图，终端占满
   }, []);
 
@@ -1677,6 +1680,24 @@ function Inner() {
     logs: "服务日志",
     inbox: `知识收件箱${pendingKnowledge ? ` · ${pendingKnowledge} 条待裁决` : ""}`,
   };
+  // 标题旁的一句功能说明（让"这个界面是干嘛的"一目了然）
+  const TAB_DESC: Partial<Record<Tab, string>> = {
+    audit: "谁(主人/访客)问了什么、命中哪个会话——只读留痕，不可改",
+    inbox: "群聊里沉淀出的规则 / 人格修订候选，等你采纳或忽略",
+    logs: "引擎 / 服务运行日志，排障时看",
+  };
+  // 终端⇄转录是"同一个会话的两种视图"：粘滞切换，保持当前在看的会话
+  const viewedSessionId = tab === "terminal" ? activeTerminalId : selectedIsClaude ? selected : null;
+  const showTerminalView = () => {
+    setLastSessionView("terminal");
+    if (viewedSessionId) openTerminalForNode(viewedSessionId);
+    else setTab("terminal");
+  };
+  const showTranscriptView = () => {
+    setLastSessionView("transcript");
+    if (viewedSessionId) setSelected(viewedSessionId);
+    setTab("transcript");
+  };
 
   return (
     <div className="app">
@@ -1754,16 +1775,18 @@ function Inner() {
               return arr;
             })
           }
-          onSelect={(id) => {
-            setSelected(id);
-            setTab("transcript");
-          }}
           onOpenTerminal={(id) => {
             if (!canvasCollapsed) {
               // 节点视图下点会话 → 定位到该节点(选中+居中)，会话多时方便找位置，不切去终端
               locateNode(id);
+              return;
+            }
+            // 面板视图：选中该会话，按"上次的会话视图"显示(粘滞)，不再强制跳终端
+            setSelected(id);
+            if (lastSessionView === "transcript") {
+              setTab("transcript");
             } else {
-              openTerminalForNode(id);
+              openTerminalForNode(id); // 终端视图：打开/聚焦它的终端
             }
           }}
           onAddSession={() => addNode("claude-session")}
@@ -2182,32 +2205,40 @@ function Inner() {
 
         {/* 画布展开时隐藏面板(但保持挂载，终端不掉)；收起时面板占满 */}
         <aside className="side" style={canvasCollapsed ? { flex: 1, minWidth: 0 } : { display: "none" }}>
-          {/* 终端有自己的页签条+信息栏，这里的顶部标题就会重复，故终端视图下不显示 */}
-          {tab !== "terminal" &&
-            (tab === "transcript" || tab === "logs" ? (
-              // 会话转录 / 服务日志坍缩成一个面板：标题 + 顶部小页签切换（常态看转录，少切日志）
-              <div className="panel-title panel-title-tabs">
-                <span className="pt-label">{TAB_TITLE[tab]}</span>
-                <span className="panel-subtabs">
-                  <button
-                    className={`subtab ${tab === "transcript" ? "on" : ""}`}
-                    title="某个会话的飞书回复转录（左侧选会话）"
-                    onClick={() => setTab("transcript")}
-                  >
-                    📝 会话转录
-                  </button>
-                  <button
-                    className={`subtab ${tab === "logs" ? "on" : ""}`}
-                    title="引擎 / 服务运行日志（排障时看）"
-                    onClick={() => setTab("logs")}
-                  >
-                    🛠 服务日志
-                  </button>
-                </span>
-              </div>
-            ) : (
-              <div className="panel-title">{TAB_TITLE[tab]}</div>
-            ))}
+          {/* 终端 / 转录是同一个会话的两种视图 → 面板顶部小页签切换（左侧选会话只换"哪个会话"，视图粘滞）。
+              其余(审计/日志/收件箱)是全局面板，标题旁直接写一句功能说明。 */}
+          {(tab === "terminal" || tab === "transcript") ? (
+            <div className="panel-title panel-title-tabs">
+              <span className="pt-label">
+                {tab === "terminal"
+                  ? activeTermLabel
+                    ? `终端 · ${activeTermLabel}`
+                    : "终端 · 开发会话"
+                  : TAB_TITLE.transcript}
+              </span>
+              <span className="panel-subtabs">
+                <button
+                  className={`subtab ${tab === "terminal" ? "on" : ""}`}
+                  title="这个会话的开发终端（软件里的本地 Claude 会话）"
+                  onClick={showTerminalView}
+                >
+                  🖥 终端
+                </button>
+                <button
+                  className={`subtab ${tab === "transcript" ? "on" : ""}`}
+                  title="这个会话的飞书脱敏分身回复转录"
+                  onClick={showTranscriptView}
+                >
+                  📝 转录
+                </button>
+              </span>
+            </div>
+          ) : (
+            <div className="panel-title">
+              <span className="pt-label">{TAB_TITLE[tab]}</span>
+              {TAB_DESC[tab] && <span className="pt-desc">{TAB_DESC[tab]}</span>}
+            </div>
+          )}
 
           <div className="panel">
             {tab === "transcript" && (

@@ -13,17 +13,16 @@ interface Props {
   unseenDone: Record<string, boolean>;
   /** 拖动会话卡片改变顺序：把 dragId 移到 dropId 之前(after=false)/之后(after=true) */
   onReorder?: (dragId: string, dropId: string, after: boolean) => void;
-  onSelect: (nodeId: string) => void;
   onOpenTerminal: (nodeId: string) => void;
   onAddSession: () => void;
 }
 
 /**
  * 会话侧栏（常驻）：所有 Claude 会话节点的卡片列表。
- * 交互模型：卡片决定「哪个会话」，左侧图标栏决定「看哪个视图」。
- * - 单击卡片 = 打开/聚焦该会话的开发终端（主操作；终端保活，再点只聚焦不重开）。
- * - 访客转录是少用功能 → 降级成卡片上的 💬 小按钮（或图标栏的「转录」）。
- * 画布收起时这里是会话的唯一入口。
+ * 交互模型：卡片只决定「哪个会话」；「终端 / 转录」是同一会话的两种视图，靠面板顶部小页签切换。
+ * - 单击卡片 = 选中该会话，右侧按"当前视图类型"显示它（视图粘滞：在看终端就显示它的终端、
+ *   在看转录就显示它的转录），不再强制跳终端。终端保活，再点只聚焦不重开。
+ * - 画布(节点视图)下单击 = 定位到该节点（选中+居中），不切去面板。
  */
 export function SessionSidebar({
   claudeNodes,
@@ -91,7 +90,7 @@ export function SessionSidebar({
               className={`rail-card ${activeTerminalId === n.id ? "active" : ""} ${
                 selected === n.id && activeTerminalId !== n.id ? "sel" : ""
               } ${sweep} ${dragId === n.id ? "dragging" : ""} ${dropClass(n.id)}`}
-              title={`${d.cwd || ""}\n单击=打开/聚焦开发终端 · 拖动可排序`}
+              title={`${d.cwd || ""}\n单击=查看此会话(保持当前 终端/转录 视图) · 拖动可排序`}
               {...itemProps(n.id, () => onOpenTerminal(n.id))}
             >
               <div className="rail-card-top">
