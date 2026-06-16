@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Node } from "@xyflow/react";
 import { usePointerReorder } from "../usePointerReorder.js";
+import { useT } from "../i18n/index.js";
 
 interface Props {
   claudeNodes: Node[];
@@ -35,6 +36,7 @@ export function SessionSidebar({
   onOpenTerminal,
   onAddSession,
 }: Props) {
+  const t = useT();
   // 会话卡片拖拽排序（指针拖拽；纵向，插入横线）
   const { dragId, dropClass, itemProps } = usePointerReorder(onReorder, "vertical");
   // 会话多时才露出搜索框：按名称/工作区过滤，找会话不用一路滚
@@ -51,8 +53,8 @@ export function SessionSidebar({
   return (
     <div className="rail">
       <div className="rail-head">
-        <span className="rail-title">会话 · {claudeNodes.length}</span>
-        <button className="rail-toggle" title="新建 Claude 会话节点" onClick={onAddSession}>
+        <span className="rail-title">{t("会话 · {0}", claudeNodes.length)}</span>
+        <button className="rail-toggle" title={t("新建 Claude 会话节点")} onClick={onAddSession}>
           +
         </button>
       </div>
@@ -61,20 +63,20 @@ export function SessionSidebar({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="搜索会话 / 工作区…"
+            placeholder={t("搜索会话 / 工作区…")}
             spellCheck={false}
           />
           {q && (
-            <button className="rail-search-x" title="清除" onClick={() => setQ("")}>
+            <button className="rail-search-x" title={t("清除")} onClick={() => setQ("")}>
               ×
             </button>
           )}
         </div>
       )}
       <div className="rail-list">
-        {claudeNodes.length === 0 && <div className="rail-empty">还没有 Claude 会话节点</div>}
+        {claudeNodes.length === 0 && <div className="rail-empty">{t("还没有 Claude 会话节点")}</div>}
         {claudeNodes.length > 0 && shown.length === 0 && (
-          <div className="rail-empty">没有匹配「{q}」的会话</div>
+          <div className="rail-empty">{t("没有匹配「{0}」的会话", q)}</div>
         )}
         {shown.map((n) => {
           const d = n.data as { label?: string; cwd?: string; status?: string };
@@ -90,14 +92,14 @@ export function SessionSidebar({
               className={`rail-card ${activeTerminalId === n.id ? "active" : ""} ${
                 selected === n.id && activeTerminalId !== n.id ? "sel" : ""
               } ${sweep} ${dragId === n.id ? "dragging" : ""} ${dropClass(n.id)}`}
-              title={`${d.cwd || ""}\n单击=查看此会话(保持当前 终端/转录 视图) · 拖动可排序`}
+              title={`${d.cwd || ""}\n${t("单击=查看此会话(保持当前 终端/转录 视图) · 拖动可排序")}`}
               {...itemProps(n.id, () => onOpenTerminal(n.id))}
             >
               <div className="rail-card-top">
                 <span className={`rail-dot status-${d.status ?? "idle"}`} />
-                <span className="rail-label">{d.label || "会话"}</span>
+                <span className="rail-label">{d.label || t("会话")}</span>
                 {done && (
-                  <span className="rail-flag" title="终端任务已完成，还没查看">
+                  <span className="rail-flag" title={t("终端任务已完成，还没查看")}>
                     <svg width="11" height="13" viewBox="0 0 12 14" fill="none">
                       <path d="M2.6 1 V13.2" stroke="#ff5a4d" strokeWidth="1.5" strokeLinecap="round" />
                       <path d="M2.6 1.7 H10.2 L7.9 4 L10.2 6.3 H2.6 Z" fill="#ff5a4d" />
@@ -105,7 +107,7 @@ export function SessionSidebar({
                   </span>
                 )}
                 {open && (
-                  <span className="rail-open" title="终端已打开">
+                  <span className="rail-open" title={t("终端已打开")}>
                     <svg
                       width="13"
                       height="13"

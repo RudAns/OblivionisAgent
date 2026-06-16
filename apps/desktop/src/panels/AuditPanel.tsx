@@ -1,3 +1,5 @@
+import { useT } from "../i18n/index.js";
+
 export interface AuditItem {
   chatId: string;
   senderId: string;
@@ -18,12 +20,13 @@ interface Props {
  * durable 记录由引擎落盘在 ~/.oblivionis/audit.jsonl。
  */
 export function AuditPanel({ items, owners, groupName }: Props) {
+  const t = useT();
   if (items.length === 0)
     return (
       <div className="panel-empty">
-        暂无 @消息记录。
+        {t("暂无 @消息记录。")}
         <br />
-        持久记录在 <code>~/.oblivionis/audit.jsonl</code>
+        {t("持久记录在 ")}<code>~/.oblivionis/audit.jsonl</code>
       </div>
     );
 
@@ -49,7 +52,7 @@ export function AuditPanel({ items, owners, groupName }: Props) {
               <div key={i} className="audit-row">
                 <span className="audit-ts">{new Date(it.ts).toLocaleString()}</span>
                 <span className={ownerSet.has(it.senderId) ? "badge-owner" : "badge-guest"}>
-                  {ownerSet.has(it.senderId) ? "主人" : "访客"}
+                  {ownerSet.has(it.senderId) ? t("主人") : t("访客")}
                 </span>
                 <span className="audit-sender" title={it.senderId}>
                   {it.sender}

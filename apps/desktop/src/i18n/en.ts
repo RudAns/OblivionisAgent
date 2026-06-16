@@ -307,4 +307,88 @@ export const EN: Record<string, string> = {
   "群聊里沉淀出的规则 / 人格修订候选，等你采纳或忽略":
     "Rule / persona-revision candidates distilled from chats, awaiting your accept or ignore",
   "引擎 / 服务运行日志，排障时看": "Engine / service logs — for troubleshooting",
+
+  // ── 会话侧栏 SessionSidebar ────────────────────────
+  "会话 · {0}": "Sessions · {0}",
+  "新建 Claude 会话节点": "New Claude session node",
+  "搜索会话 / 工作区…": "Search sessions / workspace…",
+  "清除": "Clear",
+  "还没有 Claude 会话节点": "No Claude session nodes yet",
+  "没有匹配「{0}」的会话": "No sessions match “{0}”",
+  "单击=查看此会话(保持当前 终端/转录 视图) · 拖动可排序":
+    "Click = view this session (keeps the current terminal/transcript view) · drag to reorder",
+  "会话": "Session",
+  "终端任务已完成，还没查看": "Terminal task finished, not viewed yet",
+  "终端已打开": "Terminal open",
+
+  // ── 知识收件箱 InboxPanel ──────────────────────────
+  "暂无待裁决的知识。": "No knowledge awaiting your decision.",
+  "群聊问答中出现“规则性指令”（如“以后打包前先跑 lint”）时，会自动提取到这里等你裁决；采纳后写入项目的 CLAUDE.md，主会话与访客分身都会遵守。":
+    "When a “rule-like instruction” shows up in chat (e.g. “always run lint before packaging”), it's auto-extracted here for your decision; once accepted it's written to the project's CLAUDE.md, which both the main session and guest forks follow.",
+  "待裁决 · {0}": "Pending · {0}",
+  "已处理": "Processed",
+  "🎭 人格演化提案 · {0}": "🎭 Persona evolution proposal · {0}",
+  "修订后的完整 SOUL.md，可直接编辑后采纳": "The full revised SOUL.md — edit it then accept",
+  "可直接编辑后再采纳": "Edit then accept",
+  "源于提问：{0}": "From question: {0}",
+  "覆写该会话的 SOUL.md（下条消息生效）": "Overwrite this session's SOUL.md (effective next message)",
+  "写入 {0}\\CLAUDE.md 的「群聊沉淀规则」小节": "Write to the 'distilled chat rules' section of {0}\\CLAUDE.md",
+  "✅ 采纳 → 更新人格": "✅ Accept → update persona",
+  "✅ 采纳 → CLAUDE.md": "✅ Accept → CLAUDE.md",
+  "抛弃": "Discard",
+
+  // ── 审计 AuditPanel ────────────────────────────────
+  "暂无 @消息记录。": "No @messages logged yet.",
+  "持久记录在 ": "Persisted at ",
+  "主人": "Owner",
+  "访客": "Guest",
+
+  // ── 转录 TranscriptPanel ───────────────────────────
+  "从左侧会话列表选择一个会话，查看访客提问的处理过程":
+    "Pick a session from the list on the left to see how guest questions are handled",
+  "该会话暂无访客活动。群里 @机器人 提问、或在节点编辑里发测试消息后，这里会实时显示处理过程（记录保留约 3 天）。":
+    "No guest activity for this session yet. After @bot in a group or sending a test message in the node editor, the processing shows here live (kept ~3 days).",
+  "🔎 搜索这个会话的历史…（保留约 3 天）": "🔎 Search this session's history… (kept ~3 days)",
+  "没有匹配的内容": "No matching content",
+  "初始化": "Init",
+  "↪️ 工具结果": "↪️ Tool result",
+  "完成": "Done",
+  "{0} 轮": "{0} turns",
+
+  // ── 飞书连接面板 FeishuPanel ───────────────────────
+  "未连接": "Disconnected",
+  "连接中…": "Connecting…",
+  "已连接": "Connected",
+  "连接出错": "Connection error",
+  "Mock(本地调试)": "Mock (local debug)",
+  "· 机器人：{0}": "· Bot: {0}",
+  "域": "Domain",
+  "已保存（留空则沿用）": "Saved (leave blank to keep)",
+  "应用 Secret": "App Secret",
+  "feishu（飞书/国内）": "feishu (Feishu / China)",
+  "lark（海外）": "lark (overseas)",
+  "保存并连接": "Save & connect",
+  "重连": "Reconnect",
+  "断开": "Disconnect",
+  "主人（@机器人时可改代码；其余人只读咨询）":
+    "Owners (can change code when they @bot; everyone else gets read-only Q&A)",
+  "尚未设置主人——目前所有人 @ 都只读咨询（fail-closed）。":
+    "No owner set yet — for now everyone who @s gets read-only Q&A (fail-closed).",
+  "姓名(可填)": "Name (optional)",
+  "移除": "Remove",
+  "添加": "Add",
+  "手机号": "Mobile",
+  "或邮箱": "or email",
+  "查 open_id": "Look up open_id",
+  "查询失败：{0}（需通讯录权限 contact:user.id:readonly）":
+    "Lookup failed: {0} (needs the contact:user.id:readonly scope)",
+  "设为主人": "Set as owner",
+  "主人只能在本机刻意设置（飞书里的人无法自助成为主人）。手机号/邮箱查询用于直接查到你自己的 open_id；日志里也会显示发送者 open_id 作参考。":
+    "Owners can only be set deliberately on this machine (no one in Feishu can make themselves an owner). The mobile/email lookup is for finding your own open_id; the logs also show each sender's open_id for reference.",
+  "Home Chat（运维群：定时任务结果/服务通知默认发这里）":
+    "Home Chat (ops group: cron results / service notices go here by default)",
+  "chatId (oc_...)，可从画布上的群节点复制": "chatId (oc_...), copy it from a group node on the canvas",
+  "保存": "Save",
+  "飞书后台需开通以下权限：im:message、im:message:send_as_bot、im:chat、im:resource；事件订阅选「长连接」并订阅 im.message.receive_v1。":
+    "In the Feishu console, grant: im:message, im:message:send_as_bot, im:chat, im:resource; for event subscription choose 'long connection' and subscribe to im.message.receive_v1.",
 };

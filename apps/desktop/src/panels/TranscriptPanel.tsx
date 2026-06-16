@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClaudeStreamEvent } from "@oblivionis/shared";
 import { assistantText, isAssistant, isInit, isResult } from "@oblivionis/shared";
+import { useT } from "../i18n/index.js";
 
 interface Props {
   nodeId: string | null;
@@ -17,6 +18,7 @@ function eventText(e: ClaudeStreamEvent): string {
 
 /** 解析 stream-json，把一个会话节点的运行过程渲染成可读转录（支持关键词过滤） */
 export function TranscriptPanel({ nodeId, events }: Props) {
+  const t = useT();
   const endRef = useRef<HTMLDivElement>(null);
   const [filter, setFilter] = useState("");
 
@@ -31,16 +33,16 @@ export function TranscriptPanel({ nodeId, events }: Props) {
     if (!filter) endRef.current?.scrollIntoView({ block: "end" });
   }, [nodeId, events.length, filter]);
 
-  if (!nodeId) return <div className="panel-empty">从左侧会话列表选择一个会话，查看访客提问的处理过程</div>;
+  if (!nodeId) return <div className="panel-empty">{t("从左侧会话列表选择一个会话，查看访客提问的处理过程")}</div>;
   if (events.length === 0)
-    return <div className="panel-empty">该会话暂无访客活动。群里 @机器人 提问、或在节点编辑里发测试消息后，这里会实时显示处理过程（记录保留约 3 天）。</div>;
+    return <div className="panel-empty">{t("该会话暂无访客活动。群里 @机器人 提问、或在节点编辑里发测试消息后，这里会实时显示处理过程（记录保留约 3 天）。")}</div>;
 
   return (
     <div className="transcript-wrap">
       <div className="transcript-search">
         <input
           value={filter}
-          placeholder="🔎 搜索这个会话的历史…（保留约 3 天）"
+          placeholder={t("🔎 搜索这个会话的历史…（保留约 3 天）")}
           onChange={(e) => setFilter(e.target.value)}
         />
         {filter && (
@@ -50,7 +52,7 @@ export function TranscriptPanel({ nodeId, events }: Props) {
         )}
       </div>
       <div className="transcript">
-        {filter && filtered.length === 0 && <div className="panel-empty">没有匹配的内容</div>}
+        {filter && filtered.length === 0 && <div className="panel-empty">{t("没有匹配的内容")}</div>}
         {filtered.map((e, i) => (
           <EventRow key={i} e={e} highlight={filter} />
         ))}
@@ -82,10 +84,11 @@ function mark(text: string, q: string) {
 }
 
 function EventRow({ e, highlight }: { e: ClaudeStreamEvent; highlight: string }) {
+  const t = useT();
   if (isInit(e)) {
     return (
       <div className="evt evt-init">
-        ⚙️ 初始化 · model={e.model} · auth={e.apiKeySource} · cwd={e.cwd}
+        ⚙️ {t("初始化")} · model={e.model} · auth={e.apiKeySource} · cwd={e.cwd}
       </div>
     );
   }
@@ -102,12 +105,12 @@ function EventRow({ e, highlight }: { e: ClaudeStreamEvent; highlight: string })
     );
   }
   if (e.type === "user") {
-    return <div className="evt evt-tool-result">↪️ 工具结果</div>;
+    return <div className="evt evt-tool-result">{t("↪️ 工具结果")}</div>;
   }
   if (isResult(e)) {
     return (
       <div className={`evt evt-result ${e.is_error ? "err" : ""}`}>
-        ✅ 完成 · {e.subtype} · ${e.total_cost_usd?.toFixed(4)} · {e.num_turns} 轮
+        ✅ {t("完成")} · {e.subtype} · ${e.total_cost_usd?.toFixed(4)} · {t("{0} 轮", e.num_turns ?? 0)}
       </div>
     );
   }
