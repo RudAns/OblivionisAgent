@@ -56,24 +56,38 @@ export function ConditionEdge({
   const active = hovered || selected;
   // 只在有意图条件时显示标签(不再有重复的"＋意图"占位；加条件走右键菜单)
   const showBadge = !!cond;
+  // 赋能类连线(人格/技能/子代理 → 会话)：不是消息"流动"，而是给会话"挂能力"。
+  // → 用虚线 + 按节点类型上色(人格紫/技能青/子代理粉) + 不带箭头，和实线的消息流一眼区分。
+  const isCapability =
+    d?.sourceKind === "soul" || d?.sourceKind === "skill" || d?.sourceKind === "subagent";
+  const capColor =
+    d?.sourceKind === "skill" ? "#3a8fa0" : d?.sourceKind === "subagent" ? "#c0517a" : "#8167b2";
   // 静息色用 CSS 变量：随 data-theme 在绘制时解析(浅色更深)，不依赖 React 重渲染时机
   const baseStyle = { ...style, stroke: "var(--edge-rest)", ...(dimmed ? { opacity: 0.22 } : null) };
-  // 优先级：群消息流动(橙色虚线动画，最显眼) > hover/选中(蓝) > 静息
-  const mergedStyle = flowing
-    ? { ...baseStyle, stroke: "#d96745", strokeWidth: 2.4, opacity: 1 } // 运行中：品牌橙，配 .edge-flow 虚线流动
-    : active
-      ? { ...baseStyle, stroke: "#4e6f9e", strokeWidth: 2.2, opacity: 1 } // 选中/hover：美术稿选中连线色
-      : baseStyle;
+  // 优先级：赋能虚线 > 群消息流动(橙色虚线动画) > hover/选中(蓝) > 静息
+  const mergedStyle = isCapability
+    ? {
+        ...style,
+        stroke: capColor,
+        strokeWidth: active ? 2 : 1.5,
+        strokeDasharray: "5 4",
+        opacity: dimmed ? 0.22 : active ? 1 : 0.82,
+      }
+    : flowing
+      ? { ...baseStyle, stroke: "#d96745", strokeWidth: 2.4, opacity: 1 } // 运行中：品牌橙，配 .edge-flow 虚线流动
+      : active
+        ? { ...baseStyle, stroke: "#4e6f9e", strokeWidth: 2.2, opacity: 1 } // 选中/hover：美术稿选中连线色
+        : baseStyle;
 
   return (
     <>
       <BaseEdge
         id={id}
         path={path}
-        markerEnd={markerEnd}
+        markerEnd={isCapability ? undefined : markerEnd}
         style={mergedStyle}
         interactionWidth={0}
-        className={flowing ? "edge-flow" : undefined}
+        className={flowing && !isCapability ? "edge-flow" : undefined}
       />
       {/* 透明加宽路径：扩大 hover/点击命中区 */}
       <path
