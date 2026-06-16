@@ -48,7 +48,7 @@ import { AuditPanel, type AuditItem } from "./panels/AuditPanel.js";
 import { InboxPanel } from "./panels/InboxPanel.js";
 import { FeishuPanel, FeishuStatusDot, type FeishuState } from "./panels/FeishuPanel.js";
 import { IconRail, type RailKey } from "./layout/IconRail.js";
-import { useI18n, useT, type Lang } from "./i18n/index.js";
+import { useI18n, useT, tStatic, type Lang } from "./i18n/index.js";
 import { IconMoon, IconSun, IconMonitor } from "./layout/icons.js";
 import { SessionSidebar } from "./layout/SessionSidebar.js";
 import { StatusBar } from "./layout/StatusBar.js";
@@ -117,6 +117,7 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
 
 // 自绘窗口控件（最小化/最大化/关闭）——无边框窗口(decorations:false)用，融进顶栏
 function WindowControls() {
+  const t = useT();
   const act = (fn: "minimize" | "toggleMaximize" | "close") => {
     try {
       void getCurrentWindow()[fn]();
@@ -126,17 +127,17 @@ function WindowControls() {
   };
   return (
     <div className="win-ctrls">
-      <button className="win-btn" title="最小化" onClick={() => act("minimize")}>
+      <button className="win-btn" title={t("最小化")} onClick={() => act("minimize")}>
         <svg width="11" height="11" viewBox="0 0 16 16">
           <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
         </svg>
       </button>
-      <button className="win-btn" title="最大化 / 还原" onClick={() => act("toggleMaximize")}>
+      <button className="win-btn" title={t("最大化 / 还原")} onClick={() => act("toggleMaximize")}>
         <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
           <rect x="3.5" y="3.5" width="9" height="9" rx="1" stroke="currentColor" strokeWidth="1.3" />
         </svg>
       </button>
-      <button className="win-btn win-close" title="关闭" onClick={() => act("close")}>
+      <button className="win-btn win-close" title={t("关闭")} onClick={() => act("close")}>
         <svg width="11" height="11" viewBox="0 0 16 16">
           <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
         </svg>
@@ -586,14 +587,14 @@ function Inner() {
         case "route-test-result": {
           // C3 干跑结果：高亮命中链路 + 选中命中会话 + 文案；6 秒后熄灭高亮
           if (msg.error) {
-            setRtResult(`⚠️ 出错：${msg.error}`);
+            setRtResult(tStatic("⚠️ 出错：{0}", msg.error));
           } else if (!msg.matched) {
-            setRtResult("❌ 无匹配链路（检查群是否建了节点、是否需要 @、意图边是否覆盖）");
+            setRtResult(tStatic("❌ 无匹配链路（检查群是否建了节点、是否需要 @、意图边是否覆盖）"));
             setTestPath([]);
           } else {
             setRtResult(
-              `✅ 命中会话「${msg.nodeLabel ?? msg.nodeId}」 · 走过 ${msg.pathEdgeIds.length} 条连线` +
-                (msg.finalText ? `\n→ 发给 Claude：${msg.finalText.slice(0, 100)}${msg.finalText.length > 100 ? "…" : ""}` : ""),
+              tStatic("✅ 命中会话「{0}」 · 走过 {1} 条连线", msg.nodeLabel ?? msg.nodeId ?? "", msg.pathEdgeIds.length) +
+                (msg.finalText ? "\n" + tStatic("→ 发给 Claude：{0}", msg.finalText.slice(0, 100) + (msg.finalText.length > 100 ? "…" : "")) : ""),
             );
             setTestPath(msg.pathEdgeIds);
             if (msg.nodeId) setSelected(msg.nodeId);
@@ -1333,7 +1334,7 @@ function Inner() {
         setEdges(re); // 变更会触发既有的防抖自动存盘
         window.setTimeout(() => rf.fitView({ duration: 300, padding: 0.2 }), 60);
       } catch (e) {
-        window.alert(`导入失败：${(e as Error).message}`);
+        window.alert(tStatic("导入失败：{0}", (e as Error).message));
       }
     };
     reader.readAsText(file);
@@ -1371,7 +1372,7 @@ function Inner() {
       id,
       type: kind,
       position: pos ?? { x: 80 + Math.round(60 * (nodes.length % 5)), y: 80 + 40 * nodes.length },
-      data: { ...base.data, label: base.label, status: "idle" },
+      data: { ...base.data, label: t(base.label), status: "idle" },
     };
     setNodes((n) => [...n, node]);
     setSelected(id);
@@ -1388,7 +1389,7 @@ function Inner() {
     const id = crypto.randomUUID();
     setNodes((n) => [
       ...n,
-      { id, type: kind, position: pos, data: { ...baseDef.data, label: baseDef.label, status: "idle" } },
+      { id, type: kind, position: pos, data: { ...baseDef.data, label: t(baseDef.label), status: "idle" } },
     ]);
     setEdges((es) =>
       addEdge(
@@ -1677,11 +1678,14 @@ function Inner() {
 
   const pendingKnowledge = knowledge.filter((k) => k.status === "pending").length;
   const TAB_TITLE: Record<Tab, string> = {
-    transcript: selectedIsClaude && selectedLabel ? `转录 · ${selectedLabel} 的访客会话` : "转录 · 访客会话（左侧选择一个会话）",
-    terminal: activeTermLabel ? `终端 · ${activeTermLabel}` : "终端 · 开发会话",
-    audit: "审计 · 谁问了什么",
-    logs: "服务日志",
-    inbox: `知识收件箱${pendingKnowledge ? ` · ${pendingKnowledge} 条待裁决` : ""}`,
+    transcript:
+      selectedIsClaude && selectedLabel
+        ? t("转录 · {0} 的访客会话", selectedLabel)
+        : t("转录 · 访客会话（左侧选择一个会话）"),
+    terminal: activeTermLabel ? t("终端 · {0}", activeTermLabel) : t("终端 · 开发会话"),
+    audit: t("审计 · 谁问了什么"),
+    logs: t("服务日志"),
+    inbox: t("知识收件箱") + (pendingKnowledge ? t(" · {0} 条待裁决", pendingKnowledge) : ""),
   };
   // 标题旁的一句功能说明（让"这个界面是干嘛的"一目了然）
   const TAB_DESC: Partial<Record<Tab, string>> = {
@@ -2194,9 +2198,10 @@ function Inner() {
             <div className="popup-head">
               <span className="pi-head-title">
                 <span className="pi-head-icon">{NODE_ICON[selectedNode.type ?? ""] ?? "▦"}</span>
-                {NODE_LABEL[selectedNode.type ?? ""] ?? "节点"} 设置{canvasCollapsed ? "（画布已收起）" : ""}
+                {t("{0} 设置", t(NODE_LABEL[selectedNode.type ?? ""] ?? "节点"))}
+                {canvasCollapsed ? t("（画布已收起）") : ""}
               </span>
-              <button className="popup-x" onClick={() => setInspectorOpen(false)} title="隐藏">
+              <button className="popup-x" onClick={() => setInspectorOpen(false)} title={t("隐藏")}>
                 ×
               </button>
             </div>
@@ -2238,21 +2243,21 @@ function Inner() {
               <span className="pt-label">
                 {tab === "terminal"
                   ? activeTermLabel
-                    ? `终端 · ${activeTermLabel}`
-                    : "终端 · 开发会话"
+                    ? t("终端 · {0}", activeTermLabel)
+                    : t("终端 · 开发会话")
                   : TAB_TITLE.transcript}
               </span>
               <span className="panel-subtabs">
                 <button
                   className={`subtab ${tab === "terminal" ? "on" : ""}`}
-                  title="这个会话的开发终端（软件里的本地 Claude 会话）"
+                  title={t("这个会话的开发终端（软件里的本地 Claude 会话）")}
                   onClick={showTerminalView}
                 >
                   🖥 终端
                 </button>
                 <button
                   className={`subtab ${tab === "transcript" ? "on" : ""}`}
-                  title="这个会话的飞书脱敏分身回复转录"
+                  title={t("这个会话的飞书脱敏分身回复转录")}
                   onClick={showTranscriptView}
                 >
                   📝 转录
@@ -2335,7 +2340,7 @@ function Inner() {
                   const g = nodes.find(
                     (n) => n.type === "feishu-group" && (n.data as any).chatId === chatId,
                   );
-                  return (g?.data as any)?.label ?? "(未命名群)";
+                  return (g?.data as any)?.label ?? t("(未命名群)");
                 }}
               />
             )}

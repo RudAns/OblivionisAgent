@@ -156,7 +156,7 @@ export function FeishuPanel({
           />
           <input
             value={manualName}
-            placeholder="姓名(可填)"
+            placeholder={t("姓名(可填)")}
             onChange={(e) => setManualName(e.target.value)}
           />
           <button

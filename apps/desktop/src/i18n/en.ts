@@ -425,4 +425,30 @@ export const EN: Record<string, string> = {
 
   // ── 服务日志 LogPanel ──────────────────────────────
   "暂无日志": "No logs yet",
+
+  // ── 窗口控件 / 杂项 ────────────────────────────────
+  "最小化": "Minimize",
+  "最大化 / 还原": "Maximize / restore",
+  "关闭": "Close",
+  "这个会话的开发终端（软件里的本地 Claude 会话）": "This session's dev terminal (the local Claude session in-app)",
+  "这个会话的飞书脱敏分身回复转录": "This session's Feishu redacted-fork reply transcript",
+  // 面板标题 TAB_TITLE / 检视浮窗头 / 杂项
+  "转录 · {0} 的访客会话": "Transcript · {0}'s guest session",
+  "转录 · 访客会话（左侧选择一个会话）": "Transcript · guest session (pick one on the left)",
+  "终端 · {0}": "Terminal · {0}",
+  "终端 · 开发会话": "Terminal · dev session",
+  "知识收件箱": "Knowledge inbox",
+  " · {0} 条待裁决": " · {0} pending",
+  "{0} 设置": "{0} settings",
+  "（画布已收起）": " (canvas collapsed)",
+  "(未命名群)": "(unnamed group)",
+  "新群": "New group",
+  "新会话": "New session",
+  // 路由测试结果（事件回调，用 tStatic）
+  "⚠️ 出错：{0}": "⚠️ Error: {0}",
+  "❌ 无匹配链路（检查群是否建了节点、是否需要 @、意图边是否覆盖）":
+    "❌ No matching path (check the group node exists, whether @ is required, and that intent edges cover it)",
+  "✅ 命中会话「{0}」 · 走过 {1} 条连线": "✅ Hit session “{0}” · traversed {1} edges",
+  "→ 发给 Claude：{0}": "→ Sent to Claude: {0}",
+  "导入失败：{0}": "Import failed: {0}",
 };
