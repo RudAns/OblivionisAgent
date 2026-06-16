@@ -46,7 +46,7 @@
 | 可添加的节点 | 会话节点设置 |
 |:---:|:---:|
 | ![节点类型](docs/screenshots/nodes.png) | ![会话节点设置](docs/screenshots/nodesetting.png) |
-| 画布支持的全部节点（输入源 / 路由决策 / 执行 / 赋能） | cwd · 主客权限 · baseSessionId · 安全态势一览 |
+| 画布支持的全部节点（输入源 / 路由决策 / 执行 / 技能） | cwd · 主客权限 · baseSessionId · 安全态势一览 |
 
 | 审计留痕 | 对话样例（触发打包 + 人格回复） |
 |:---:|:---:|
