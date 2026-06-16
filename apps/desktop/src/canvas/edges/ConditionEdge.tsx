@@ -2,6 +2,7 @@ import { useContext, useRef, useState } from "react";
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from "@xyflow/react";
 import { EdgeActionContext } from "../edge-context.js";
 import { EdgeRuntimeContext } from "../edge-runtime-context.js";
+import { useT } from "../../i18n/index.js";
 
 /**
  * 带「意图条件徽标」+ hover 工具的连线：
@@ -34,6 +35,7 @@ export function ConditionEdge({
   });
   const d = data as { condition?: string; sourceKind?: string } | undefined;
   const cond = (d?.condition ?? "").trim();
+  const t = useT();
   const { editEdge } = useContext(EdgeActionContext);
 
   // hover 状态带 60ms 延迟清除：从线条移到工具按钮的瞬间不闪烁
@@ -122,8 +124,8 @@ export function ConditionEdge({
             {count > 0 && (
               <span
                 title={
-                  `运行轨迹：已触发 ${count} 次` +
-                  (stat?.lastTs ? ` · 最近 ${new Date(stat.lastTs).toLocaleString()}` : "")
+                  t("运行轨迹：已触发 {0} 次", count) +
+                  (stat?.lastTs ? t(" · 最近 {0}", new Date(stat.lastTs).toLocaleString()) : "")
                 }
                 style={{
                   fontSize: 10,
@@ -145,9 +147,9 @@ export function ConditionEdge({
                   e.stopPropagation();
                   editEdge(id);
                 }}
-                title={`意图条件：${cond}（点击编辑）`}
+                title={t("意图条件：{0}（点击编辑）", cond)}
               >
-                意图：{cond.length > 12 ? cond.slice(0, 12) + "…" : cond}
+                {t("意图：{0}", cond.length > 12 ? cond.slice(0, 12) + "…" : cond)}
               </button>
             )}
           </div>

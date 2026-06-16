@@ -1,3 +1,5 @@
+import { useT } from "../i18n/index.js";
+
 export type AlignKind = "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom";
 
 interface Props {
@@ -48,41 +50,42 @@ const rot: React.CSSProperties = { transform: "rotate(90deg)" };
 
 /** 多选(≥2)时浮出的对齐/分布工具条（专业编辑器标配）。分布需 ≥3 个节点。 */
 export function AlignBar({ count, onAlign, onDistribute }: Props) {
+  const t = useT();
   const canDist = count >= 3;
   return (
     <div className="canvas-align-bar">
-      <span className="cab-count">{count} 个节点</span>
+      <span className="cab-count">{t("{0} 个节点", count)}</span>
       <span className="cab-sep" />
-      <button className="cab-btn" title="左对齐" onClick={() => onAlign("left")}>
+      <button className="cab-btn" title={t("左对齐")} onClick={() => onAlign("left")}>
         <AlignStartIcon />
       </button>
-      <button className="cab-btn" title="水平居中" onClick={() => onAlign("hcenter")}>
+      <button className="cab-btn" title={t("水平居中")} onClick={() => onAlign("hcenter")}>
         <AlignCenterIcon />
       </button>
-      <button className="cab-btn" title="右对齐" onClick={() => onAlign("right")}>
+      <button className="cab-btn" title={t("右对齐")} onClick={() => onAlign("right")}>
         <AlignEndIcon />
       </button>
       <span className="cab-sep" />
-      <button className="cab-btn" title="顶对齐" onClick={() => onAlign("top")}>
+      <button className="cab-btn" title={t("顶对齐")} onClick={() => onAlign("top")}>
         <span style={rot}>
           <AlignStartIcon />
         </span>
       </button>
-      <button className="cab-btn" title="垂直居中" onClick={() => onAlign("vcenter")}>
+      <button className="cab-btn" title={t("垂直居中")} onClick={() => onAlign("vcenter")}>
         <span style={rot}>
           <AlignCenterIcon />
         </span>
       </button>
-      <button className="cab-btn" title="底对齐" onClick={() => onAlign("bottom")}>
+      <button className="cab-btn" title={t("底对齐")} onClick={() => onAlign("bottom")}>
         <span style={rot}>
           <AlignEndIcon />
         </span>
       </button>
       <span className="cab-sep" />
-      <button className="cab-btn" title="水平等距分布（需≥3）" disabled={!canDist} onClick={() => onDistribute("h")}>
+      <button className="cab-btn" title={t("水平等距分布（需≥3）")} disabled={!canDist} onClick={() => onDistribute("h")}>
         <DistributeIcon />
       </button>
-      <button className="cab-btn" title="垂直等距分布（需≥3）" disabled={!canDist} onClick={() => onDistribute("v")}>
+      <button className="cab-btn" title={t("垂直等距分布（需≥3）")} disabled={!canDist} onClick={() => onDistribute("v")}>
         <span style={rot}>
           <DistributeIcon />
         </span>

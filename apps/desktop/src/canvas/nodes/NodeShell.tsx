@@ -1,6 +1,7 @@
 import { Handle, Position, useNodeId } from "@xyflow/react";
 import { useContext, type ReactNode } from "react";
 import { NodeActionContext } from "../node-action-context.js";
+import { useT } from "../../i18n/index.js";
 
 /**
  * 节点卡片统一外壳（参考专业流程图工具）：
@@ -31,6 +32,7 @@ export function NodeShell({
 }) {
   // hover 快捷操作：复制 / 删除
   const id = useNodeId();
+  const t = useT();
   const { copyNode, deleteNode } = useContext(NodeActionContext);
   return (
     <div className={`xnode xnode-${kind} ${selected ? "selected" : ""} ${status ? `xn-${status}` : ""}`}>
@@ -39,7 +41,7 @@ export function NodeShell({
         <div className="xnode-actions">
           <button
             className="xn-act"
-            title="复制此节点"
+            title={t("复制此节点")}
             onClick={(e) => {
               e.stopPropagation();
               copyNode(id);
@@ -49,7 +51,7 @@ export function NodeShell({
           </button>
           <button
             className="xn-act danger"
-            title="删除此节点及其连线"
+            title={t("删除此节点及其连线")}
             onClick={(e) => {
               e.stopPropagation();
               deleteNode(id);
@@ -78,7 +80,7 @@ export function NodeShell({
               color: status === "error" ? "#c83c3c" : "#d96745",
             }}
           >
-            {status === "running" ? "运行中" : status === "error" ? "出错" : status}
+            {status === "running" ? t("运行中") : status === "error" ? t("出错") : status}
           </span>
         )}
         {status && <span className={`xnode-dot status-${status}`} title={status} />}

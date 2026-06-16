@@ -35,6 +35,7 @@ import { EdgeActionContext } from "./edge-context.js";
 import { EdgeRuntimeContext } from "./edge-runtime-context.js";
 import { NodeMetaContext } from "./node-meta-context.js";
 import { NodeActionContext } from "./node-action-context.js";
+import { useT } from "../i18n/index.js";
 
 interface Props {
   nodes: Node[];
@@ -109,6 +110,7 @@ const ROUTING_SRC = new Set(["feishu-group", "route", "intent-switch", "cron", "
 const ROUTING_TGT = new Set(["route", "intent-switch", "claude-session"]);
 
 export function FlowCanvas(props: Props) {
+  const t = useT();
   const nodeTypes = useMemo(
     () => ({
       "feishu-group": FeishuGroupNode,
@@ -207,17 +209,17 @@ export function FlowCanvas(props: Props) {
       />
       {props.nodes.length === 0 && (
         <div className="canvas-empty-guide">
-          <div className="ceg-title">空画布 · 开始搭一条链路</div>
-          <div className="ceg-body">从上方 <b>＋ 工具条</b> 建节点。典型搭法:</div>
+          <div className="ceg-title">{t("空画布 · 开始搭一条链路")}</div>
+          <div className="ceg-body">{t("从上方 ＋ 工具条建节点。典型搭法:")}</div>
           <div className="ceg-flow">
-            <span className="ceg-chip fg">飞书群</span>
+            <span className="ceg-chip fg">{t("飞书群")}</span>
             <span className="ceg-arrow">→</span>
-            <span className="ceg-chip rt">路由</span>
+            <span className="ceg-chip rt">{t("路由")}</span>
             <span className="ceg-arrow">→</span>
-            <span className="ceg-chip cs">Claude 会话</span>
+            <span className="ceg-chip cs">{t("Claude 会话")}</span>
           </div>
-          <div className="ceg-hint">连好后，在飞书群 @机器人 即可对话。连线会自动校验，连错会被拒绝。</div>
-          <div className="ceg-hint">提示：按住 Shift 点选 / 框选多个节点可批量对齐分布 · 右键空白处或 Ctrl+K 快速加节点。</div>
+          <div className="ceg-hint">{t("连好后，在飞书群 @机器人 即可对话。连线会自动校验，连错会被拒绝。")}</div>
+          <div className="ceg-hint">{t("提示：按住 Shift 点选 / 框选多个节点可批量对齐分布 · 右键空白处或 Ctrl+K 快速加节点。")}</div>
         </div>
       )}
     </ReactFlow>

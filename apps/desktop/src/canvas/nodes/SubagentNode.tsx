@@ -1,5 +1,6 @@
 import { Position, type NodeProps } from "@xyflow/react";
 import { NodeShell } from "./NodeShell.js";
+import { useT } from "../../i18n/index.js";
 
 /**
  * 子代理(Subagent)节点：管理一个 Claude Code 原生子代理(~/.claude/agents/)。会话里的 claude
@@ -8,19 +9,20 @@ import { NodeShell } from "./NodeShell.js";
  * 作组织标识；选中后在右侧面板编辑子代理定义。
  */
 export function SubagentNode({ data, selected }: NodeProps) {
+  const t = useT();
   const d = data as { label: string; status?: string };
   return (
     <NodeShell
       kind="subagent"
       icon="🦾"
-      label={d.label || "子代理"}
+      label={d.label || t("子代理")}
       selected={selected}
       hasTarget={false}
       sourcePosition={Position.Left}
     >
       <div className="xnode-soul-hint">
-        拖左侧 ● 连到会话；独立上下文做重活，claude 自动委派
-        <div className="dim">选中后在右侧面板编辑子代理定义</div>
+        {t("拖左侧 ● 连到会话；独立上下文做重活，claude 自动委派")}
+        <div className="dim">{t("选中后在右侧面板编辑子代理定义")}</div>
       </div>
     </NodeShell>
   );
