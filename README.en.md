@@ -2,10 +2,10 @@
 
 # 🌒 OblivionisAgent
 
-**A Windows desktop tool that bridges Feishu (Lark) group chats into your "local Claude Code sessions"**
+**A node-wiring control panel for the local Claude Code CLI — orchestrate sessions visually and optimize how you drive it (a Windows desktop app)**
 
-@-mention the bot in a group → routed to the Claude session for the matching project on your PC → rich-text reply that @-mentions the asker.
-You keep developing in the built-in terminal on the same session, while guests and your own work never pollute each other.
+Wire nodes on a canvas to orchestrate local claude sessions: multi-session routing, intent splitting, persona / skill / subagent capabilities, a built-in interactive terminal, sensitive-op approvals… turning "how you drive the Claude CLI" into something **visual and tunable**.
+**One of its capabilities** is bridging **Feishu (Lark) group chats** — @-mention the bot in a group → routed to the matching project's session → rich-text reply that @-mentions the asker, with guests and your own dev never polluting each other.
 
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Tauri](https://img.shields.io/badge/shell-Tauri%20v2-FFC131?logo=tauri&logoColor=black)

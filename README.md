@@ -2,10 +2,10 @@
 
 # 🌒 OblivionisAgent
 
-**把飞书群聊接入你「本地 Claude Code 会话」的 Windows 桌面工具**
+**给本地 Claude Code CLI 的「连线式控制台」——可视化编排会话、优化你驱动它的方式（Windows 桌面应用）**
 
-在群里 @机器人 提问 → 路由到你电脑上对应项目的 Claude 会话 → 富文本回帖并 @提问人。
-你继续在内置终端用同一套会话做开发，访客与你的工作互不污染。
+拖节点连线就能编排本地 claude 会话：多会话路由、意图分流、人格 / 技能 / 子代理赋能、内置交互终端、敏感操作审批……把「怎么驱动 Claude CLI」整套做成**可视化、可调优**。
+其中**一项能力**是接入**飞书群聊**——群里 @机器人 → 路由到对应项目的会话 → 富文本回帖并 @提问人，访客与你的开发互不污染。
 
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Tauri](https://img.shields.io/badge/shell-Tauri%20v2-FFC131?logo=tauri&logoColor=black)
