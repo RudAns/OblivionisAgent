@@ -55,6 +55,66 @@ function isAtAllMention(m: any): boolean {
   return id === "all" || name === "所有人" || name.toLowerCase() === "all" || /_?all\b/i.test(key);
 }
 
+/**
+ * A1 富卡：把含 Markdown 表格的文本拆成 飞书卡 2.0 元素列表（markdown 段落 + 原生 table 组件）。
+ * 没有表格 → 返回 null（调用方回退普通 markdown 卡）。解析尽力而为，异常上抛由调用方兜底。
+ */
+function mdToRichElements(text: string): unknown[] | null {
+  const lines = text.split("\n");
+  const isRow = (l: string) => /^\s*\|.*\|\s*$/.test(l);
+  const isSep = (l: string) => /\|/.test(l) && /^[\s|:-]+$/.test(l) && /-{2,}|--/.test(l.replace(/[^|:-]/g, "-"));
+  const cells = (l: string) =>
+    l
+      .trim()
+      .replace(/^\||\|$/g, "")
+      .split("|")
+      .map((c) => c.trim());
+  const els: unknown[] = [];
+  let buf: string[] = [];
+  let hasTable = false;
+  const flush = () => {
+    const t = buf.join("\n").trim();
+    if (t) els.push({ tag: "markdown", content: t });
+    buf = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const cur = lines[i]!;
+    const nxt = lines[i + 1];
+    if (isRow(cur) && nxt !== undefined && isSep(nxt)) {
+      flush();
+      const header = cells(cur);
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && isRow(lines[i]!)) rows.push(cells(lines[i++]!));
+      i--;
+      const columns = header.map((h, ci) => ({
+        name: `c${ci}`,
+        display_name: h || " ",
+        data_type: "text",
+        width: "auto",
+      }));
+      const tableRows = rows.map((r) => {
+        const o: Record<string, string> = {};
+        header.forEach((_, ci) => (o[`c${ci}`] = r[ci] ?? ""));
+        return o;
+      });
+      els.push({
+        tag: "table",
+        page_size: Math.min(Math.max(rows.length, 1), 10),
+        row_height: "low",
+        header_style: { background_style: "grey", bold: true },
+        columns,
+        rows: tableRows,
+      });
+      hasTable = true;
+    } else {
+      buf.push(cur);
+    }
+  }
+  flush();
+  return hasTable ? els : null;
+}
+
 export interface LarkOptions {
   appId: string;
   appSecret: string;
@@ -409,7 +469,7 @@ export class LarkTransport implements FeishuTransport {
           chatId,
           opts?.replyToMessageId,
           "interactive",
-          this.answerCard(text, opts?.atUserId, false, opts?.fromLabel),
+          this.richCard(text, opts?.atUserId, opts?.fromLabel),
           opts?.inThread,
         ),
       2,
@@ -503,6 +563,25 @@ export class LarkTransport implements FeishuTransport {
     });
   }
 
+  /** A1 富卡：回复含 Markdown 表格时渲染成 飞书原生表格(卡 2.0)；无表格/异常都回退普通 markdown 卡。
+   *  只在"定稿"时用(流式中途仍用普通卡)，避免半截表格。 */
+  private richCard(text: string, atUserId?: string, fromLabel?: string): string {
+    try {
+      const els = mdToRichElements(text);
+      if (els && els.length) {
+        const at = atUserId ? `<at id=${atUserId}></at> ` : "";
+        const first = els[0] as { tag?: string; content?: string };
+        if (first?.tag === "markdown") first.content = at + (first.content ?? "");
+        else if (at.trim()) els.unshift({ tag: "markdown", content: at.trim() });
+        if (fromLabel) els.push({ tag: "note", elements: [{ tag: "plain_text", content: `🔹 由「${fromLabel}」作答` }] });
+        return JSON.stringify({ schema: "2.0", config: { update_multi: true }, body: { elements: els } });
+      }
+    } catch (e) {
+      this.opts.log("warn", `富卡渲染失败，回退普通卡: ${(e as Error).message}`);
+    }
+    return this.answerCard(text, atUserId, false, fromLabel);
+  }
+
   /** 开一张流式卡片：先发"思考中"占位，返回 update/finish/fail 句柄（内部节流 patch） */
   async replyStream(chatId: string, opts?: ReplyOpts): Promise<ReplyStreamHandle | null> {
     if (!this.client) return null;
@@ -534,7 +613,12 @@ export class LarkTransport implements FeishuTransport {
     const patchOnce = (text: string, running: boolean) =>
       this.client.im.message.patch({
         path: { message_id: messageId },
-        data: { content: this.answerCard(text, opts?.atUserId, running, opts?.fromLabel) },
+        // 定稿(running=false)才走富卡(可能含原生表格)；流式中途用普通卡，避免半截表格
+        data: {
+          content: running
+            ? this.answerCard(text, opts?.atUserId, true, opts?.fromLabel)
+            : this.richCard(text, opts?.atUserId, opts?.fromLabel),
+        },
       });
 
     // 把一次中间帧刷新排进串行链：成功则缓降间隔、失败(尤其限流)则退避
