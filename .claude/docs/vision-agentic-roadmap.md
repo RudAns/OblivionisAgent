@@ -1,7 +1,6 @@
 # OblivionisAgent 演进路线：从 IDE 壳子到被开发者喜爱的养成系 Agent
 
-> 2026-06-11 深夜研究定稿。依据：两份深度调研
-> （[research-hermes-agent.md](research-hermes-agent.md)、[research-agent-landscape.md](research-agent-landscape.md)）。
+> 设计定稿。选型依据见 [research-hermes-oauth.md](research-hermes-oauth.md)（为何遥控官方 CLI 而非直连 API）。
 > 硬约束不变：LLM 只经 spawn 官方 `claude` CLI。
 
 ## 0. 定位（一句话）

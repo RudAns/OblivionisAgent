@@ -14,8 +14,9 @@
 ![Claude](https://img.shields.io/badge/LLM-官方%20Claude%20CLI-D97757)
 ![License](https://img.shields.io/badge/License-GPL%20v3-3b82f6)
 ![Version](https://img.shields.io/badge/version-0.1.0-2ea44f)
+[![CI](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml)
 
-[更新日志 CHANGELOG](CHANGELOG.md)
+[更新日志 CHANGELOG](CHANGELOG.md) · [贡献指南 CONTRIBUTING](CONTRIBUTING.md) · [安全策略 SECURITY](SECURITY.md)
 
 </div>
 
