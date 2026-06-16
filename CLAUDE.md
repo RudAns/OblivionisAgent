@@ -32,7 +32,9 @@ cd packages/bridge && pnpm package           # 打包 sidecar exe
 # 部署 = 双击 rebuild-deploy.bat（构建→关应用→覆盖便携版→重启）
 ```
 
-运行时配置在 `~/.oblivionis/config.json`（**不在仓库里**，含 App Secret）。
+运行时配置在 `~/.oblivionis/config.json`（**不在仓库里**）。**App Secret 不再放这里**——存
+Windows 凭据管理器（外壳从凭据库读出经 env `OBLIVIONIS_FEISHU_SECRET` 注入 bridge；见 `secret-store.ts`、
+`src-tauri/lib.rs`）。别再往 config.json 写明文密钥；`config-store.save` 也会兜底清空它。
 会话 transcript 在 `~/.claude/projects/<编码cwd>/<sessionId>.jsonl`。
 
 ## 许可证 & 第三方合规

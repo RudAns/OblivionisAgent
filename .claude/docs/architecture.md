@@ -119,7 +119,9 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 - `LICENSE` — PolyForm Noncommercial 1.0.0（禁商用）；`THIRD-PARTY-NOTICES.md` — 第三方许可声明
 
 ## 关键运行时路径（都在用户目录，不进仓库）
-- `~/.oblivionis/config.json` — 全部配置（含 App Secret，**明文**，待加密）
+- `~/.oblivionis/config.json` — 全部配置（**App Secret 已移出**：存 Windows 凭据管理器，
+  外壳启动时从凭据库读出经 env `OBLIVIONIS_FEISHU_SECRET` 注入 bridge；见 `secret-store.ts` / `src-tauri/lib.rs`。
+  首次启动自动迁移并清掉旧明文；密钥不再落盘、也不经 WS 广播）
 - `~/.oblivionis/audit.jsonl` — 审计日志
 - `~/.claude/projects/<编码cwd>/<sid>.jsonl` — claude 会话 transcript
   （编码规则：绝对路径非字母数字→`-`；**盘符可能是小写**，匹配时要兜底搜全部目录）
