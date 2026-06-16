@@ -451,4 +451,9 @@ export const EN: Record<string, string> = {
   "✅ 命中会话「{0}」 · 走过 {1} 条连线": "✅ Hit session “{0}” · traversed {1} edges",
   "→ 发给 Claude：{0}": "→ Sent to Claude: {0}",
   "导入失败：{0}": "Import failed: {0}",
+  "按组合键把窗口唤到最前。格式如 CommandOrControl+Shift+O、Alt+Space；不生效多半是被别的软件占用了，换一个。":
+    "A key combo brings the window to the front. Format like CommandOrControl+Shift+O or Alt+Space; if it doesn't work, another app probably grabbed it — try a different one.",
+  // 项目 / GitHub
+  "项目": "Project",
+  "在浏览器打开项目仓库（GitHub）": "Open the project repository (GitHub) in your browser",
 };

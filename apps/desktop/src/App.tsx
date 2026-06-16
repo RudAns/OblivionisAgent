@@ -373,10 +373,6 @@ function Inner() {
   // 运行时点亮真实链路：按 runId(每条入站消息) 存，value 带目标会话 nodeId——
   // 这样多个群并发触发同一会话时，多条链路各自独立点亮，互不覆盖。
   const [activePaths, setActivePaths] = useState<Record<string, { nodeId: string; edgeIds: string[] }>>({});
-  const [testPath, setTestPath] = useState<string[]>([]); // C3 干跑路由测试：临时高亮命中的连线
-  const [rtChat, setRtChat] = useState(""); // C3 路由测试：选的群 chatId
-  const [rtText, setRtText] = useState(""); // C3 路由测试：样例消息
-  const [rtResult, setRtResult] = useState(""); // C3 路由测试：结果文案
   const [edgeStats, setEdgeStats] = useState<Record<string, { count: number; lastTs: number }>>(() => {
     // C2 运行轨迹：每条连线累计触发次数，持久化在前端
     try {
@@ -582,24 +578,6 @@ function Inner() {
             }
             return { ...m, [msg.runId]: { nodeId: msg.nodeId, edgeIds: msg.edgeIds } };
           });
-          break;
-        }
-        case "route-test-result": {
-          // C3 干跑结果：高亮命中链路 + 选中命中会话 + 文案；6 秒后熄灭高亮
-          if (msg.error) {
-            setRtResult(tStatic("⚠️ 出错：{0}", msg.error));
-          } else if (!msg.matched) {
-            setRtResult(tStatic("❌ 无匹配链路（检查群是否建了节点、是否需要 @、意图边是否覆盖）"));
-            setTestPath([]);
-          } else {
-            setRtResult(
-              tStatic("✅ 命中会话「{0}」 · 走过 {1} 条连线", msg.nodeLabel ?? msg.nodeId ?? "", msg.pathEdgeIds.length) +
-                (msg.finalText ? "\n" + tStatic("→ 发给 Claude：{0}", msg.finalText.slice(0, 100) + (msg.finalText.length > 100 ? "…" : "")) : ""),
-            );
-            setTestPath(msg.pathEdgeIds);
-            if (msg.nodeId) setSelected(msg.nodeId);
-            window.setTimeout(() => setTestPath([]), 6000);
-          }
           break;
         }
         case "log":
@@ -1493,7 +1471,6 @@ function Inner() {
   // 避免汇聚会话两条入边都亮；否则(cron/webhook 等无路由)回退为沿入边回溯整条上游链路。
   const activeEdgeIds = useMemo(() => {
     const active = new Set<string>();
-    for (const eid of testPath) active.add(eid); // C3 干跑测试：高亮命中的链路
     const runningIds = nodes
       .filter((n) => (n.data as { status?: string } | undefined)?.status === "running")
       .map((n) => n.id);
@@ -1526,7 +1503,7 @@ function Inner() {
       }
     }
     return active;
-  }, [nodes, edges, activePaths, testPath]);
+  }, [nodes, edges, activePaths]);
 
   // 聚焦高亮：选中单个节点时，它上下游链路上的连线集合（其它连线降透明度）。无选中=null。
   const focusEdgeIds = useMemo(() => {
@@ -2087,45 +2064,6 @@ function Inner() {
                 {t("拖动调整所有终端字号；终端里也可 Ctrl + +/− 调整、Ctrl+0 复位。")}
               </div>
 
-              <div className="settings-label" style={{ marginTop: 16 }}>{t("🧪 路由测试（干跑·不发飞书）")}</div>
-              <select value={rtChat} onChange={(e) => setRtChat(e.target.value)} style={{ width: "100%", marginBottom: 6 }}>
-                <option value="">{t("选择群（飞书群节点）…")}</option>
-                {nodes
-                  .filter((n) => n.type === "feishu-group")
-                  .map((n) => {
-                    const cid = (n.data as { chatId?: string })?.chatId ?? "";
-                    return (
-                      <option key={n.id} value={cid}>
-                        {cid || t("(未填 chatId)")}
-                      </option>
-                    );
-                  })}
-              </select>
-              <input
-                value={rtText}
-                onChange={(e) => setRtText(e.target.value)}
-                placeholder={t("输入一句样例消息，看它命中哪条链路")}
-                style={{ width: "100%", marginBottom: 6 }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && rtChat && rtText.trim())
-                    client.send({ type: "route-test", chatId: rtChat, text: rtText.trim() });
-                }}
-              />
-              <div className="fs-actions">
-                <button
-                  disabled={!rtChat || !rtText.trim()}
-                  onClick={() => client.send({ type: "route-test", chatId: rtChat, text: rtText.trim() })}
-                  title={t("只跑路由+意图分类，不真发飞书、不真跑会话；命中的连线会在画布上高亮 6 秒")}
-                >
-                  {t("▶ 测试路由")}
-                </button>
-              </div>
-              {rtResult && (
-                <div className="hint" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                  {rtResult}
-                </div>
-              )}
-
               <div className="settings-label" style={{ marginTop: 16 }}>{t("全局唤起热键（默认关）")}</div>
               <div className="seg">
                 {(
@@ -2152,8 +2090,7 @@ function Inner() {
                     style={{ width: "100%", marginTop: 6 }}
                   />
                   <div className="hint" style={{ marginTop: 6 }}>
-                    按组合键把窗口唤到最前。格式如 <code>CommandOrControl+Shift+O</code>、<code>Alt+Space</code>；
-                    不生效多半是被别的软件占用了，换一个。
+                    {t("按组合键把窗口唤到最前。格式如 CommandOrControl+Shift+O、Alt+Space；不生效多半是被别的软件占用了，换一个。")}
                   </div>
                 </>
               )}
@@ -2183,6 +2120,31 @@ function Inner() {
               />
               <div className="hint" style={{ marginTop: 6 }}>
                 {t("导出抹掉会话身份与密钥；导入后会话首次收到飞书消息会自动重新 fork。")}
+              </div>
+
+              <div className="settings-label" style={{ marginTop: 16 }}>{t("项目")}</div>
+              <div className="fs-actions">
+                <button
+                  title={t("在浏览器打开项目仓库（GitHub）")}
+                  onClick={() =>
+                    void invoke("open_path", {
+                      path: "https://github.com/RudAns/OblivionisAgent",
+                      base: "",
+                    }).catch(() => {})
+                  }
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                    style={{ marginRight: 5, verticalAlign: "-2px" }}
+                    aria-hidden
+                  >
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 014 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" />
+                  </svg>
+                  GitHub
+                </button>
               </div>
             </div>
           </div>
