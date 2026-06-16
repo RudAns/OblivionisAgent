@@ -15,6 +15,7 @@ export function NodeShell({
   status,
   hasTarget = true,
   hasSource = true,
+  sourcePosition = Position.Right,
   children,
 }: {
   kind: string;
@@ -24,6 +25,8 @@ export function NodeShell({
   status?: string;
   hasTarget?: boolean;
   hasSource?: boolean;
+  /** 输出口位置（默认右；人格/技能/子代理这类辅助节点放左） */
+  sourcePosition?: Position;
   children?: ReactNode;
 }) {
   // hover 快捷操作：复制 / 删除
@@ -81,7 +84,7 @@ export function NodeShell({
         {status && <span className={`xnode-dot status-${status}`} title={status} />}
       </div>
       {children && <div className="xnode-body">{children}</div>}
-      {hasSource && <Handle type="source" position={Position.Right} />}
+      {hasSource && <Handle type="source" position={sourcePosition} />}
     </div>
   );
 }

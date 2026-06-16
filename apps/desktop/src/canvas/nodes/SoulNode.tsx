@@ -1,4 +1,4 @@
-import type { NodeProps } from "@xyflow/react";
+import { Position, type NodeProps } from "@xyflow/react";
 import { NodeShell } from "./NodeShell.js";
 
 /**
@@ -9,9 +9,16 @@ import { NodeShell } from "./NodeShell.js";
 export function SoulNode({ data, selected }: NodeProps) {
   const d = data as { label: string; status?: string };
   return (
-    <NodeShell kind="soul" icon="🎭" label={d.label || "人格"} selected={selected} hasTarget={false}>
+    <NodeShell
+      kind="soul"
+      icon="🎭"
+      label={d.label || "人格"}
+      selected={selected}
+      hasTarget={false}
+      sourcePosition={Position.Left}
+    >
       <div className="xnode-soul-hint">
-        拖右侧 ● 到会话的 <b>🎭人格口</b>
+        拖左侧 ● 到会话的 <b>🎭人格/🧩技能/🦾子代理口</b>
         <div className="dim">选中后在右侧面板编辑灵魂</div>
       </div>
     </NodeShell>

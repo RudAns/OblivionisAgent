@@ -41,7 +41,7 @@ export function ClaudeSessionNode({ id, data, selected }: NodeProps) {
       {/* 人格连接口：Soul 节点拖到这里，作用于该会话的飞书回复(fork 脱敏分身)。
           终端(base)注入人格已评估为不需要，故只留单个口 */}
       <Handle type="target" id="fork" position={Position.Top} className="soul-port" style={{ left: "50%" }} />
-      <span className="soul-port-label" style={{ left: "50%" }}>🎭人格</span>
+      <span className="soul-port-label" style={{ left: "50%" }}>🎭人格/🧩技能/🦾子代理</span>
 
       <Row k="cwd" v={tailTruncate(d.cwd) || "(未设置)"} dim={!d.cwd} title={d.cwd || undefined} />
       <Row k="模型" v={d.model || "默认"} />
