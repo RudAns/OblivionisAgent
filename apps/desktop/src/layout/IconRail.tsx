@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { IconGraph, IconAudit, IconLogs, IconInbox, IconSettings } from "./icons.js";
+import { IconGraph, IconAudit, IconLogs, IconInbox, IconReports, IconSettings } from "./icons.js";
 import { useT } from "../i18n/index.js";
 
-export type RailKey = "canvas" | "audit" | "logs" | "inbox" | "feishu" | "settings";
+export type RailKey = "canvas" | "audit" | "logs" | "inbox" | "reports" | "feishu" | "settings";
 
 interface Props {
   /** 画布是否展开（高亮"节点图"项） */
@@ -74,6 +74,14 @@ export function IconRail({ canvasOpen, tab, settingsOpen, inboxBadge, onAction }
         <IconLogs />
       </RailButton>
       <div className="railbar-spacer" />
+      {/* 阅读清单：Claude 生成的、给人读的报告/文档（放在设置正上方，便于随手翻看） */}
+      <RailButton
+        title={t("阅读清单 · Claude 生成的报告/文档，点开即读")}
+        active={tab === "reports"}
+        onClick={() => onAction("reports")}
+      >
+        <IconReports />
+      </RailButton>
       <RailButton title={t("设置（主题等）")} active={settingsOpen} dataPopup="settings" onClick={() => onAction("settings")}>
         <IconSettings />
       </RailButton>

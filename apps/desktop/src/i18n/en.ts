@@ -456,4 +456,21 @@ export const EN: Record<string, string> = {
   // 项目 / GitHub
   "项目": "Project",
   "在浏览器打开项目仓库（GitHub）": "Open the project repository (GitHub) in your browser",
+  // 阅读清单 Reports
+  "阅读清单 · Claude 生成的报告/文档，点开即读":
+    "Reading list · reports/docs Claude made for you, click to open",
+  "阅读清单 · Claude 生成的报告/文档": "Reading list · reports/docs Claude generated",
+  "阅读清单": "Reading list",
+  "Claude 为你生成的、需要你阅读的报告与文档（不含代码/配置改动）":
+    "Reports and docs Claude generated for you to read (no code/config changes)",
+  "阅读清单仅在桌面应用中可用（浏览器开发版不支持）。":
+    "The reading list is only available in the desktop app (not the browser dev build).",
+  "还没有文档。": "No documents yet.",
+  "Claude 为你生成的报告 / 文档（HTML、Markdown 等）会出现在这里——只收阅读材料，不含代码或配置改动。":
+    "Reports / docs Claude generates for you (HTML, Markdown, etc.) appear here — reading material only, no code or config changes.",
+  "刷新中…": "Refreshing…",
+  "刷新": "Refresh",
+  "打开文件夹": "Open folder",
+  "点击打开：{0}": "Click to open: {0}",
+  "读取失败：": "Failed to read: ",
 };

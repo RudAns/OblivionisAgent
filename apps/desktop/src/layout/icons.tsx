@@ -90,6 +90,16 @@ export function IconInbox({ size }: IconProps) {
   );
 }
 
+/** 阅读清单（给人看的报告/文档） */
+export function IconReports({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M6 3.5h7l5 5V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" />
+      <path d="M13 3.5V9h5M8.5 13h7M8.5 16.5h5" />
+    </svg>
+  );
+}
+
 /** 深色（月亮） */
 export function IconMoon({ size }: IconProps) {
   return (

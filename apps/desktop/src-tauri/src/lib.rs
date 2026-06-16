@@ -284,6 +284,58 @@ fn open_path(path: String, base: String) -> Result<(), String> {
     Ok(())
 }
 
+// ── 阅读清单：Claude 生成的、给人看的报告/文档统一落在 ~/.oblivionis/reports/ ──────
+// 与代码/配置改动彻底分开——只有显式写进这个目录的文件才会出现在 GUI 的「阅读清单」里。
+fn reports_dir_path() -> std::path::PathBuf {
+    let home = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".to_string());
+    std::path::Path::new(&home).join(".oblivionis").join("reports")
+}
+
+/// 列出阅读清单目录里的文件（按修改时间倒序）。目录不存在则创建并返回空列表。
+/// 只用 serde_json（已是依赖），避免引入新的 serde derive。
+#[tauri::command]
+fn list_reports() -> Result<serde_json::Value, String> {
+    let dir = reports_dir_path();
+    if !dir.exists() {
+        let _ = std::fs::create_dir_all(&dir);
+    }
+    let mut files: Vec<serde_json::Value> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for entry in rd.flatten() {
+            let p = entry.path();
+            if !p.is_file() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                continue; // 跳过隐藏文件
+            }
+            let ext = p
+                .extension()
+                .map(|e| e.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            let meta = entry.metadata().ok();
+            let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+            let modified_ms = meta
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            files.push(serde_json::json!({
+                "name": name,
+                "path": p.to_string_lossy().to_string(),
+                "ext": ext,
+                "size": size,
+                "modifiedMs": modified_ms,
+            }));
+        }
+    }
+    files.sort_by(|a, b| {
+        b["modifiedMs"].as_u64().unwrap_or(0).cmp(&a["modifiedMs"].as_u64().unwrap_or(0))
+    });
+    Ok(serde_json::json!({ "dir": dir.to_string_lossy().to_string(), "files": files }))
+}
+
 // ── 飞书 App Secret：存进 Windows 凭据管理器，绝不明文落 config.json ─────────────
 const KEYRING_SERVICE: &str = "OblivionisAgent";
 const KEYRING_ACCOUNT: &str = "feishu-app-secret";
@@ -360,7 +412,7 @@ pub fn run() {
         .manage(PtyState::default())
         .invoke_handler(tauri::generate_handler![
             pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
-            set_feishu_secret, has_feishu_secret
+            set_feishu_secret, has_feishu_secret, list_reports
         ])
         .setup(|app| {
             if std::env::var("OBLIVIONIS_NO_SIDECAR").as_deref() != Ok("1") {
