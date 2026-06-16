@@ -125,8 +125,9 @@ export type BridgeMessage =
       status: SessionStatus;
     }
   /** 运行时实际走过的连线（用于画布"只点亮真实链路"，避免汇聚会话两条入边都亮）。
-   *  edgeIds 为空 = 清除该会话的活动链路。 */
-  | { type: "session-active-path"; nodeId: string; edgeIds: string[] }
+   *  runId 唯一标识本轮入站（按消息 id）——多个群并发触发同一会话时各自独立点亮、互不覆盖。
+   *  edgeIds 为空 = 清除该 runId 的活动链路。 */
+  | { type: "session-active-path"; runId: string; nodeId: string; edgeIds: string[] }
   /** 干跑路由结果（响应 route-test）：命中哪个会话节点 / 走过哪些连线 / 最终发给 Claude 的文本 */
   | {
       type: "route-test-result";

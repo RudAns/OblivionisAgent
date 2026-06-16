@@ -495,8 +495,10 @@ async function main() {
       fromLabel: node.label, // 标注是哪个会话/脱敏分身作答（多会话群里区分来源）
       // 注：不开 thread——话题里链接不好点；用普通的单独卡片回复(引用原消息)
     };
-    // 运行时点亮真实链路：把这条消息实际走过的连线告诉 GUI（汇聚会话就不会两条入边都亮）
-    hub.broadcast({ type: "session-active-path", nodeId: node.id, edgeIds: resolved.pathEdgeIds });
+    // 运行时点亮真实链路：把这条消息实际走过的连线告诉 GUI（汇聚会话就不会两条入边都亮）。
+    // runId=本条消息 id：多个群并发触发同一会话时，各自独立点亮、互不覆盖。
+    const runId = inbound.messageId || `${inbound.chatId}:${Date.now()}`;
+    hub.broadcast({ type: "session-active-path", runId, nodeId: node.id, edgeIds: resolved.pathEdgeIds });
     // 出站脱敏函数：访客每一帧都过一遍密钥过滤（流式也不破坏脱敏保证），主人原样
     const secrets = collectSecrets(cfg.feishu.appSecret);
     const redact = (t: string) => (isOwner ? t : redactText(t, secrets));
@@ -590,8 +592,8 @@ async function main() {
       if (stream) await stream.fail((e as Error).message).catch(() => {});
       else await gateway.transport?.reply(inbound.chatId, errMsg, replyOpts).catch(() => {});
     } finally {
-      // 本轮结束(成功或失败)：熄灭该会话的活动链路
-      hub.broadcast({ type: "session-active-path", nodeId: node.id, edgeIds: [] });
+      // 本轮结束(成功或失败)：只熄灭"本轮(runId)"的活动链路——不波及同一会话其它并发群的链路
+      hub.broadcast({ type: "session-active-path", runId, nodeId: node.id, edgeIds: [] });
     }
     } catch (outerErr) {
       // 路由/分类/解析等环节出错：别静默吞，回一条兜底提示

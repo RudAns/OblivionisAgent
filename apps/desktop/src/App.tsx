@@ -364,7 +364,9 @@ function Inner() {
   const [activeTerminal, setActiveTerminal] = useState<string | null>(null); // 当前显示的终端(独立状态)
   const [termRunning, setTermRunning] = useState<Record<string, boolean>>({}); // 各会话终端是否在跑(输出活动)
   const [unseenDone, setUnseenDone] = useState<Record<string, boolean>>({}); // 完成但用户还没切过去看 → 红点
-  const [activePaths, setActivePaths] = useState<Record<string, string[]>>({}); // 各会话本轮实际走过的连线(运行时点亮真实链路)
+  // 运行时点亮真实链路：按 runId(每条入站消息) 存，value 带目标会话 nodeId——
+  // 这样多个群并发触发同一会话时，多条链路各自独立点亮，互不覆盖。
+  const [activePaths, setActivePaths] = useState<Record<string, { nodeId: string; edgeIds: string[] }>>({});
   const [testPath, setTestPath] = useState<string[]>([]); // C3 干跑路由测试：临时高亮命中的连线
   const [rtChat, setRtChat] = useState(""); // C3 路由测试：选的群 chatId
   const [rtText, setRtText] = useState(""); // C3 路由测试：样例消息
@@ -564,15 +566,15 @@ function Inner() {
               return next;
             });
           }
-          // 运行时实际走过的连线：空=熄灭该会话的活动链路
+          // 运行时实际走过的连线：按 runId 存，空=只熄灭这一轮(不波及同会话其它并发群)
           setActivePaths((m) => {
             if (msg.edgeIds.length === 0) {
-              if (!m[msg.nodeId]) return m;
+              if (!m[msg.runId]) return m;
               const next = { ...m };
-              delete next[msg.nodeId];
+              delete next[msg.runId];
               return next;
             }
-            return { ...m, [msg.nodeId]: msg.edgeIds };
+            return { ...m, [msg.runId]: { nodeId: msg.nodeId, edgeIds: msg.edgeIds } };
           });
           break;
         }
@@ -1496,9 +1498,10 @@ function Inner() {
       else incoming.set(e.target, [e]);
     }
     for (const rid of runningIds) {
-      const reported = activePaths[rid];
-      if (reported && reported.length) {
-        for (const eid of reported) active.add(eid); // 真实链路：只点这条
+      // 收集所有"正流向该会话"的真实链路(多个群可并发触发同一会话 → 多条同时点亮)
+      const reported = Object.values(activePaths).filter((p) => p.nodeId === rid);
+      if (reported.length) {
+        for (const p of reported) for (const eid of p.edgeIds) active.add(eid); // 真实链路：只点这些
         continue;
       }
       // 回退：从该 running 节点沿入边回溯整条上游链路
