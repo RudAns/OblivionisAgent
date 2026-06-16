@@ -218,6 +218,7 @@ OblivionisAgent/
 | 措施 | 实现位置 |
 |---|---|
 | 订阅合规：只驱动官方 CLI，不碰 OAuth 令牌 | 整体架构 |
+| 飞书 App Secret 存 **Windows 凭据管理器**，不明文落 `config.json`、不经 WS 广播 | `secret-store.ts` + `src-tauri/lib.rs` |
 | 访客会话 fork 自开发会话，transcript 密钥替换为 `[REDACTED]` | `fork-prepare.ts` |
 | 访客回复出站前二次脱敏 | `index.ts` + `secrets.ts` |
 | 访客护栏 system prompt（严禁泄露密钥/凭据/敏感文件/权限/个人信息） | 配置 `guestGuardrail` |
@@ -225,8 +226,8 @@ OblivionisAgent/
 | 主人/访客分级 permission mode | 会话节点配置 |
 | 全量入站审计 `~/.oblivionis/audit.jsonl` | `index.ts` |
 
-> [!WARNING]
-> **已知待办**：`~/.oblivionis/config.json` 中 App Secret 目前**明文**存储，公司级分发前应改为 OS 凭据库；安装包未做代码签名（SmartScreen 会拦）。
+> [!NOTE]
+> exe / 安装包**未做代码签名**：首次打开 Windows SmartScreen 会拦——点「**更多信息 → 仍要运行**」即可。这是未签名导致的正常拦截，不影响功能与安全。
 
 ---
 
