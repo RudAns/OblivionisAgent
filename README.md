@@ -43,6 +43,16 @@
 | ![意图分流](docs/screenshots/intent.png) | ![飞书回帖](docs/screenshots/feishu.png) |
 | 同群消息按语义走不同分支（LLM 判定） | 富文本回复并 @ 提问人 |
 
+| 可添加的节点 | 会话节点设置 |
+|:---:|:---:|
+| ![节点类型](docs/screenshots/nodes.png) | ![会话节点设置](docs/screenshots/nodesetting.png) |
+| 画布支持的全部节点（输入源 / 路由决策 / 执行 / 赋能） | cwd · 主客权限 · baseSessionId · 安全态势一览 |
+
+| 审计留痕 | 对话样例（触发打包 + 人格回复） |
+|:---:|:---:|
+| ![审计](docs/screenshots/shenji.png) | ![对话样例](docs/screenshots/feishu2.png) |
+| 谁(主人/访客)问了什么、命中哪个会话——只读不可改 | 触发 CI 打包 → 按所连人格口吻回帖、标注作答会话 |
+
 ---
 
 ## ✨ 亮点功能

@@ -44,6 +44,16 @@ Wire nodes on a canvas to orchestrate local claude sessions: multi-session routi
 | ![intent](docs/screenshots/intent.png) | ![feishu reply](docs/screenshots/feishu.png) |
 | Same-group messages take different branches by semantics (LLM-judged) | Rich-text reply that @-mentions the asker |
 
+| Available node types | Claude session settings |
+|:---:|:---:|
+| ![node types](docs/screenshots/nodes.png) | ![session settings](docs/screenshots/nodesetting.png) |
+| Every node you can add (inputs / routing / execution / capability) | cwd · owner/guest permissions · baseSessionId · security posture |
+
+| Audit trail | Conversation example (trigger a build + persona reply) |
+|:---:|:---:|
+| ![audit](docs/screenshots/shenji.png) | ![conversation](docs/screenshots/feishu2.png) |
+| Who (owner/guest) asked what, which session handled it — read-only | @bot to package → reply in the connected persona's voice, with the answering session labeled |
+
 ---
 
 ## ✨ Highlights
