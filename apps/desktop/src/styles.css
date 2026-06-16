@@ -524,6 +524,45 @@ button.primary {
   letter-spacing: 0.04em;
   flex-shrink: 0;
 }
+/* 坍缩面板(会话转录/服务日志)的标题条：左标题 + 右侧小页签切换 */
+.panel-title-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.panel-title-tabs .pt-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panel-subtabs {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.panel-subtabs .subtab {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.panel-subtabs .subtab:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+.panel-subtabs .subtab.on {
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.35);
+}
 .canvas {
   flex: 1;
   min-width: 0;

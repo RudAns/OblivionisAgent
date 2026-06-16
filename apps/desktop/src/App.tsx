@@ -2183,7 +2183,31 @@ function Inner() {
         {/* 画布展开时隐藏面板(但保持挂载，终端不掉)；收起时面板占满 */}
         <aside className="side" style={canvasCollapsed ? { flex: 1, minWidth: 0 } : { display: "none" }}>
           {/* 终端有自己的页签条+信息栏，这里的顶部标题就会重复，故终端视图下不显示 */}
-          {tab !== "terminal" && <div className="panel-title">{TAB_TITLE[tab]}</div>}
+          {tab !== "terminal" &&
+            (tab === "transcript" || tab === "logs" ? (
+              // 会话转录 / 服务日志坍缩成一个面板：标题 + 顶部小页签切换（常态看转录，少切日志）
+              <div className="panel-title panel-title-tabs">
+                <span className="pt-label">{TAB_TITLE[tab]}</span>
+                <span className="panel-subtabs">
+                  <button
+                    className={`subtab ${tab === "transcript" ? "on" : ""}`}
+                    title="某个会话的飞书回复转录（左侧选会话）"
+                    onClick={() => setTab("transcript")}
+                  >
+                    📝 会话转录
+                  </button>
+                  <button
+                    className={`subtab ${tab === "logs" ? "on" : ""}`}
+                    title="引擎 / 服务运行日志（排障时看）"
+                    onClick={() => setTab("logs")}
+                  >
+                    🛠 服务日志
+                  </button>
+                </span>
+              </div>
+            ) : (
+              <div className="panel-title">{TAB_TITLE[tab]}</div>
+            ))}
 
           <div className="panel">
             {tab === "transcript" && (
