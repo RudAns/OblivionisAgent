@@ -3229,3 +3229,69 @@ button.primary {
   border-color: var(--accent);
   color: var(--text);
 }
+
+/* ── 文档查看器：独立窗口 + 目录树 + HTML 内嵌 ───────────────── */
+.docwin {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--panel);
+  color: var(--text);
+}
+.md-render-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.md-html {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #fff;
+}
+.md-tree-dir {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-tree-dir:hover {
+  color: var(--text);
+}
+.md-tw {
+  display: inline-block;
+  width: 12px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.md-tree-file {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.md-tree-file:hover {
+  background: var(--hover);
+}
+.md-tree-file.on {
+  background: var(--accent);
+  color: #fff;
+}

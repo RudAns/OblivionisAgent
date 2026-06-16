@@ -46,8 +46,6 @@ import { TerminalsHost, type TermInfo } from "./panels/TerminalsHost.js";
 import { LogPanel, type LogLine } from "./panels/LogPanel.js";
 import { AuditPanel, type AuditItem } from "./panels/AuditPanel.js";
 import { InboxPanel } from "./panels/InboxPanel.js";
-import { ReportsPanel } from "./panels/ReportsPanel.js";
-import { MarkdownViewer } from "./panels/MarkdownViewer.js";
 import { FeishuPanel, FeishuStatusDot, type FeishuState } from "./panels/FeishuPanel.js";
 import { IconRail, type RailKey } from "./layout/IconRail.js";
 import { useI18n, useT, tStatic, type Lang } from "./i18n/index.js";
@@ -55,7 +53,7 @@ import { IconMoon, IconSun, IconMonitor } from "./layout/icons.js";
 import { SessionSidebar } from "./layout/SessionSidebar.js";
 import { StatusBar } from "./layout/StatusBar.js";
 
-type Tab = "transcript" | "terminal" | "audit" | "logs" | "inbox" | "reports";
+type Tab = "transcript" | "terminal" | "audit" | "logs" | "inbox";
 type ThemePref = "dark" | "light" | "system";
 
 const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">> = {
@@ -445,7 +443,6 @@ function Inner() {
     () => (document.documentElement.getAttribute("data-theme") as "dark" | "light") || "dark",
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [mdViewerOpen, setMdViewerOpen] = useState(false);
   const [themeNotice, setThemeNotice] = useState(false); // 切主题后提示"已同步 Claude、需重开终端"
   // 完成任务桌面提示开关：只管「完成时弹不弹右下角小人」。任务栏流光是常驻能力，不归它管。
   const [completionAlert, setCompletionAlert] = useState<boolean>(() => {
@@ -1599,7 +1596,7 @@ function Inner() {
         setSettingsOpen((o) => !o);
         break;
       case "mdviewer":
-        setMdViewerOpen(true); // Markdown 查看器是独立弹窗，不占面板/不退节点视图
+        void invoke("open_md_viewer"); // 文档查看器是独立窗口，可边看边继续用主窗
         break;
       default:
         setTab(key);
@@ -1669,14 +1666,12 @@ function Inner() {
     audit: t("审计 · 谁问了什么"),
     logs: t("服务日志"),
     inbox: t("知识收件箱") + (pendingKnowledge ? t(" · {0} 条待裁决", pendingKnowledge) : ""),
-    reports: t("阅读清单 · Claude 生成的报告/文档"),
   };
   // 标题旁的一句功能说明（让"这个界面是干嘛的"一目了然）
   const TAB_DESC: Partial<Record<Tab, string>> = {
     audit: t("谁(主人/访客)问了什么、命中哪个会话——只读留痕，不可改"),
     inbox: t("群聊里沉淀出的规则 / 人格修订候选，等你采纳或忽略"),
     logs: t("引擎 / 服务运行日志，排障时看"),
-    reports: t("Claude 为你生成的、需要你阅读的报告与文档（不含代码/配置改动）"),
   };
   // 终端⇄转录是"同一个会话的两种视图"：粘滞切换，保持当前在看的会话
   const viewedSessionId = tab === "terminal" ? activeTerminalId : selectedIsClaude ? selected : null;
@@ -1748,7 +1743,6 @@ function Inner() {
           canvasOpen={!canvasCollapsed}
           tab={tab}
           settingsOpen={settingsOpen}
-          mdViewerOpen={mdViewerOpen}
           inboxBadge={pendingKnowledge}
           onAction={onRailAction}
         />
@@ -2316,7 +2310,6 @@ function Inner() {
               />
             )}
             {tab === "logs" && <LogPanel lines={logs} />}
-            {tab === "reports" && <ReportsPanel />}
             {tab === "inbox" && (
               <InboxPanel
                 items={knowledge}
@@ -2574,8 +2567,6 @@ function Inner() {
           </div>,
           document.body,
         )}
-
-      {mdViewerOpen && <MarkdownViewer nodes={nodes} onClose={() => setMdViewerOpen(false)} />}
     </div>
   );
 }

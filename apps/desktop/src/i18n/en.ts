@@ -490,4 +490,14 @@ export const EN: Record<string, string> = {
   "← 左侧选一个目录和文件": "← Pick a directory and file on the left",
   "用 VSCode 打开": "Open in VSCode",
   "加载中…": "Loading…",
+  // 文档查看器（独立窗口，md + html）
+  "文档查看器 · 看各项目目录里的 .md / .html（独立窗口）":
+    "Doc viewer · view .md / .html across project dirs (separate window)",
+  "文档查看器": "Doc viewer",
+  "各会话项目目录里的 .md / .html（已渲染）": "Rendered .md / .html across each session's project directory",
+  "文档查看器仅在桌面应用中可用。": "The doc viewer is only available in the desktop app.",
+  "重新扫描（有新文档时点它）": "Rescan (click when new docs appear)",
+  "此目录下没有 .md / .html 文档。": "No .md / .html docs in this directory.",
+  "← 左侧选一个文档": "← Pick a document on the left",
+  "用默认程序打开": "Open with default app",
 };

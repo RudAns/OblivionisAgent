@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App.js";
 import { Mascot } from "./Mascot.js";
+import { DocViewer } from "./panels/DocViewer.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { LangProvider } from "./i18n/index.js";
 import "./styles.css";
@@ -20,6 +21,10 @@ root.render(
   <LangProvider>
     {label === "mascot" ? (
       <Mascot />
+    ) : label === "mdviewer" ? (
+      <ErrorBoundary>
+        <DocViewer />
+      </ErrorBoundary>
     ) : (
       <React.StrictMode>
         <ErrorBoundary>

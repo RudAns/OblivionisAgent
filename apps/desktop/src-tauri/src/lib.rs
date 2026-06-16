@@ -291,60 +291,99 @@ fn reports_dir_path() -> std::path::PathBuf {
     std::path::Path::new(&home).join(".oblivionis").join("reports")
 }
 
-/// 列出阅读清单目录里的文件（按修改时间倒序）。目录不存在则创建并返回空列表。
-/// 只用 serde_json（已是依赖），避免引入新的 serde derive。
+/// 打开（或聚焦）独立的「文档查看器」窗口——可以边看文档边继续用主窗。
 #[tauri::command]
-fn list_reports() -> Result<serde_json::Value, String> {
+fn open_md_viewer(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("mdviewer") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    tauri::WebviewWindowBuilder::new(&app, "mdviewer", tauri::WebviewUrl::App("index.html".into()))
+        .title("文档查看器 · OblivionisAgent")
+        .inner_size(1080.0, 800.0)
+        .min_inner_size(640.0, 460.0)
+        .center()
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 路径归一化（去重用）：分隔符统一成 \、去尾斜杠、小写（Windows 大小写不敏感）。
+fn norm_path(p: &str) -> String {
+    p.replace('/', "\\").trim_end_matches('\\').to_lowercase()
+}
+
+/// 从 ~/.oblivionis/config.json 读出各「Claude 会话」节点的工作目录，去重整理成切换列表。
+/// 多个会话同一目录 → 合并成一条并带上用到它的会话名。
+#[tauri::command]
+fn session_dirs() -> Result<serde_json::Value, String> {
+    let home = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".to_string());
+    let cfg = std::path::Path::new(&home).join(".oblivionis").join("config.json");
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    if let Ok(raw) = std::fs::read_to_string(&cfg) {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&raw) {
+            let nodes = json.get("graph").and_then(|g| g.get("nodes")).and_then(|n| n.as_array());
+            for n in nodes.into_iter().flatten() {
+                if n.get("kind").and_then(|k| k.as_str()) != Some("claude-session") {
+                    continue;
+                }
+                let cwd = n
+                    .get("data")
+                    .and_then(|d| d.get("cwd"))
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+                if cwd.is_empty() {
+                    continue;
+                }
+                let label = n.get("label").and_then(|l| l.as_str()).unwrap_or("").to_string();
+                let key = norm_path(&cwd);
+                if let Some(&i) = seen.get(&key) {
+                    if !label.is_empty() {
+                        if let Some(arr) = out[i].get_mut("sessions").and_then(|s| s.as_array_mut()) {
+                            if !arr.iter().any(|v| v.as_str() == Some(label.as_str())) {
+                                arr.push(serde_json::Value::String(label));
+                            }
+                        }
+                    }
+                } else {
+                    seen.insert(key, out.len());
+                    let title = cwd
+                        .trim_end_matches(|c| c == '\\' || c == '/')
+                        .rsplit(|c| c == '\\' || c == '/')
+                        .next()
+                        .unwrap_or(&cwd)
+                        .to_string();
+                    let sessions = if label.is_empty() {
+                        Vec::new()
+                    } else {
+                        vec![serde_json::Value::String(label)]
+                    };
+                    out.push(serde_json::json!({ "path": cwd, "title": title, "sessions": sessions }));
+                }
+            }
+        }
+    }
+    Ok(serde_json::Value::Array(out))
+}
+
+/// 公共目录（`~/.oblivionis/reports`）的绝对路径，不存在则创建——供文档查看器作为「公共目录」。
+#[tauri::command]
+fn reports_dir() -> String {
     let dir = reports_dir_path();
     if !dir.exists() {
         let _ = std::fs::create_dir_all(&dir);
     }
-    let mut files: Vec<serde_json::Value> = Vec::new();
-    if let Ok(rd) = std::fs::read_dir(&dir) {
-        for entry in rd.flatten() {
-            let p = entry.path();
-            if !p.is_file() {
-                continue;
-            }
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with('.') {
-                continue; // 跳过隐藏文件
-            }
-            let ext = p
-                .extension()
-                .map(|e| e.to_string_lossy().to_lowercase())
-                .unwrap_or_default();
-            let meta = entry.metadata().ok();
-            let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
-            let modified_ms = meta
-                .and_then(|m| m.modified().ok())
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0);
-            files.push(serde_json::json!({
-                "name": name,
-                "path": p.to_string_lossy().to_string(),
-                "ext": ext,
-                "size": size,
-                "modifiedMs": modified_ms,
-            }));
-        }
-    }
-    files.sort_by(|a, b| {
-        b["modifiedMs"].as_u64().unwrap_or(0).cmp(&a["modifiedMs"].as_u64().unwrap_or(0))
-    });
-    Ok(serde_json::json!({ "dir": dir.to_string_lossy().to_string(), "files": files }))
+    dir.to_string_lossy().to_string()
 }
 
-/// 阅读清单目录的绝对路径——供前端把它作为「公共目录」并进 Markdown 查看器的切换列表。
-#[tauri::command]
-fn reports_dir() -> String {
-    reports_dir_path().to_string_lossy().to_string()
-}
-
-// 递归扫 .md 时要跳过的重目录（Unity / 构建产物 / VCS 噪音）。按名小写匹配。
+// 递归扫文档时跳过的重目录（Unity / 构建产物 / VCS 噪音）。按名小写匹配。
 // 注意：不黑名单所有点目录——`.claude` / `.oblivionis` 这类含文档，必须保留。
-fn md_skip_dir(name: &str) -> bool {
+fn doc_skip_dir(name: &str) -> bool {
     matches!(
         name.to_lowercase().as_str(),
         "library" | "temp" | "obj" | "bin" | "logs" | "build" | "builds"
@@ -353,7 +392,18 @@ fn md_skip_dir(name: &str) -> bool {
     )
 }
 
-/// 递归列出某目录下所有 .md（跳过重目录、限深度/数量）——防 Unity 工程百万文件把界面拖死。
+/// 按文件名后缀判断是否文档（.md 渲染 / .html 内嵌显示），返回类型标记。
+fn doc_kind(name_lower: &str) -> Option<&'static str> {
+    if name_lower.ends_with(".md") || name_lower.ends_with(".markdown") {
+        Some("md")
+    } else if name_lower.ends_with(".html") || name_lower.ends_with(".htm") {
+        Some("html")
+    } else {
+        None
+    }
+}
+
+/// 递归列出某目录下所有 .md / .html（跳过重目录、限深度/数量）——防 Unity 工程百万文件拖死界面。
 #[tauri::command]
 fn list_md_files(dir: String) -> Result<serde_json::Value, String> {
     let root = std::path::Path::new(&dir);
@@ -379,15 +429,15 @@ fn list_md_files(dir: String) -> Result<serde_json::Value, String> {
             let fname = entry.file_name().to_string_lossy().to_string();
             let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
             if is_dir {
-                if depth + 1 <= MAX_DEPTH && !md_skip_dir(&fname) {
+                if depth + 1 <= MAX_DEPTH && !doc_skip_dir(&fname) {
                     stack.push((p, depth + 1));
                 }
                 continue;
             }
-            let lower = fname.to_lowercase();
-            if !(lower.ends_with(".md") || lower.ends_with(".markdown")) {
-                continue;
-            }
+            let ext = match doc_kind(&fname.to_lowercase()) {
+                Some(e) => e,
+                None => continue,
+            };
             if out.len() >= MAX_FILES {
                 truncated = true;
                 break;
@@ -406,7 +456,7 @@ fn list_md_files(dir: String) -> Result<serde_json::Value, String> {
                 .replace('\\', "/");
             out.push(serde_json::json!({
                 "name": fname, "path": p.to_string_lossy().to_string(),
-                "rel": rel, "size": size, "modifiedMs": modified_ms,
+                "rel": rel, "ext": ext, "size": size, "modifiedMs": modified_ms,
             }));
         }
     }
@@ -416,16 +466,63 @@ fn list_md_files(dir: String) -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({ "dir": dir, "files": out, "truncated": truncated, "exists": true }))
 }
 
-/// 读 .md 文件内容（UTF-8，限大小，防误读巨型文件）。
+/// 读文本文档内容（.md / .html，UTF-8，限大小，防误读巨型文件）。
 #[tauri::command]
 fn read_md(path: String) -> Result<String, String> {
     let p = std::path::Path::new(&path);
     let meta = std::fs::metadata(p).map_err(|e| e.to_string())?;
-    const MAX: u64 = 4 * 1024 * 1024;
+    const MAX: u64 = 8 * 1024 * 1024;
     if meta.len() > MAX {
         return Err(format!("文件过大（{} KB），超过 {} KB 上限", meta.len() / 1024, MAX / 1024));
     }
     std::fs::read_to_string(p).map_err(|e| e.to_string())
+}
+
+/// 把本地图片读成 data URL——让 Markdown 里的相对路径图片在 webview 里直接显示，
+/// 免去配置 Tauri asset 协议/scope。path 为相对路径时按 base（文件所在目录）解析。
+#[tauri::command]
+fn read_file_b64(path: String, base: String) -> Result<String, String> {
+    let p = std::path::Path::new(&path);
+    let full = if p.is_absolute() || base.is_empty() {
+        p.to_path_buf()
+    } else {
+        std::path::Path::new(&base).join(p)
+    };
+    let meta = std::fs::metadata(&full).map_err(|e| e.to_string())?;
+    const MAX: u64 = 8 * 1024 * 1024;
+    if meta.len() > MAX {
+        return Err("图片过大".into());
+    }
+    let bytes = std::fs::read(&full).map_err(|e| e.to_string())?;
+    let ext = full.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
+        "ico" => "image/x-icon",
+        _ => "application/octet-stream",
+    };
+    Ok(format!("data:{};base64,{}", mime, b64_encode(&bytes)))
+}
+
+/// 极简 base64 编码（标准字母表 + padding）——避免为一处图片引入额外 crate。
+fn b64_encode(data: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut s = String::with_capacity(data.len().div_ceil(3) * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        s.push(T[((n >> 18) & 63) as usize] as char);
+        s.push(T[((n >> 12) & 63) as usize] as char);
+        s.push(if chunk.len() > 1 { T[((n >> 6) & 63) as usize] as char } else { '=' });
+        s.push(if chunk.len() > 2 { T[(n & 63) as usize] as char } else { '=' });
+    }
+    s
 }
 
 // ── 飞书 App Secret：存进 Windows 凭据管理器，绝不明文落 config.json ─────────────
@@ -504,8 +601,8 @@ pub fn run() {
         .manage(PtyState::default())
         .invoke_handler(tauri::generate_handler![
             pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
-            set_feishu_secret, has_feishu_secret, list_reports,
-            reports_dir, list_md_files, read_md
+            set_feishu_secret, has_feishu_secret,
+            reports_dir, open_md_viewer, session_dirs, list_md_files, read_md, read_file_b64
         ])
         .setup(|app| {
             if std::env::var("OBLIVIONIS_NO_SIDECAR").as_deref() != Ok("1") {
