@@ -33,7 +33,7 @@ export function ConditionEdge({
   });
   const d = data as { condition?: string; sourceKind?: string } | undefined;
   const cond = (d?.condition ?? "").trim();
-  const { editEdge, deleteEdge } = useContext(EdgeActionContext);
+  const { editEdge } = useContext(EdgeActionContext);
 
   // hover 状态带 60ms 延迟清除：从线条移到工具按钮的瞬间不闪烁
   const [hovered, setHovered] = useState(false);
@@ -85,7 +85,7 @@ export function ConditionEdge({
         onMouseEnter={enter}
         onMouseLeave={leave}
       />
-      {(showBadge || active || count > 0) && (
+      {(showBadge || count > 0) && (
         <EdgeLabelRenderer>
           <div
             className="edge-tools"
@@ -127,18 +127,6 @@ export function ConditionEdge({
                 title={`意图条件：${cond}（点击编辑）`}
               >
                 意图：{cond.length > 12 ? cond.slice(0, 12) + "…" : cond}
-              </button>
-            )}
-            {active && (
-              <button
-                className="edge-del"
-                title="删除连线"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteEdge(id);
-                }}
-              >
-                ×
               </button>
             )}
           </div>
