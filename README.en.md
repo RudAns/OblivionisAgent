@@ -34,8 +34,6 @@ Wire nodes on a canvas to orchestrate local claude sessions: multi-session routi
 
 ## 📸 Screenshots
 
-> Placeholders — drop the matching PNGs into [`docs/screenshots/`](docs/screenshots/) and they show up automatically (see that directory's notes for naming).
-
 | Node-wiring canvas | Built-in interactive terminal |
 |:---:|:---:|
 | ![canvas](docs/screenshots/canvas.png) | ![terminal](docs/screenshots/terminal.png) |

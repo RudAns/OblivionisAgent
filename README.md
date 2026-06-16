@@ -33,8 +33,6 @@
 
 ## 📸 界面预览
 
-> 截图占位——把对应 PNG 放进 [`docs/screenshots/`](docs/screenshots/) 即自动显示（命名见该目录说明）。
-
 | 连线配置画布 | 内置交互终端 |
 |:---:|:---:|
 | ![连线画布](docs/screenshots/canvas.png) | ![内置终端](docs/screenshots/terminal.png) |
