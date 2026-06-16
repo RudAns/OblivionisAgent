@@ -1966,7 +1966,8 @@ function Inner() {
               </button>
             </div>
             <div className="popup-body">
-              <div className="settings-label">{t("语言")}</div>
+              {/* 语言切换器本身刻意不走 t()：固定双语/英文，做"通用入口"，谁都找得到、不随界面语言翻转 */}
+              <div className="settings-label">语言 · Language</div>
               <div className="seg">
                 {(
                   [
@@ -1980,7 +1981,8 @@ function Inner() {
                 ))}
               </div>
               <div className="hint" style={{ marginTop: 8 }}>
-                {t("切换界面语言（专业术语 / 标识符保持原样）。漏译的地方会暂时显示中文，正在逐步补全。")}
+                Switch the interface language. Technical terms / identifiers stay as-is; untranslated parts
+                temporarily show Chinese and are being filled in.
               </div>
 
               <div className="settings-label" style={{ marginTop: 16 }}>{t("主题")}</div>
