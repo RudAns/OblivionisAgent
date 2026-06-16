@@ -253,6 +253,11 @@ fn save_paste_image(b64: String, ext: String) -> Result<String, String> {
 /// 点击终端里的文件路径时打开它：.md 用 VSCode，.html 等用默认程序(浏览器)。相对路径按会话 cwd(base) 解析。
 #[tauri::command]
 fn open_path(path: String, base: String) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    // 经 cmd 启动 code/start 是为了走 PATHEXT 把 `code`→`code.cmd`；但 cmd 会闪一个黑色控制台窗。
+    // CREATE_NO_WINDOW(0x08000000) 让这个中转 cmd 不创建控制台——VSCode/浏览器是独立 GUI 进程，照常打开。
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
     let p = std::path::Path::new(&path);
     let full = if p.is_absolute() || base.is_empty() {
         p.to_path_buf()
@@ -265,12 +270,14 @@ fn open_path(path: String, base: String) -> Result<(), String> {
     if lower.ends_with(".md") || lower.ends_with(".markdown") {
         std::process::Command::new(&comspec)
             .args(["/c", "code", &full_str])
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| format!("用 VSCode 打开失败(确认 code 在 PATH): {e}"))?;
     } else {
         // .html 等：用默认关联程序打开（html 默认即浏览器）
         std::process::Command::new(&comspec)
             .args(["/c", "start", "", &full_str])
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| e.to_string())?;
     }
