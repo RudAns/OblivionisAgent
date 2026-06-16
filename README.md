@@ -16,6 +16,8 @@
 ![Version](https://img.shields.io/badge/version-0.1.0-2ea44f)
 [![CI](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml)
 
+[English](README.en.md) · **简体中文**
+
 [更新日志 CHANGELOG](CHANGELOG.md) · [贡献指南 CONTRIBUTING](CONTRIBUTING.md) · [安全策略 SECURITY](SECURITY.md)
 
 </div>
