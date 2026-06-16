@@ -93,6 +93,11 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
     label: "人格",
     data: {},
   }),
+  skill: () => ({
+    kind: "skill",
+    label: "技能",
+    data: {},
+  }),
   webhook: () => ({
     kind: "webhook",
     label: "Webhook",
@@ -153,6 +158,7 @@ const PALETTE: [keyof typeof NEW_NODE_DEFAULTS, string][] = [
   ["cron", "定时任务"],
   ["webhook", "Webhook"],
   ["soul", "人格"],
+  ["skill", "技能"],
 ];
 // kind → 本地化名（检视标题等用，避免直接显示原始 "claude-session"）
 const NODE_LABEL: Record<string, string> = Object.fromEntries(PALETTE);
@@ -186,7 +192,10 @@ const ADD_GROUPS: {
   },
   {
     title: "辅助",
-    items: [{ kind: "soul", label: "人格", icon: "🎭", color: "#9d7bc9" }],
+    items: [
+      { kind: "soul", label: "人格", icon: "🎭", color: "#9d7bc9" },
+      { kind: "skill", label: "技能", icon: "🧩", color: "#3a8fa0" },
+    ],
   },
 ];
 // kind → 代表色 / 图标(节点检视浮窗的彩色头部用，避免纯白无特征)
@@ -198,6 +207,7 @@ const NODE_COLOR: Record<string, string> = {
   cron: "#3a8fa0",
   webhook: "#b7791f",
   soul: "#9d7bc9",
+  skill: "#3a8fa0",
 };
 const NODE_ICON: Record<string, string> = {
   "feishu-group": "💬",
@@ -207,6 +217,7 @@ const NODE_ICON: Record<string, string> = {
   cron: "⏰",
   webhook: "🪝",
   soul: "🎭",
+  skill: "🧩",
 };
 
 // 从某类节点的「输出口」拖到空白处时，能落地的目标类型（与 FlowCanvas 连线校验同源）。
@@ -214,7 +225,7 @@ const NODE_ICON: Record<string, string> = {
 function dropTargetsFor(
   sourceKind: string | undefined,
 ): { kind: keyof typeof NEW_NODE_DEFAULTS; handle?: string }[] {
-  if (sourceKind === "soul") return [{ kind: "claude-session", handle: "fork" }];
+  if (sourceKind === "soul" || sourceKind === "skill") return [{ kind: "claude-session", handle: "fork" }];
   if (sourceKind === "cron" || sourceKind === "webhook") return [{ kind: "claude-session" }];
   if (sourceKind === "feishu-group" || sourceKind === "route" || sourceKind === "intent-switch")
     return [{ kind: "route" }, { kind: "intent-switch" }, { kind: "claude-session" }];
@@ -2136,6 +2147,7 @@ function Inner() {
                 onListSessions={(cwd) => client.send({ type: "list-sessions", cwd })}
                 onRefreshSnapshot={(nodeId) => client.send({ type: "prepare-fork", nodeId })}
                 onEditSoul={(nodeId) => client.send({ type: "ensure-soul", nodeId })}
+                onEditSkill={(nodeId) => client.send({ type: "ensure-skill", nodeId })}
                 onEditGroupMemory={(chatId) => client.send({ type: "ensure-group-memory", chatId })}
               />
               {selectedIsClaude && (
@@ -2501,6 +2513,7 @@ function Inspector({
   onListSessions,
   onRefreshSnapshot,
   onEditSoul,
+  onEditSkill,
   onEditGroupMemory,
 }: {
   node: Node | null;
@@ -2510,6 +2523,7 @@ function Inspector({
   onListSessions: (cwd: string) => void;
   onRefreshSnapshot: (nodeId: string) => void;
   onEditSoul: (nodeId: string) => void;
+  onEditSkill: (nodeId: string) => void;
   onEditGroupMemory: (chatId: string) => void;
 }) {
   const [showPicker, setShowPicker] = useState(false);
@@ -2588,6 +2602,22 @@ function Inspector({
               onClick={() => node && onEditSoul(node.id)}
             >
               🎭 编辑灵魂 (SOUL.md)
+            </button>
+          </div>
+        </>
+      )}
+      {node.type === "skill" && (
+        <>
+          <div className="hint" style={{ marginBottom: 6 }}>
+            技能 (SKILL.md)：操作性指令 / 话术 / 输出格式，和人格互补（人格管怎么说话，技能管怎么做事）。
+            把本节点右侧 ● 连到「Claude 会话」的 <b>🎭人格/🧩技能口</b>；一个会话可连多个技能。
+          </div>
+          <div className="fs-actions">
+            <button
+              title="编辑这份技能文件 SKILL.md（首次自动生成模板，保存即生效）"
+              onClick={() => node && onEditSkill(node.id)}
+            >
+              🧩 编辑技能 (SKILL.md)
             </button>
           </div>
         </>

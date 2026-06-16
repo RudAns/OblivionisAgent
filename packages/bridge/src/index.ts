@@ -18,6 +18,7 @@ import { classifyIntent } from "./claude/classify-intent.js";
 import { TranscriptStore } from "./transcript-store.js";
 import { UsageMonitor } from "./usage-monitor.js";
 import { ensureSoul, resolveSessionSoul } from "./soul-store.js";
+import { ensureSkill, resolveSessionSkills } from "./skill-store.js";
 import { KnowledgeStore } from "./knowledge-store.js";
 import { extractKnowledge } from "./claude/extract-knowledge.js";
 import { CronScheduler } from "./cron-scheduler.js";
@@ -414,6 +415,8 @@ async function main() {
     //   3. 访客护栏 —— 永远压轴，并声明优先级（人格只影响表达，不得越权）
     // 人格：飞书走 Fork 口——找连到该会话「Fork口」的 soul 节点，无则回退旧的一会话一人格文件
     const soul = resolveSessionSoul(cfg, node.id, "fork")?.content;
+    // 技能节点(SKILL.md)：连到该会话「人格/技能口」的技能，操作性指令/话术/格式，注入到操作层
+    const skills = resolveSessionSkills(cfg, node.id);
     // 群记忆：注入该群的 GROUP.md，让机器人"记得这个群"（成员称呼、约定、关注点）
     const groupMem = readGroupMemory(inbound.chatId);
     const memBlock = groupMem
@@ -428,7 +431,7 @@ async function main() {
           .filter(Boolean)
           .join("\n");
     const appendPrompt =
-      [soul, memBlock, node.data.appendSystemPrompt, guardrail].filter(Boolean).join("\n\n") || undefined;
+      [soul, memBlock, node.data.appendSystemPrompt, skills, guardrail].filter(Boolean).join("\n\n") || undefined;
 
     // 审计落盘：每条入站(尤其访客提问)。nodeId 供人格反思按节点取近期对话
     appendAudit({
@@ -747,6 +750,7 @@ async function main() {
     getTranscripts: () => transcripts.histories(),
     getUsage: () => usage.getLast(),
     ensureSoul: (nodeId) => ensureSoul(nodeId),
+    ensureSkill: (nodeId) => ensureSkill(nodeId),
     ensureGroupMemory: (chatId) => ensureGroupMemory(chatId),
     knowledge,
     permBroker,

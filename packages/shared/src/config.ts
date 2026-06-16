@@ -146,6 +146,10 @@ export type WebhookData = z.infer<typeof WebhookData>;
 export const SoulData = z.object({});
 export type SoulData = z.infer<typeof SoulData>;
 
+/** 技能节点：内容在 ~/.oblivionis/skills/<nodeId>.md(操作性指令/话术/格式)，连到会话注入 */
+export const SkillData = z.object({});
+export type SkillData = z.infer<typeof SkillData>;
+
 const BaseNode = z.object({
   id: z.string(),
   position: XY,
@@ -160,6 +164,7 @@ export const GraphNode = z.discriminatedUnion("kind", [
   BaseNode.extend({ kind: z.literal("cron"), data: CronData }),
   BaseNode.extend({ kind: z.literal("webhook"), data: WebhookData }),
   BaseNode.extend({ kind: z.literal("soul"), data: SoulData }),
+  BaseNode.extend({ kind: z.literal("skill"), data: SkillData }),
 ]);
 export type GraphNode = z.infer<typeof GraphNode>;
 
@@ -170,6 +175,7 @@ export type ClaudeSessionNode = Extract<GraphNode, { kind: "claude-session" }>;
 export type CronNode = Extract<GraphNode, { kind: "cron" }>;
 export type WebhookNode = Extract<GraphNode, { kind: "webhook" }>;
 export type SoulNode = Extract<GraphNode, { kind: "soul" }>;
+export type SkillNode = Extract<GraphNode, { kind: "skill" }>;
 
 export const GraphEdge = z.object({
   id: z.string(),

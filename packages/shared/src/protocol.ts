@@ -34,6 +34,8 @@ export type ClientMessage =
   | { type: "get-audit" }
   /** 确保节点人格文件(SOUL.md)存在（无则播种 starter），回 soul-path */
   | { type: "ensure-soul"; nodeId: string }
+  /** 确保技能节点文件(SKILL.md)存在（无则播种 starter），回 open-file 供 GUI 编辑 */
+  | { type: "ensure-skill"; nodeId: string }
   /** 确保某群的 GROUP.md 存在（无则建模板），回 file-path 供 GUI 打开编辑 */
   | { type: "ensure-group-memory"; chatId: string }
   /** 知识收件箱裁决：accept(可带编辑后规则)→写 cwd 的 CLAUDE.md；dismiss=抛弃 */
