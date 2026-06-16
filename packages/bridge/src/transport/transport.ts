@@ -1,5 +1,15 @@
 /** 飞书传输层抽象：实现可替换（mock / lark SDK / 未来的 Hermes 适配器） */
 
+/** 随消息发来的文件附件（含被引用消息里的）。已下载到本地。 */
+export interface InboundFile {
+  /** 原始文件名（含扩展名） */
+  name: string;
+  /** 下载后的本地绝对路径（claude 可用 Read 打开） */
+  path: string;
+  /** 文本类文件的正文（截断后内联进 prompt）；二进制 / 超体积上限时为 undefined */
+  text?: string;
+}
+
 export interface InboundMessage {
   /** 会话 ID（群 oc_xxx 或单聊） */
   chatId: string;
@@ -15,6 +25,8 @@ export interface InboundMessage {
   quoted?: string;
   /** 随消息发来的图片（含被引用消息里的图）下载后的本地绝对路径；交给 claude 用 Read 读图 */
   images?: string[];
+  /** 随消息发来的文件附件（含被引用消息里的）下载后的信息；文本类已内联正文 */
+  files?: InboundFile[];
   /** 原始事件，便于扩展 */
   raw?: unknown;
 }

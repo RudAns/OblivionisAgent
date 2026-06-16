@@ -1,8 +1,8 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import type { FeishuStatus } from "@oblivionis/shared";
-import type { FeishuTransport, InboundMessage, ReplyOpts, ReplyStreamHandle } from "./transport.js";
+import type { FeishuTransport, InboundFile, InboundMessage, ReplyOpts, ReplyStreamHandle } from "./transport.js";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -39,6 +39,38 @@ function sniffImageExt(b: Buffer): string {
   if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return "gif";
   if (b.length >= 12 && b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WEBP") return "webp";
   return "png";
+}
+
+/** 入站文件内联正文的体积上限（超过只截断内联前半段，原文件仍落地供 claude 用 Read 打开） */
+const MAX_INLINE_FILE_BYTES = 512 * 1024;
+
+/** 文本类附件白名单（按扩展名）：这些读出正文内联进 prompt，其余只给本地路径让 claude 自行 Read */
+const TEXT_FILE_EXTS = new Set([
+  "md", "markdown", "txt", "text", "log", "csv", "tsv", "json", "json5", "jsonc",
+  "yml", "yaml", "toml", "ini", "conf", "cfg", "env", "xml", "html", "htm", "css", "scss", "less",
+  "js", "mjs", "cjs", "ts", "tsx", "jsx", "vue", "svelte", "py", "rb", "php", "go", "rs", "java",
+  "kt", "kts", "c", "h", "cpp", "hpp", "cc", "cs", "swift", "m", "sh", "bash", "zsh", "ps1", "bat",
+  "sql", "graphql", "proto", "diff", "patch", "gradle", "properties", "dockerfile", "makefile",
+]);
+
+/** 文件名净化：去掉路径分隔符 / 父目录 / 控制字符，防穿越；保留扩展名，限长 */
+function sanitizeFileName(name: string): string {
+  const base = String(name || "file")
+    .replace(/[/\\]/g, "_")
+    .replace(/\.\.+/g, "_")
+    .replace(/[<>:"|?*]/g, "_")
+    .trim();
+  const cleaned = base.replace(/^_+/, "") || "file";
+  return cleaned.length > 80 ? cleaned.slice(-80) : cleaned;
+}
+
+/** 按扩展名判断是否文本类附件 */
+function isTextFile(name: string): boolean {
+  const m = /\.([a-z0-9]+)$/i.exec(name);
+  const ext = m?.[1]?.toLowerCase();
+  if (ext && TEXT_FILE_EXTS.has(ext)) return true;
+  // 无扩展名的常见纯文本配置文件
+  return /^(dockerfile|makefile|readme|license|changelog)$/i.test(name.trim());
 }
 
 export interface BotInfo {
@@ -237,9 +269,9 @@ export class LarkTransport implements FeishuTransport {
     const chatId: string = message.chat_id;
     if (!chatId) return;
 
-    // 解析本条消息：文本(text)/图片(image)/富文本(post)。其它类型(文件/音频/贴纸…)且无文本无图 → 跳过。
-    const { text, imageKeys } = this.extractContent(message.message_type, message.content);
-    if (!text && imageKeys.length === 0) return;
+    // 解析本条消息：文本(text)/图片(image)/文件(file)/富文本(post)。其它类型(音频/贴纸…)且无文本无图无文件 → 跳过。
+    const { text, imageKeys, fileKeys } = this.extractContent(message.message_type, message.content);
+    if (!text && imageKeys.length === 0 && fileKeys.length === 0) return;
 
     const chatType: string = message.chat_type ?? "p2p"; // p2p | group
     const mentions: any[] = Array.isArray(message.mentions) ? message.mentions : [];
@@ -260,14 +292,23 @@ export class LarkTransport implements FeishuTransport {
     // text 始终透传（triggerMode=all 的群靠 router 决定触发，不在这里早退）。
     let quoted: string | undefined;
     const images: string[] = [];
+    const files: InboundFile[] = [];
     if (isMention) {
       let parentImageKeys: string[] = [];
+      let parentFileKeys: Array<{ key: string; name: string }> = [];
       let parentMsgId: string | undefined;
       if (message.parent_id) {
         const parent = await this.fetchMessage(message.parent_id);
         if (parent) {
-          quoted = parent.text || (parent.imageKeys.length ? "[图片]" : undefined);
+          quoted =
+            parent.text ||
+            (parent.imageKeys.length
+              ? "[图片]"
+              : parent.fileKeys.length
+                ? `[文件] ${parent.fileKeys.map((f) => f.name).join("、")}`
+                : undefined);
           parentImageKeys = parent.imageKeys;
+          parentFileKeys = parent.fileKeys;
           parentMsgId = message.parent_id;
         }
       }
@@ -280,6 +321,18 @@ export class LarkTransport implements FeishuTransport {
         for (const k of parentImageKeys) {
           const p = await this.downloadImage(parentMsgId, k, idx++);
           if (p) images.push(p);
+        }
+      }
+      // 文件附件：本条消息 + 被引用消息（截图里那种「回复某文件并 @机器人」就是落在父消息）。
+      let fidx = 0;
+      for (const f of fileKeys) {
+        const got = await this.downloadFile(message.message_id, f.key, f.name, fidx++);
+        if (got) files.push(got);
+      }
+      if (parentMsgId && parentFileKeys.length) {
+        for (const f of parentFileKeys) {
+          const got = await this.downloadFile(parentMsgId, f.key, f.name, fidx++);
+          if (got) files.push(got);
         }
       }
     }
@@ -298,21 +351,29 @@ export class LarkTransport implements FeishuTransport {
       isMention,
       quoted,
       images: images.length ? images : undefined,
+      files: files.length ? files : undefined,
       raw: data,
     });
   }
 
-  /** 解析消息内容：返回纯文本 + 图片 key 列表。支持 text / image / post(富文本)。 */
-  private extractContent(type: string, contentStr: string): { text: string; imageKeys: string[] } {
+  /** 解析消息内容：返回纯文本 + 图片 key + 文件 key。支持 text / image / file / post(富文本)。 */
+  private extractContent(
+    type: string,
+    contentStr: string,
+  ): { text: string; imageKeys: string[]; fileKeys: Array<{ key: string; name: string }> } {
     const imageKeys: string[] = [];
+    const fileKeys: Array<{ key: string; name: string }> = [];
     let text = "";
     try {
-      if (!contentStr) return { text, imageKeys };
+      if (!contentStr) return { text, imageKeys, fileKeys };
       const c = JSON.parse(contentStr);
       if (type === "text") {
         text = c?.text ?? "";
       } else if (type === "image") {
         if (c?.image_key) imageKeys.push(c.image_key);
+      } else if (type === "file") {
+        // 文件附件消息：content = {file_key, file_name}
+        if (c?.file_key) fileKeys.push({ key: c.file_key, name: typeof c?.file_name === "string" ? c.file_name : "file" });
       } else if (type === "post") {
         // post 可能按 locale 包一层(zh_cn/en_us…)；content 是「段落数组」，每段是「元素数组」
         const body = c?.zh_cn || c?.en_us || c?.ja_jp || c;
@@ -333,7 +394,7 @@ export class LarkTransport implements FeishuTransport {
     } catch {
       /* 解析失败 → 空 */
     }
-    return { text, imageKeys };
+    return { text, imageKeys, fileKeys };
   }
 
   /** 下载飞书消息里的图片资源(需 im:resource 权限)，按真实格式存到 ~/.oblivionis/inbound-images，返回本地绝对路径 */
@@ -367,6 +428,51 @@ export class LarkTransport implements FeishuTransport {
       }
     } catch (e) {
       this.opts.log("warn", `下载飞书图片失败(${String(fileKey).slice(0, 10)}…): ${(e as Error).message}`);
+    }
+    return undefined;
+  }
+
+  /**
+   * 下载飞书消息里的文件附件(需 im:resource 权限)，存到 ~/.oblivionis/inbound-files，返回本地路径。
+   * 文本类附件顺手读出正文(截断到上限)内联；二进制只留路径供 claude 用 Read 打开。
+   */
+  private async downloadFile(messageId: string, fileKey: string, fileName: string, idx: number): Promise<InboundFile | undefined> {
+    if (!this.client || !messageId || !fileKey) return undefined;
+    try {
+      const res: any = await this.client.im.messageResource.get({
+        path: { message_id: messageId, file_key: fileKey },
+        params: { type: "file" },
+      });
+      let buf: Buffer | undefined;
+      if (typeof res?.getReadableStream === "function") {
+        const chunks: Buffer[] = [];
+        for await (const ch of res.getReadableStream()) chunks.push(Buffer.isBuffer(ch) ? ch : Buffer.from(ch));
+        buf = Buffer.concat(chunks);
+      }
+      const dir = join(homedir(), ".oblivionis", "inbound-files");
+      mkdirSync(dir, { recursive: true });
+      const safeMsg = String(messageId).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 24);
+      const safeName = sanitizeFileName(fileName);
+      const path = join(dir, `${safeMsg}_${idx}_${safeName}`);
+      if (buf && buf.length) {
+        writeFileSync(path, buf);
+      } else if (typeof res?.writeFile === "function") {
+        await res.writeFile(path);
+      } else {
+        return undefined;
+      }
+      // 文本类附件：读出正文内联（截断到上限）。源用已收到的 buffer，没有再回读磁盘。
+      let inlineText: string | undefined;
+      if (isTextFile(safeName)) {
+        const source = buf ?? (existsSync(path) ? readFileSync(path) : undefined);
+        if (source && source.length) {
+          const slice = source.subarray(0, MAX_INLINE_FILE_BYTES).toString("utf8");
+          inlineText = source.length > MAX_INLINE_FILE_BYTES ? `${slice}\n…（文件超过 ${Math.round(MAX_INLINE_FILE_BYTES / 1024)}KB，已截断）` : slice;
+        }
+      }
+      return { name: fileName, path, text: inlineText };
+    } catch (e) {
+      this.opts.log("warn", `下载飞书文件失败(${fileName}): ${(e as Error).message}`);
     }
     return undefined;
   }
@@ -442,8 +548,10 @@ export class LarkTransport implements FeishuTransport {
     }
   }
 
-  /** 通过消息 id 读取被引用消息：返回文本 + 图片 key（图片/post 也能读） */
-  private async fetchMessage(messageId: string): Promise<{ text: string; imageKeys: string[] } | undefined> {
+  /** 通过消息 id 读取被引用消息：返回文本 + 图片 key + 文件 key（图片/文件/post 都能读） */
+  private async fetchMessage(
+    messageId: string,
+  ): Promise<{ text: string; imageKeys: string[]; fileKeys: Array<{ key: string; name: string }> } | undefined> {
     try {
       const resp: any = await this.client.im.message.get({ path: { message_id: messageId } });
       const items = resp?.data?.items ?? resp?.items ?? [];
