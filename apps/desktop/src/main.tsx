@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App.js";
 import { Mascot } from "./Mascot.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
+import { LangProvider } from "./i18n/index.js";
 import "./styles.css";
 
 // index.html 这份打包驱动主窗 + 小人提醒窗(启动闪屏是独立的 splash.html，不走这里)，按 label 分流。
@@ -16,13 +17,15 @@ try {
 
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 root.render(
-  label === "mascot" ? (
-    <Mascot />
-  ) : (
-    <React.StrictMode>
-      <ErrorBoundary>
-        <App />
-      </ErrorBoundary>
-    </React.StrictMode>
-  ),
+  <LangProvider>
+    {label === "mascot" ? (
+      <Mascot />
+    ) : (
+      <React.StrictMode>
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      </React.StrictMode>
+    )}
+  </LangProvider>,
 );

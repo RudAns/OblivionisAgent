@@ -48,6 +48,7 @@ import { AuditPanel, type AuditItem } from "./panels/AuditPanel.js";
 import { InboxPanel } from "./panels/InboxPanel.js";
 import { FeishuPanel, FeishuStatusDot, type FeishuState } from "./panels/FeishuPanel.js";
 import { IconRail, type RailKey } from "./layout/IconRail.js";
+import { useI18n, type Lang } from "./i18n/index.js";
 import { IconMoon, IconSun, IconMonitor } from "./layout/icons.js";
 import { SessionSidebar } from "./layout/SessionSidebar.js";
 import { StatusBar } from "./layout/StatusBar.js";
@@ -326,6 +327,8 @@ function Inner() {
   const [tab, setTab] = useState<Tab>("transcript");
   // 会话视图"粘滞"：记住上次在看会话的哪种视图(终端/转录)，切会话时沿用、不强制跳终端
   const [lastSessionView, setLastSessionView] = useState<"terminal" | "transcript">("terminal");
+  // 国际化：t() 翻译界面文案(中文原文即 key，漏译回退中文)；lang/setLang 给设置里的语言切换器
+  const { t, lang, setLang } = useI18n();
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [inbox, setInbox] = useState<AuditItem[]>([]);
   const [feishu, setFeishu] = useState<FeishuState>({ status: "disconnected" });
@@ -1957,19 +1960,36 @@ function Inner() {
         {settingsOpen && (
           <div className="popup popup-settings">
             <div className="popup-head">
-              <span>设置</span>
-              <button className="popup-x" onClick={() => setSettingsOpen(false)} title="隐藏">
+              <span>{t("设置")}</span>
+              <button className="popup-x" onClick={() => setSettingsOpen(false)} title={t("隐藏")}>
                 ×
               </button>
             </div>
             <div className="popup-body">
-              <div className="settings-label">主题</div>
+              <div className="settings-label">{t("语言")}</div>
               <div className="seg">
                 {(
                   [
-                    ["dark", "深色", IconMoon],
-                    ["light", "浅色", IconSun],
-                    ["system", "跟随系统", IconMonitor],
+                    ["zh", "中文"],
+                    ["en", "English"],
+                  ] as [Lang, string][]
+                ).map(([v, label]) => (
+                  <button key={v} className={`seg-btn ${lang === v ? "on" : ""}`} onClick={() => setLang(v)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="hint" style={{ marginTop: 8 }}>
+                {t("切换界面语言（专业术语 / 标识符保持原样）。漏译的地方会暂时显示中文，正在逐步补全。")}
+              </div>
+
+              <div className="settings-label" style={{ marginTop: 16 }}>{t("主题")}</div>
+              <div className="seg">
+                {(
+                  [
+                    ["dark", t("深色"), IconMoon],
+                    ["light", t("浅色"), IconSun],
+                    ["system", t("跟随系统"), IconMonitor],
                   ] as [ThemePref, string, (p: { size?: number }) => JSX.Element][]
                 ).map(([v, label, Icon]) => (
                   <button key={v} className={`seg-btn ${theme === v ? "on" : ""}`} onClick={() => applyTheme(v)}>
@@ -1993,26 +2013,26 @@ function Inner() {
                         setThemeNotice(false);
                       }}
                     >
-                      🔄 重开所有终端（{openedTerminals.length}）—— 会话保留
+                      🔄 {t("重开所有终端（{0}）—— 会话保留", openedTerminals.length)}
                     </button>
                   )}
                 </div>
               ) : (
                 <div className="hint" style={{ marginTop: 10 }}>
-                  切换会一并设置 Claude 终端主题；浅色参考 Claude 主页配色，部分细节仍在调。
+                  {t("切换会一并设置 Claude 终端主题；浅色参考 Claude 主页配色，部分细节仍在调。")}
                 </div>
               )}
 
-              <div className="settings-label" style={{ marginTop: 16 }}>完成任务桌面提示</div>
+              <div className="settings-label" style={{ marginTop: 16 }}>{t("完成任务桌面提示")}</div>
               <div className="seg">
                 {(
                   [
-                    [false, "关"],
-                    [true, "开"],
+                    [false, t("关")],
+                    [true, t("开")],
                   ] as [boolean, string][]
                 ).map(([v, label]) => (
                   <button
-                    key={label}
+                    key={String(v)}
                     className={`seg-btn ${completionAlert === v ? "on" : ""}`}
                     onClick={() => setCompletionAlert(v)}
                   >
@@ -2021,12 +2041,12 @@ function Inner() {
                 ))}
               </div>
               <div className="hint" style={{ marginTop: 8 }}>
-                后台跑完任务时，右下角弹个小人提醒，点它回到会话。
+                {t("后台跑完任务时，右下角弹个小人提醒，点它回到会话。")}
               </div>
               {completionAlert && (
                 <div style={{ marginTop: 10 }}>
                   <div className="settings-label" style={{ marginBottom: 6 }}>
-                    小人停留时长：{mascotSec} 秒
+                    {t("小人停留时长：{0} 秒", mascotSec)}
                   </div>
                   <input
                     type="range"
@@ -2037,14 +2057,14 @@ function Inner() {
                     style={{ width: "100%" }}
                   />
                   <div className="fs-actions" style={{ marginTop: 6 }}>
-                    <button onClick={() => showMascot("", "位置预览")} title="按当前时长弹一下小人看看效果（屏幕右下角）">
-                      👀 预览
+                    <button onClick={() => showMascot("", t("位置预览"))} title={t("按当前时长弹一下小人看看效果（屏幕右下角）")}>
+                      {t("👀 预览")}
                     </button>
                   </div>
                 </div>
               )}
 
-              <div className="settings-label" style={{ marginTop: 16 }}>终端字号：{termFontSize}px</div>
+              <div className="settings-label" style={{ marginTop: 16 }}>{t("终端字号：{0}px", termFontSize)}</div>
               <input
                 type="range"
                 min={9}
@@ -2054,19 +2074,19 @@ function Inner() {
                 style={{ width: "100%" }}
               />
               <div className="hint" style={{ marginTop: 6 }}>
-                拖动调整所有终端字号；终端里也可 Ctrl + +/− 调整、Ctrl+0 复位。
+                {t("拖动调整所有终端字号；终端里也可 Ctrl + +/− 调整、Ctrl+0 复位。")}
               </div>
 
-              <div className="settings-label" style={{ marginTop: 16 }}>🧪 路由测试（干跑·不发飞书）</div>
+              <div className="settings-label" style={{ marginTop: 16 }}>{t("🧪 路由测试（干跑·不发飞书）")}</div>
               <select value={rtChat} onChange={(e) => setRtChat(e.target.value)} style={{ width: "100%", marginBottom: 6 }}>
-                <option value="">选择群（飞书群节点）…</option>
+                <option value="">{t("选择群（飞书群节点）…")}</option>
                 {nodes
                   .filter((n) => n.type === "feishu-group")
                   .map((n) => {
                     const cid = (n.data as { chatId?: string })?.chatId ?? "";
                     return (
                       <option key={n.id} value={cid}>
-                        {cid || "(未填 chatId)"}
+                        {cid || t("(未填 chatId)")}
                       </option>
                     );
                   })}
@@ -2074,7 +2094,7 @@ function Inner() {
               <input
                 value={rtText}
                 onChange={(e) => setRtText(e.target.value)}
-                placeholder="输入一句样例消息，看它命中哪条链路"
+                placeholder={t("输入一句样例消息，看它命中哪条链路")}
                 style={{ width: "100%", marginBottom: 6 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && rtChat && rtText.trim())
@@ -2085,9 +2105,9 @@ function Inner() {
                 <button
                   disabled={!rtChat || !rtText.trim()}
                   onClick={() => client.send({ type: "route-test", chatId: rtChat, text: rtText.trim() })}
-                  title="只跑路由+意图分类，不真发飞书、不真跑会话；命中的连线会在画布上高亮 6 秒"
+                  title={t("只跑路由+意图分类，不真发飞书、不真跑会话；命中的连线会在画布上高亮 6 秒")}
                 >
-                  ▶ 测试路由
+                  {t("▶ 测试路由")}
                 </button>
               </div>
               {rtResult && (
@@ -2096,16 +2116,16 @@ function Inner() {
                 </div>
               )}
 
-              <div className="settings-label" style={{ marginTop: 16 }}>全局唤起热键（默认关）</div>
+              <div className="settings-label" style={{ marginTop: 16 }}>{t("全局唤起热键（默认关）")}</div>
               <div className="seg">
                 {(
                   [
-                    [false, "关"],
-                    [true, "开"],
+                    [false, t("关")],
+                    [true, t("开")],
                   ] as [boolean, string][]
                 ).map(([v, label]) => (
                   <button
-                    key={label}
+                    key={String(v)}
                     className={`seg-btn ${hotkeyEnabled === v ? "on" : ""}`}
                     onClick={() => setHotkeyEnabled(v)}
                   >
@@ -2118,7 +2138,7 @@ function Inner() {
                   <input
                     value={hotkeyKey}
                     onChange={(e) => setHotkeyKey(e.target.value)}
-                    placeholder="如 CommandOrControl+Shift+O"
+                    placeholder={t("如 CommandOrControl+Shift+O")}
                     style={{ width: "100%", marginTop: 6 }}
                   />
                   <div className="hint" style={{ marginTop: 6 }}>
@@ -2128,16 +2148,16 @@ function Inner() {
                 </>
               )}
 
-              <div className="settings-label" style={{ marginTop: 16 }}>画布配置</div>
+              <div className="settings-label" style={{ marginTop: 16 }}>{t("画布配置")}</div>
               <div className="fs-actions">
-                <button onClick={exportCanvas} title="把整张画布导出成 JSON 文件（已抹会话身份/密钥），可分享/进 git">
-                  ⬇ 导出
+                <button onClick={exportCanvas} title={t("把整张画布导出成 JSON 文件（已抹会话身份/密钥），可分享/进 git")}>
+                  {t("⬇ 导出")}
                 </button>
                 <button
                   onClick={() => importInputRef.current?.click()}
-                  title="从 JSON 文件导入画布（会替换当前画布）"
+                  title={t("从 JSON 文件导入画布（会替换当前画布）")}
                 >
-                  ⬆ 导入
+                  {t("⬆ 导入")}
                 </button>
               </div>
               <input
@@ -2152,7 +2172,7 @@ function Inner() {
                 }}
               />
               <div className="hint" style={{ marginTop: 6 }}>
-                导出抹掉会话身份与密钥；导入后会话首次收到飞书消息会自动重新 fork。
+                {t("导出抹掉会话身份与密钥；导入后会话首次收到飞书消息会自动重新 fork。")}
               </div>
             </div>
           </div>
