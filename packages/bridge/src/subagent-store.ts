@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import type { OblivionisConfig } from "@oblivionis/shared";
 
 /**
  * 子代理（Claude Code 原生 subagent）存取：定义文件放在 `~/.claude/agents/`，claude 会自动发现，
@@ -30,6 +31,39 @@ tools: Read, Grep, Glob
 export function subagentPath(nodeId: string): string {
   const safe = nodeId.replace(/[^a-zA-Z0-9-]/g, "_");
   return join(AGENTS_DIR(), `oblivionis-${safe}.md`);
+}
+
+/** 读子代理定义里的 name + description（frontmatter），用于告诉主会话"它有这些可委派的子代理" */
+export function readSubagentMeta(nodeId: string): { name: string; description: string } | undefined {
+  try {
+    const p = subagentPath(nodeId);
+    if (!existsSync(p)) return undefined;
+    const fm = readFileSync(p, "utf8").match(/^---\s*([\s\S]*?)\s*---/)?.[1];
+    if (!fm) return undefined;
+    const name = (fm.match(/name:\s*(.+)/)?.[1] ?? "").trim();
+    const description = (fm.match(/description:\s*(.+)/)?.[1] ?? "").trim();
+    return name ? { name, description } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 解析连到某会话节点「人格/技能口」的所有子代理的 name+description，让该会话主动委派给它们 */
+export function resolveSessionSubagents(
+  config: Pick<OblivionisConfig, "graph">,
+  sessionNodeId: string,
+): Array<{ name: string; description: string }> {
+  const { nodes, edges } = config.graph;
+  const out: Array<{ name: string; description: string }> = [];
+  for (const e of edges) {
+    if (e.target !== sessionNodeId) continue;
+    if ((e.targetHandle ?? "fork") !== "fork") continue;
+    const src = nodes.find((n) => n.id === e.source);
+    if (src?.kind !== "subagent") continue;
+    const meta = readSubagentMeta(e.source);
+    if (meta) out.push(meta);
+  }
+  return out;
 }
 
 /** 确保子代理定义存在（无则播种 starter，绝不覆盖）。返回 { path, created } */

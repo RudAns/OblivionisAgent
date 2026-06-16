@@ -19,7 +19,7 @@ import { TranscriptStore } from "./transcript-store.js";
 import { UsageMonitor } from "./usage-monitor.js";
 import { ensureSoul, resolveSessionSoul } from "./soul-store.js";
 import { ensureSkill, resolveSessionSkills } from "./skill-store.js";
-import { ensureSubagent } from "./subagent-store.js";
+import { ensureSubagent, resolveSessionSubagents } from "./subagent-store.js";
 import { KnowledgeStore } from "./knowledge-store.js";
 import { extractKnowledge } from "./claude/extract-knowledge.js";
 import { CronScheduler } from "./cron-scheduler.js";
@@ -418,6 +418,12 @@ async function main() {
     const soul = resolveSessionSoul(cfg, node.id, "fork")?.content;
     // 技能节点(SKILL.md)：连到该会话「人格/技能口」的技能，操作性指令/话术/格式，注入到操作层
     const skills = resolveSessionSkills(cfg, node.id);
+    // 子代理节点：连到该会话的子代理 → 注入"你有这些可委派的子代理"提示，让本会话主动用 Task 委派
+    const subagents = resolveSessionSubagents(cfg, node.id);
+    const subagentHint = subagents.length
+      ? `【可委派的子代理（遇到对应子任务就用 Task 工具委派给它们，在独立上下文里做，别全堆在本会话里）】\n` +
+        subagents.map((s) => `- ${s.name}：${s.description}`).join("\n")
+      : undefined;
     // 群记忆：注入该群的 GROUP.md，让机器人"记得这个群"（成员称呼、约定、关注点）
     const groupMem = readGroupMemory(inbound.chatId);
     const memBlock = groupMem
@@ -432,7 +438,9 @@ async function main() {
           .filter(Boolean)
           .join("\n");
     const appendPrompt =
-      [soul, memBlock, node.data.appendSystemPrompt, skills, guardrail].filter(Boolean).join("\n\n") || undefined;
+      [soul, memBlock, node.data.appendSystemPrompt, skills, subagentHint, guardrail]
+        .filter(Boolean)
+        .join("\n\n") || undefined;
 
     // 审计落盘：每条入站(尤其访客提问)。nodeId 供人格反思按节点取近期对话
     appendAudit({
