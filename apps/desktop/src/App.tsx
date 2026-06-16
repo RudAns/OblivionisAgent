@@ -2763,16 +2763,6 @@ function Inspector({
             />
           </label>
 
-          <div className="fs-actions">
-            <button
-              className="ghost"
-              title="本会话的内联人格 SOUL.md——仅当没有「🎭 人格节点」连到此会话的人格口时才回退生效。推荐：建一个人格节点连到会话单独管理（可共享给多个会话）。"
-              onClick={() => node && onEditSoul(node.id)}
-            >
-              🎭 内联人格（回退·未接人格节点时）
-            </button>
-          </div>
-
           <div className="base-session">
             <div className="base-session-title">基础会话 (fork 来源，如「角色管线」会话)</div>
             <div className="field">

@@ -88,10 +88,7 @@ export function resolveSessionSoul(
     const content = readSoul(edge.source);
     return content ? { key: edge.source, content } : undefined;
   }
-  if (port === "fork") {
-    const content = readSoul(sessionNodeId); // legacy 兜底：旧的一会话一人格
-    if (content) return { key: sessionNodeId, content };
-  }
+  // 不再回退"会话内联人格"：没连「🎭 人格节点」= 该会话没人格(用户明确要求)
   return undefined;
 }
 
