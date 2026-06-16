@@ -116,7 +116,7 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 - `scripts/gen-icon.mjs` — 生成图标（Windows 必须有 .ico）
 - `scripts/gen-notices.cjs` — 生成 `THIRD-PARTY-NOTICES.md`（扫 JS 生产依赖 + Rust crate），发布前重跑
 - `rebuild-deploy.bat` — 一键发布（构建→taskkill→覆盖便携版→重启）
-- `LICENSE` — PolyForm Noncommercial 1.0.0（禁商用）；`THIRD-PARTY-NOTICES.md` — 第三方许可声明
+- `LICENSE` — GPL-3.0（强 copyleft；不禁商用）；`THIRD-PARTY-NOTICES.md` — 第三方许可声明
 
 ## 关键运行时路径（都在用户目录，不进仓库）
 - `~/.oblivionis/config.json` — 全部配置（**App Secret 已移出**：存 Windows 凭据管理器，

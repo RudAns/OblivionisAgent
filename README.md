@@ -12,7 +12,7 @@
 ![React](https://img.shields.io/badge/UI-React%2018-61DAFB?logo=react&logoColor=black)
 ![Node](https://img.shields.io/badge/engine-Node%20%E2%89%A520-339933?logo=nodedotjs&logoColor=white)
 ![Claude](https://img.shields.io/badge/LLM-官方%20Claude%20CLI-D97757)
-![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial-3b82f6)
+![License](https://img.shields.io/badge/License-GPL%20v3-3b82f6)
 
 </div>
 
@@ -232,8 +232,8 @@ OblivionisAgent/
 
 ## 📜 License
 
-[**PolyForm Noncommercial License 1.0.0**](LICENSE) —— **仅限非商业用途**（个人 / 研究 / 教学 / 非营利可自由使用、修改、分享、二次开发；**禁止任何商业用途**）。分发时须保留署名。
+[**GNU General Public License v3.0（GPL-3.0）**](LICENSE) —— 自由软件、强 copyleft：**任何人可自由使用、修改、再分发，甚至商用**；但只要**分发**（含打包成 exe 给别人），就**必须以 GPL-3.0 继续开源、并提供（含你改动的）完整源码**。不允许把它改成闭源专有产品。
 
-**Copyright © 2026 Derek·JW·Chen**
+**Copyright © 2026 Derek·JW·Chen** — Licensed under GPL-3.0.
 
 成品捆绑的第三方开源组件的许可证与版权声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)（随发行物分发；`node scripts/gen-notices.cjs` 可重新生成）。其中含 5 个 MPL‑2.0 弱 copyleft 组件（Tauri 的 CSS 解析链，未改动即可使用）。

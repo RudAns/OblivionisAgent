@@ -39,7 +39,7 @@ Windows 凭据管理器（外壳从凭据库读出经 env `OBLIVIONIS_FEISHU_SEC
 
 ## 许可证 & 第三方合规
 
-- 本项目：**PolyForm Noncommercial 1.0.0**（禁商用；署名 Derek·JW·Chen），见 `LICENSE`。改许可前先确认意图（用户要"随便用但别拿去卖"，故非 MIT/Apache）。
+- 本项目：**GPL-3.0**（强 copyleft；Copyright 2026 Derek·JW·Chen），见 `LICENSE`。意图＝"谁都能用甚至商用，但谁也别想把它闭源拿走"（用户研究后从 PolyForm Noncommercial 改来；曾一度定 AGPL-3.0 又改回 GPL-3.0；**注意 GPL 不禁商用**）。改许可前先确认意图。捆绑的依赖须 GPLv3 兼容——Apache-2.0 兼容 GPLv3（不兼容 GPLv2），故只能 v3。
 - 成品捆绑的第三方依赖须保留其许可声明：`THIRD-PARTY-NOTICES.md` 由 `node scripts/gen-notices.cjs` 生成，**发布前重跑刷新**。依赖全宽松、无强 copyleft（含 5 个 MPL-2.0 弱 copyleft，未改动即可用）。
 
 ## 改代码前必读

@@ -1,7 +1,7 @@
 # Third-Party Notices
 
 OblivionisAgent 的成品（桌面 exe / sidecar exe / 安装包）捆绑分发了下列第三方开源组件。
-本项目自身按 PolyForm Noncommercial 1.0.0 授权，但以下各组件仍各自适用其原始许可证；
+本项目自身按 GNU GPL-3.0 授权，但以下各组件仍各自适用其原始许可证；
 此处保留其许可证与版权声明，以满足 MIT / BSD / ISC / Apache-2.0 等许可「分发须保留声明」的要求。
 
 > 本文件由 `scripts/gen-notices.cjs` 自动生成，发布前可重跑刷新。
