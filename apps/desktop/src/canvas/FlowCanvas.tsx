@@ -28,6 +28,7 @@ import { CronNode } from "./nodes/CronNode.js";
 import { WebhookNode } from "./nodes/WebhookNode.js";
 import { SoulNode } from "./nodes/SoulNode.js";
 import { SkillNode } from "./nodes/SkillNode.js";
+import { SubagentNode } from "./nodes/SubagentNode.js";
 import { ConditionEdge } from "./edges/ConditionEdge.js";
 import { HelperLines } from "./HelperLines.js";
 import { EdgeActionContext } from "./edge-context.js";
@@ -95,6 +96,7 @@ const NODE_COLORS: Record<string, string> = {
   webhook: "#b7791f",
   soul: "#8167b2",
   skill: "#3a8fa0",
+  subagent: "#c0517a",
 };
 // 缩略图用各节点代表色（选中再描品牌色圈），这样一眼分得清哪个是哪个
 const miniMapNodeColor = (node: Node) => NODE_COLORS[node.type ?? ""] ?? "#9aa3b2";
@@ -117,6 +119,7 @@ export function FlowCanvas(props: Props) {
       webhook: WebhookNode,
       soul: SoulNode,
       skill: SkillNode,
+      subagent: SubagentNode,
     }),
     [],
   );
@@ -132,8 +135,9 @@ export function FlowCanvas(props: Props) {
       const sk = kindById.get(c.source ?? "");
       const tk = kindById.get(c.target ?? "");
       if (!sk || !tk || c.source === c.target) return false;
-      if (sk === "soul" || sk === "skill") return tk === "claude-session" && c.targetHandle === "fork"; // 人格/技能连人格·技能口
-      if (c.targetHandle === "fork") return false; // 人格·技能口只接 soul/skill（上面已放行）
+      if (sk === "soul" || sk === "skill" || sk === "subagent")
+        return tk === "claude-session" && c.targetHandle === "fork"; // 人格/技能/子代理连人格·技能口
+      if (c.targetHandle === "fork") return false; // 人格·技能口只接 soul/skill/subagent（上面已放行）
       if (!ROUTING_SRC.has(sk) || !ROUTING_TGT.has(tk)) return false;
       if ((sk === "cron" || sk === "webhook") && tk !== "claude-session") return false; // 触发节点只直连会话
       return true;

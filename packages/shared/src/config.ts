@@ -150,6 +150,10 @@ export type SoulData = z.infer<typeof SoulData>;
 export const SkillData = z.object({});
 export type SkillData = z.infer<typeof SkillData>;
 
+/** 子代理节点：内容是 Claude Code 原生子代理定义(~/.claude/agents/)，会话用 Task 工具委派给它 */
+export const SubagentData = z.object({});
+export type SubagentData = z.infer<typeof SubagentData>;
+
 const BaseNode = z.object({
   id: z.string(),
   position: XY,
@@ -165,6 +169,7 @@ export const GraphNode = z.discriminatedUnion("kind", [
   BaseNode.extend({ kind: z.literal("webhook"), data: WebhookData }),
   BaseNode.extend({ kind: z.literal("soul"), data: SoulData }),
   BaseNode.extend({ kind: z.literal("skill"), data: SkillData }),
+  BaseNode.extend({ kind: z.literal("subagent"), data: SubagentData }),
 ]);
 export type GraphNode = z.infer<typeof GraphNode>;
 
@@ -176,6 +181,7 @@ export type CronNode = Extract<GraphNode, { kind: "cron" }>;
 export type WebhookNode = Extract<GraphNode, { kind: "webhook" }>;
 export type SoulNode = Extract<GraphNode, { kind: "soul" }>;
 export type SkillNode = Extract<GraphNode, { kind: "skill" }>;
+export type SubagentNode = Extract<GraphNode, { kind: "subagent" }>;
 
 export const GraphEdge = z.object({
   id: z.string(),

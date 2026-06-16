@@ -19,6 +19,7 @@ import { TranscriptStore } from "./transcript-store.js";
 import { UsageMonitor } from "./usage-monitor.js";
 import { ensureSoul, resolveSessionSoul } from "./soul-store.js";
 import { ensureSkill, resolveSessionSkills } from "./skill-store.js";
+import { ensureSubagent } from "./subagent-store.js";
 import { KnowledgeStore } from "./knowledge-store.js";
 import { extractKnowledge } from "./claude/extract-knowledge.js";
 import { CronScheduler } from "./cron-scheduler.js";
@@ -751,6 +752,7 @@ async function main() {
     getUsage: () => usage.getLast(),
     ensureSoul: (nodeId) => ensureSoul(nodeId),
     ensureSkill: (nodeId) => ensureSkill(nodeId),
+    ensureSubagent: (nodeId) => ensureSubagent(nodeId),
     ensureGroupMemory: (chatId) => ensureGroupMemory(chatId),
     knowledge,
     permBroker,

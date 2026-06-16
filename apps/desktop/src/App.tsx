@@ -98,6 +98,11 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
     label: "技能",
     data: {},
   }),
+  subagent: () => ({
+    kind: "subagent",
+    label: "子代理",
+    data: {},
+  }),
   webhook: () => ({
     kind: "webhook",
     label: "Webhook",
@@ -159,6 +164,7 @@ const PALETTE: [keyof typeof NEW_NODE_DEFAULTS, string][] = [
   ["webhook", "Webhook"],
   ["soul", "人格"],
   ["skill", "技能"],
+  ["subagent", "子代理"],
 ];
 // kind → 本地化名（检视标题等用，避免直接显示原始 "claude-session"）
 const NODE_LABEL: Record<string, string> = Object.fromEntries(PALETTE);
@@ -195,6 +201,7 @@ const ADD_GROUPS: {
     items: [
       { kind: "soul", label: "人格", icon: "🎭", color: "#9d7bc9" },
       { kind: "skill", label: "技能", icon: "🧩", color: "#3a8fa0" },
+      { kind: "subagent", label: "子代理", icon: "🦾", color: "#c0517a" },
     ],
   },
 ];
@@ -208,6 +215,7 @@ const NODE_COLOR: Record<string, string> = {
   webhook: "#b7791f",
   soul: "#9d7bc9",
   skill: "#3a8fa0",
+  subagent: "#c0517a",
 };
 const NODE_ICON: Record<string, string> = {
   "feishu-group": "💬",
@@ -218,6 +226,7 @@ const NODE_ICON: Record<string, string> = {
   webhook: "🪝",
   soul: "🎭",
   skill: "🧩",
+  subagent: "🦾",
 };
 
 // 从某类节点的「输出口」拖到空白处时，能落地的目标类型（与 FlowCanvas 连线校验同源）。
@@ -225,7 +234,8 @@ const NODE_ICON: Record<string, string> = {
 function dropTargetsFor(
   sourceKind: string | undefined,
 ): { kind: keyof typeof NEW_NODE_DEFAULTS; handle?: string }[] {
-  if (sourceKind === "soul" || sourceKind === "skill") return [{ kind: "claude-session", handle: "fork" }];
+  if (sourceKind === "soul" || sourceKind === "skill" || sourceKind === "subagent")
+    return [{ kind: "claude-session", handle: "fork" }];
   if (sourceKind === "cron" || sourceKind === "webhook") return [{ kind: "claude-session" }];
   if (sourceKind === "feishu-group" || sourceKind === "route" || sourceKind === "intent-switch")
     return [{ kind: "route" }, { kind: "intent-switch" }, { kind: "claude-session" }];
@@ -2148,6 +2158,7 @@ function Inner() {
                 onRefreshSnapshot={(nodeId) => client.send({ type: "prepare-fork", nodeId })}
                 onEditSoul={(nodeId) => client.send({ type: "ensure-soul", nodeId })}
                 onEditSkill={(nodeId) => client.send({ type: "ensure-skill", nodeId })}
+                onEditSubagent={(nodeId) => client.send({ type: "ensure-subagent", nodeId })}
                 onEditGroupMemory={(chatId) => client.send({ type: "ensure-group-memory", chatId })}
               />
               {selectedIsClaude && (
@@ -2514,6 +2525,7 @@ function Inspector({
   onRefreshSnapshot,
   onEditSoul,
   onEditSkill,
+  onEditSubagent,
   onEditGroupMemory,
 }: {
   node: Node | null;
@@ -2524,6 +2536,7 @@ function Inspector({
   onRefreshSnapshot: (nodeId: string) => void;
   onEditSoul: (nodeId: string) => void;
   onEditSkill: (nodeId: string) => void;
+  onEditSubagent: (nodeId: string) => void;
   onEditGroupMemory: (chatId: string) => void;
 }) {
   const [showPicker, setShowPicker] = useState(false);
@@ -2618,6 +2631,23 @@ function Inspector({
               onClick={() => node && onEditSkill(node.id)}
             >
               🧩 编辑技能 (SKILL.md)
+            </button>
+          </div>
+        </>
+      )}
+      {node.type === "subagent" && (
+        <>
+          <div className="hint" style={{ marginBottom: 6 }}>
+            子代理：一个 Claude Code 原生子代理（独立上下文 + 独立工具）。会话里的 claude 会用 Task 工具按它的
+            description <b>自动委派</b>给它做重活（文档/日志总结、消息分类），不污染主会话。连到会话的
+            <b>🎭人格/🧩技能口</b>作组织标识。
+          </div>
+          <div className="fs-actions">
+            <button
+              title="编辑子代理定义（首次自动生成模板，写在 ~/.claude/agents/，claude 自动发现）。务必改 name(英文唯一)+description(写清何时用)。"
+              onClick={() => node && onEditSubagent(node.id)}
+            >
+              🦾 编辑子代理
             </button>
           </div>
         </>

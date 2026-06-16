@@ -46,6 +46,8 @@ export interface ServerDeps {
   ensureSoul: (nodeId: string) => { path: string; created: boolean };
   /** 确保技能节点文件(SKILL.md)存在（无则播种），返回路径 */
   ensureSkill: (nodeId: string) => { path: string; created: boolean };
+  /** 确保子代理定义(~/.claude/agents/)存在（无则播种），返回路径 */
+  ensureSubagent: (nodeId: string) => { path: string; created: boolean };
   /** 确保某群 GROUP.md 存在，返回路径 */
   ensureGroupMemory: (chatId: string) => string;
   /** 知识收件箱 */
@@ -160,6 +162,11 @@ export class ControlServer {
       }
       case "ensure-skill": {
         const r = this.deps.ensureSkill(msg.nodeId);
+        hub.broadcast({ type: "open-file", path: r.path });
+        break;
+      }
+      case "ensure-subagent": {
+        const r = this.deps.ensureSubagent(msg.nodeId);
         hub.broadcast({ type: "open-file", path: r.path });
         break;
       }
