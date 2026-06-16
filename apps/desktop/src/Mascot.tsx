@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen, emit } from "@tauri-apps/api/event";
 import completeGif from "./assets/complete.gif";
+import { useT } from "./i18n/index.js";
 
 /**
  * 「完成时提醒」小人弹窗的内容（跑在独立的透明无边框 alwaysOnTop 窗口里，main.tsx 按窗口
@@ -10,6 +11,7 @@ import completeGif from "./assets/complete.gif";
  * "mascot-clicked" 让主窗口聚焦并跳到那个完成的会话。
  */
 export function Mascot() {
+  const t = useT();
   const [shown, setShown] = useState(false);
   const [label, setLabel] = useState("");
   const nodeRef = useRef<string | undefined>(undefined);
@@ -53,9 +55,9 @@ export function Mascot() {
   };
 
   return (
-    <div className={`mascot ${shown ? "in" : "out"}`} onClick={onClick} title="点我回到完成的会话">
-      <div className="mascot-bubble">✅ 完成啦{label ? ` · ${label}` : ""}</div>
-      <img className="mascot-gif" src={completeGif} alt="完成" draggable={false} />
+    <div className={`mascot ${shown ? "in" : "out"}`} onClick={onClick} title={t("点我回到完成的会话")}>
+      <div className="mascot-bubble">✅ {t("完成啦")}{label ? ` · ${label}` : ""}</div>
+      <img className="mascot-gif" src={completeGif} alt={t("完成")} draggable={false} />
     </div>
   );
 }

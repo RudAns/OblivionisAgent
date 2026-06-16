@@ -391,4 +391,38 @@ export const EN: Record<string, string> = {
   "保存": "Save",
   "飞书后台需开通以下权限：im:message、im:message:send_as_bot、im:chat、im:resource；事件订阅选「长连接」并订阅 im.message.receive_v1。":
     "In the Feishu console, grant: im:message, im:message:send_as_bot, im:chat, im:resource; for event subscription choose 'long connection' and subscribe to im.message.receive_v1.",
+
+  // ── 终端区 TerminalsHost ───────────────────────────
+  "交互式 Claude 终端（Ctrl+V 粘贴 · Ctrl+A 选中输入框 · Ctrl+C 复制选区/否则中断 · Shift+Enter 换行 · 右键复制或粘贴）":
+    "Interactive Claude terminal (Ctrl+V paste · Ctrl+A select input · Ctrl+C copy selection / else interrupt · Shift+Enter newline · right-click to copy or paste)",
+  "[进程已退出]": "[process exited]",
+  "(默认目录)": "(default dir)",
+  "搜索终端内容…  Enter=下一个  Shift+Enter=上一个  Esc=关闭":
+    "Search terminal content…  Enter=next  Shift+Enter=prev  Esc=close",
+  "上一个 (Shift+Enter)": "Previous (Shift+Enter)",
+  "下一个 (Enter)": "Next (Enter)",
+  "关闭 (Esc)": "Close (Esc)",
+  "移除预览（不影响已粘进输入的路径）": "Remove preview (doesn't affect paths already pasted into input)",
+  "点击任意处关闭": "Click anywhere to close",
+  "真实终端仅在桌面应用中可用（浏览器开发版不支持）。":
+    "A real terminal is only available in the desktop app (not in the browser dev build).",
+  "双击画布上的「Claude 会话」节点打开终端。多个终端会同时保活，切换/切标签都不会关闭。":
+    "Double-click a Claude session node on the canvas to open a terminal. Multiple terminals stay alive at once; switching tabs won't close them.",
+  "关闭此终端": "Close this terminal",
+  "重绘当前终端（清理偶发的叠印残影）": "Redraw the current terminal (clears occasional overprint artifacts)",
+  "会话 {0}": "Session {0}",
+  "点击放大": "click to enlarge",
+
+  // ── 小人提醒 Mascot ────────────────────────────────
+  "点我回到完成的会话": "Click to return to the finished session",
+  "完成啦": "Done!",
+
+  // ── 错误边界 ErrorBoundary ─────────────────────────
+  "界面出错了（已被拦住，未白屏）": "The UI hit an error (caught — no white screen)",
+  "把下面这段报错截图/复制发给开发者即可精准修复：":
+    "Screenshot/copy the error below and send it to the developer for a precise fix:",
+  "重载界面": "Reload UI",
+
+  // ── 服务日志 LogPanel ──────────────────────────────
+  "暂无日志": "No logs yet",
 };

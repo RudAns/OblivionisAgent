@@ -1,3 +1,5 @@
+import { useT } from "../i18n/index.js";
+
 export interface LogLine {
   kind: "log" | "inbound" | "outbound";
   level?: "info" | "warn" | "error";
@@ -6,7 +8,8 @@ export interface LogLine {
 }
 
 export function LogPanel({ lines }: { lines: LogLine[] }) {
-  if (lines.length === 0) return <div className="panel-empty">暂无日志</div>;
+  const t = useT();
+  if (lines.length === 0) return <div className="panel-empty">{t("暂无日志")}</div>;
   return (
     <div className="logs">
       {lines.map((l, i) => (

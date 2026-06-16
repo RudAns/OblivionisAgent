@@ -52,3 +52,9 @@ export function useI18n(): I18n {
 export function useT(): I18n["t"] {
   return useContext(Ctx).t;
 }
+
+/** 非 hook 版翻译（给 class 组件 / 模块用）：从 localStorage 读语言，不随切换重渲染 */
+export function tStatic(zh: string, ...vals: (string | number)[]): string {
+  const lang = localStorage.getItem(STORAGE) === "en" ? "en" : "zh";
+  return fill(lang === "en" ? EN[zh] ?? zh : zh, vals);
+}

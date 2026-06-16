@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { tStatic } from "./i18n/index.js";
 
 interface State {
   error: Error | null;
@@ -33,8 +34,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           fontSize: 13,
         }}
       >
-        <h2 style={{ color: "#ff5d5d", margin: "0 0 8px" }}>界面出错了（已被拦住，未白屏）</h2>
-        <p style={{ color: "#8a93a0" }}>把下面这段报错截图/复制发给开发者即可精准修复：</p>
+        <h2 style={{ color: "#ff5d5d", margin: "0 0 8px" }}>{tStatic("界面出错了（已被拦住，未白屏）")}</h2>
+        <p style={{ color: "#8a93a0" }}>{tStatic("把下面这段报错截图/复制发给开发者即可精准修复：")}</p>
         <pre style={{ whiteSpace: "pre-wrap", color: "#ffb84d", marginTop: 8 }}>
           {String(error.message)}
         </pre>
@@ -52,7 +53,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
             cursor: "pointer",
           }}
         >
-          重载界面
+          {tStatic("重载界面")}
         </button>
       </div>
     );

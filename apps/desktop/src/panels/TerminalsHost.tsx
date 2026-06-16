@@ -10,6 +10,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { usePointerReorder } from "../usePointerReorder.js";
+import { useT } from "../i18n/index.js";
 
 /** 终端配色：深色(GitHub Dark Dimmed 系) / 浅色(GitHub Light 系)。切主题时整套替换。 */
 const TERM_THEME_DARK = {
@@ -112,6 +113,7 @@ function TerminalView({
   /** 一次"用户发起的正式任务"跑完（区别于打开会话时 claude 启动的输出）→ 完成红旗 */
   onTaskDone?: () => void;
 }) {
+  const tr = useT();
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const themeRef = useRef(theme);
@@ -263,7 +265,7 @@ function TerminalView({
     );
     fit.fit();
     term.writeln(
-      "\x1b[90m交互式 Claude 终端（Ctrl+V 粘贴 · Ctrl+A 选中输入框 · Ctrl+C 复制选区/否则中断 · Shift+Enter 换行 · 右键复制或粘贴）\x1b[0m",
+      `\x1b[90m${tr("交互式 Claude 终端（Ctrl+V 粘贴 · Ctrl+A 选中输入框 · Ctrl+C 复制选区/否则中断 · Shift+Enter 换行 · 右键复制或粘贴）")}\x1b[0m`,
     );
 
     let ptyId: string | null = null;
@@ -743,7 +745,7 @@ function TerminalView({
           if (ptyId === null || e.payload.id === ptyId) {
             exited = true;
             reportActive(false);
-            term.writeln("\r\n\x1b[90m[进程已退出]\x1b[0m");
+            term.writeln(`\r\n\x1b[90m${tr("[进程已退出]")}\x1b[0m`);
           }
         }),
       );
@@ -1031,10 +1033,10 @@ function TerminalView({
           📁
         </span>
         <span className="ti-cwd" title={info.cwd}>
-          {info.cwd || "(默认目录)"}
+          {info.cwd || tr("(默认目录)")}
         </span>
         {info.sid && (
-          <span className="ti-sid" title={`会话 ${info.sid}`}>
+          <span className="ti-sid" title={tr("会话 {0}", info.sid)}>
             {info.sid.slice(0, 8)}
           </span>
         )}
@@ -1044,7 +1046,7 @@ function TerminalView({
           <input
             ref={searchInputRef}
             value={searchText}
-            placeholder="搜索终端内容…  Enter=下一个  Shift+Enter=上一个  Esc=关闭"
+            placeholder={tr("搜索终端内容…  Enter=下一个  Shift+Enter=上一个  Esc=关闭")}
             onChange={(e) => {
               setSearchText(e.target.value);
               doSearch(e.target.value);
@@ -1055,13 +1057,13 @@ function TerminalView({
             }}
             autoFocus
           />
-          <button title="上一个 (Shift+Enter)" onClick={() => doSearch(searchText, "prev")}>
+          <button title={tr("上一个 (Shift+Enter)")} onClick={() => doSearch(searchText, "prev")}>
             ↑
           </button>
-          <button title="下一个 (Enter)" onClick={() => doSearch(searchText, "next")}>
+          <button title={tr("下一个 (Enter)")} onClick={() => doSearch(searchText, "next")}>
             ↓
           </button>
-          <button title="关闭 (Esc)" onClick={closeSearch}>
+          <button title={tr("关闭 (Esc)")} onClick={closeSearch}>
             ×
           </button>
         </div>
@@ -1073,7 +1075,7 @@ function TerminalView({
             <button
               className="term-img-chip"
               key={i}
-              title={`${c.name}  ${c.w}×${c.h} · 点击放大`}
+              title={`${c.name}  ${c.w}×${c.h} · ${tr("点击放大")}`}
               onClick={() => setZoomChip(c)}
             >
               <img src={c.url} alt="" />
@@ -1085,7 +1087,7 @@ function TerminalView({
               </span>
               <span
                 className="tic-x"
-                title="移除预览（不影响已粘进输入的路径）"
+                title={tr("移除预览（不影响已粘进输入的路径）")}
                 onClick={(e) => {
                   e.stopPropagation();
                   removeChip(i);
@@ -1098,7 +1100,7 @@ function TerminalView({
         </div>
       )}
       {zoomChip && (
-        <div className="term-img-zoom" onClick={() => setZoomChip(null)} title="点击任意处关闭">
+        <div className="term-img-zoom" onClick={() => setZoomChip(null)} title={tr("点击任意处关闭")}>
           <img src={zoomChip.url} alt={zoomChip.name} />
         </div>
       )}
@@ -1131,17 +1133,18 @@ export function TerminalsHost({
   /** 某终端一次正式任务跑完 → 上抛给 App 插完成红旗 */
   onTaskDone?: (nodeId: string) => void;
 }) {
+  const tr = useT();
   // 手动重绘信号：点按钮 +1，当前激活的终端做一次高度抖动让 claude 整屏重画
   const [repaintTick, setRepaintTick] = useState(0);
   // 各终端是否正在运行（输出活动），用于给标签页加扫光
   const [running, setRunning] = useState<Record<string, boolean>>({});
   // 页签拖拽排序（指针拖拽，比 HTML5 draggable 在 WebView2 里稳；横向，插入竖线）
   const { dragId, dropClass, itemProps } = usePointerReorder(onReorder, "horizontal");
-  if (!inTauri()) return <div className="panel-empty">真实终端仅在桌面应用中可用（浏览器开发版不支持）。</div>;
+  if (!inTauri()) return <div className="panel-empty">{tr("真实终端仅在桌面应用中可用（浏览器开发版不支持）。")}</div>;
   if (terminals.length === 0)
     return (
       <div className="panel-empty">
-        双击画布上的「Claude 会话」节点打开终端。多个终端会同时保活，切换/切标签都不会关闭。
+        {tr("双击画布上的「Claude 会话」节点打开终端。多个终端会同时保活，切换/切标签都不会关闭。")}
       </div>
     );
   return (
@@ -1160,7 +1163,7 @@ export function TerminalsHost({
             <button
               className="term-tab-x"
               data-noreorder
-              title="关闭此终端"
+              title={tr("关闭此终端")}
               onClick={(e) => {
                 e.stopPropagation();
                 onClose(t.nodeId);
@@ -1172,7 +1175,7 @@ export function TerminalsHost({
         ))}
         <button
           className="term-repaint"
-          title="重绘当前终端（清理偶发的叠印残影）"
+          title={tr("重绘当前终端（清理偶发的叠印残影）")}
           onClick={() => setRepaintTick((n) => n + 1)}
         >
           ⟳
