@@ -232,4 +232,79 @@ export const EN: Record<string, string> = {
   "访客回复出站二次脱敏 + 安全护栏": "Guest replies are re-redacted outbound + safety guardrail",
   "（未开）": "(off)",
   "主人权限 {0} · 访客权限 {1}": "Owner perms {0} · Guest perms {1}",
+
+  // ── 工具条 / 菜单 / 命令面板 Toolbar, menus, Ctrl+K ──
+  "飞书连接（点开/收起设置）": "Feishu connection (open/close settings)",
+  "飞书": "Feishu",
+  "编辑选中节点（画布收起时也可用）": "Edit selected node (works even when the canvas is collapsed)",
+  "✎ 编辑节点": "✎ Edit node",
+  "周 {0}%": "wk {0}%",
+  "Claude 订阅用量": "Claude subscription usage",
+  "5小时窗口: {0}%": "5-hour window: {0}%",
+  " · {0}重置": " · resets {0}",
+  "本周(全模型): {0}%": "This week (all models): {0}%",
+  "每 5 分钟自动刷新": "Auto-refreshes every 5 min",
+  // 横幅
+  "收到来自": "Received a message from",
+  "的消息，但没有匹配的群节点。": ", but no matching group node.",
+  "用该 chatId 新建群节点": "Create a group node with this chatId",
+  "忽略": "Ignore",
+  // 连线意图浮窗
+  "🗑 删除连线": "🗑 Delete edge",
+  "连线意图（分流）": "Edge intent (routing)",
+  "触发意图": "Trigger intent",
+  "留空=默认边。填一句意图，如：用户想触发打包/角色管线CI/构建":
+    "Blank = default edge. Write an intent, e.g.: user wants to trigger packaging / character-pipeline CI / build",
+  "同一节点有多条带意图的出边时，引擎用 LLM 判断消息属于哪条；都不命中走「留空」的默认边。":
+    "When a node has several intent-bearing outgoing edges, the engine uses an LLM to decide which one the message matches; if none match, it takes the blank default edge.",
+  // ＋添加节点菜单
+  "添加节点": "Add node",
+  "输入源": "Inputs",
+  "路由与决策": "Routing & decisions",
+  "执行节点": "Execution",
+  "辅助": "Aux",
+  "右键添加节点 · 从端口拖到空白接新节点 · 滚轮缩放 · Ctrl+Z 撤销":
+    "Right-click to add a node · drag from a port to empty space to attach one · scroll to zoom · Ctrl+Z to undo",
+  // 飞书浮窗 / 测试框
+  "飞书连接": "Feishu connection",
+  "给该会话发测试消息（绕过飞书）": "Send a test message to this session (bypasses Feishu)",
+  "发送": "Send",
+  // 右键菜单 context menu
+  "✎ 编辑": "✎ Edit",
+  "⌨ 打开终端": "⌨ Open terminal",
+  "就地生成一个副本（不经剪贴板）": "Make a copy in place (no clipboard)",
+  "⧉ 再制": "⧉ Duplicate",
+  "放入剪贴板，可粘贴到别处（含组内连线）": "Copy to clipboard, paste elsewhere (includes intra-group edges)",
+  "⎘ 复制": "⎘ Copy",
+  "删除节点及其连线（可 Ctrl+Z 撤销）": "Delete the node and its edges (Ctrl+Z to undo)",
+  "（断开 {0} 条连线）": " (disconnects {0} edges)",
+  "✎ 设置意图条件": "✎ Set intent condition",
+  "删除连线（可 Ctrl+Z 撤销）": "Delete edge (Ctrl+Z to undo)",
+  "📋 粘贴到此处": "📋 Paste here",
+  "在此处添加节点": "Add a node here",
+  "⤢ 适应视图": "⤢ Fit view",
+  "在此处新建并连上": "Create here & connect",
+  "（人格口）": " (Persona port)",
+  // Ctrl+K 命令面板
+  "搜索命令 / 添加节点…（↑↓ 选择，Enter 执行，Esc 关闭）":
+    "Search commands / add nodes… (↑↓ select, Enter run, Esc close)",
+  "没有匹配的命令": "No matching commands",
+  "添加节点：{0}": "Add node: {0}",
+  "节点": "Node",
+  "全选节点": "Select all nodes",
+  "复制选中（放入剪贴板）": "Copy selection (to clipboard)",
+  "粘贴": "Paste",
+  "删除选中（可撤销）": "Delete selection (undoable)",
+  "适应视图（看全画布）": "Fit view (see whole canvas)",
+  "视图": "View",
+  "撤销": "Undo",
+  "重做": "Redo",
+  "定位节点：{0}": "Locate node: {0}",
+  "搜索": "Search",
+  // 面板标题旁的说明 TAB_DESC
+  "谁(主人/访客)问了什么、命中哪个会话——只读留痕，不可改":
+    "Who (owner/guest) asked what and which session it hit — a read-only trail, can't be edited",
+  "群聊里沉淀出的规则 / 人格修订候选，等你采纳或忽略":
+    "Rule / persona-revision candidates distilled from chats, awaiting your accept or ignore",
+  "引擎 / 服务运行日志，排障时看": "Engine / service logs — for troubleshooting",
 };

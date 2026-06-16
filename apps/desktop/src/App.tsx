@@ -1639,16 +1639,16 @@ function Inner() {
   const cmdkCommands: { id: string; label: string; hint?: string; run: () => void }[] = [
     ...PALETTE.map(([kind, label]) => ({
       id: `add-${kind}`,
-      label: `添加节点：${label}`,
-      hint: "节点",
+      label: t("添加节点：{0}", t(label)),
+      hint: t("节点"),
       run: () => addNode(kind, cmdkCenter()),
     })),
-    { id: "selall", label: "全选节点", hint: "Ctrl+A", run: () => setNodes((ns) => ns.map((n) => ({ ...n, selected: true }))) },
-    { id: "copy", label: "复制选中（放入剪贴板）", hint: "Ctrl+C", run: () => copySelected() },
-    ...(hasClipboard ? [{ id: "paste", label: "粘贴", hint: "Ctrl+V", run: () => pasteClipboard() }] : []),
+    { id: "selall", label: t("全选节点"), hint: "Ctrl+A", run: () => setNodes((ns) => ns.map((n) => ({ ...n, selected: true }))) },
+    { id: "copy", label: t("复制选中（放入剪贴板）"), hint: "Ctrl+C", run: () => copySelected() },
+    ...(hasClipboard ? [{ id: "paste", label: t("粘贴"), hint: "Ctrl+V", run: () => pasteClipboard() }] : []),
     {
       id: "del",
-      label: "删除选中（可撤销）",
+      label: t("删除选中（可撤销）"),
       hint: "Delete",
       run: () => {
         const ids = selIds();
@@ -1657,17 +1657,17 @@ function Inner() {
         setEdges((es) => es.filter((e) => !ids.has(e.source) && !ids.has(e.target)));
       },
     },
-    { id: "fit", label: "适应视图（看全画布）", hint: "视图", run: () => rf.fitView({ duration: 300, padding: 0.2 }) },
-    { id: "undo", label: "撤销", hint: "Ctrl+Z", run: undo },
-    { id: "redo", label: "重做", hint: "Ctrl+Shift+Z", run: redo },
+    { id: "fit", label: t("适应视图（看全画布）"), hint: t("视图"), run: () => rf.fitView({ duration: 300, padding: 0.2 }) },
+    { id: "undo", label: t("撤销"), hint: "Ctrl+Z", run: undo },
+    { id: "redo", label: t("重做"), hint: "Ctrl+Shift+Z", run: redo },
     // 每个节点一条「定位」命令：输入名字即可搜索并平滑跳到它，会话/节点多时找位置很方便
     ...nodes.map((n) => {
       const dl = (n.data as { label?: string } | undefined)?.label;
-      const kindLabel = PALETTE.find(([k]) => k === n.type)?.[1] ?? n.type ?? "节点";
+      const kindLabel = t(PALETTE.find(([k]) => k === n.type)?.[1] ?? n.type ?? "节点");
       return {
         id: `loc-${n.id}`,
-        label: `定位节点：${dl ? `${dl}（${kindLabel}）` : kindLabel}`,
-        hint: "搜索",
+        label: t("定位节点：{0}", dl ? `${dl}（${kindLabel}）` : kindLabel),
+        hint: t("搜索"),
         run: () => locateNode(n.id),
       };
     }),
@@ -1685,9 +1685,9 @@ function Inner() {
   };
   // 标题旁的一句功能说明（让"这个界面是干嘛的"一目了然）
   const TAB_DESC: Partial<Record<Tab, string>> = {
-    audit: "谁(主人/访客)问了什么、命中哪个会话——只读留痕，不可改",
-    inbox: "群聊里沉淀出的规则 / 人格修订候选，等你采纳或忽略",
-    logs: "引擎 / 服务运行日志，排障时看",
+    audit: t("谁(主人/访客)问了什么、命中哪个会话——只读留痕，不可改"),
+    inbox: t("群聊里沉淀出的规则 / 人格修订候选，等你采纳或忽略"),
+    logs: t("引擎 / 服务运行日志，排障时看"),
   };
   // 终端⇄转录是"同一个会话的两种视图"：粘滞切换，保持当前在看的会话
   const viewedSessionId = tab === "terminal" ? activeTerminalId : selectedIsClaude ? selected : null;
@@ -1712,29 +1712,33 @@ function Inner() {
           className={`fs-chip ${feishuOpen ? "on" : ""}`}
           data-popup="feishu"
           onClick={() => setFeishuOpen((o) => !o)}
-          title="飞书连接（点开/收起设置）"
+          title={t("飞书连接（点开/收起设置）")}
         >
           <FeishuStatusDot status={feishu.status} />
-          飞书{feishu.bot?.name ? `：${feishu.bot.name}` : ""}
+          {t("飞书")}{feishu.bot?.name ? `：${feishu.bot.name}` : ""}
         </button>
         {selectedNode && !inspectorOpen && (
-          <button onClick={() => setInspectorOpen(true)} title="编辑选中节点（画布收起时也可用）">
-            ✎ 编辑节点
+          <button onClick={() => setInspectorOpen(true)} title={t("编辑选中节点（画布收起时也可用）")}>
+            {t("✎ 编辑节点")}
           </button>
         )}
         <div className="spacer" data-tauri-drag-region />
         {usage?.sessionPct != null && (
           <span
             className={`usage-chip ${usage.sessionPct >= 85 ? "hot" : usage.sessionPct >= 60 ? "warm" : ""}`}
-            title={`Claude 订阅用量\n5小时窗口: ${usage.sessionPct}%${usage.sessionResets ? ` · ${usage.sessionResets}重置` : ""}${
-              usage.weekPct != null ? `\n本周(全模型): ${usage.weekPct}%${usage.weekResets ? ` · ${usage.weekResets}重置` : ""}` : ""
-            }\n每 5 分钟自动刷新`}
+            title={
+              `${t("Claude 订阅用量")}\n${t("5小时窗口: {0}%", usage.sessionPct)}${usage.sessionResets ? t(" · {0}重置", usage.sessionResets) : ""}` +
+              (usage.weekPct != null
+                ? `\n${t("本周(全模型): {0}%", usage.weekPct)}${usage.weekResets ? t(" · {0}重置", usage.weekResets) : ""}`
+                : "") +
+              `\n${t("每 5 分钟自动刷新")}`
+            }
           >
             <span className="usage-bar">
               <span style={{ width: `${Math.min(100, usage.sessionPct)}%` }} />
             </span>
             5h {Math.round(usage.sessionPct)}%
-            {usage.weekPct != null && <span className="usage-week">周 {Math.round(usage.weekPct)}%</span>}
+            {usage.weekPct != null && <span className="usage-week">{t("周 {0}%", Math.round(usage.weekPct))}</span>}
           </span>
         )}
         <WindowControls />
@@ -1742,10 +1746,10 @@ function Inner() {
 
       {unroutedActive && (
         <div className="banner">
-          收到来自 <code>{unroutedActive}</code> 的消息，但没有匹配的群节点。
-          <button onClick={() => addGroupForChat(unroutedActive)}>用该 chatId 新建群节点</button>
+          {t("收到来自")} <code>{unroutedActive}</code> {t("的消息，但没有匹配的群节点。")}
+          <button onClick={() => addGroupForChat(unroutedActive)}>{t("用该 chatId 新建群节点")}</button>
           <button className="ghost" onClick={() => setUnrouted(null)}>
-            忽略
+            {t("忽略")}
           </button>
         </div>
       )}
@@ -1841,9 +1845,9 @@ function Inner() {
               <div className="popup-head">
                 <span className="pi-head-title">
                   <span className="pi-head-icon">🎯</span>
-                  连线意图（分流）
+                  {t("连线意图（分流）")}
                 </span>
-                <button className="popup-x" onClick={() => setSelectedEdge(null)} title="隐藏">
+                <button className="popup-x" onClick={() => setSelectedEdge(null)} title={t("隐藏")}>
                   ×
                 </button>
               </div>
@@ -1853,17 +1857,17 @@ function Inner() {
                     {edgeEndLabel(selectedEdgeObj.source)} → {edgeEndLabel(selectedEdgeObj.target)}
                   </div>
                   <label className="field" style={{ alignItems: "flex-start" }}>
-                    <span>触发意图</span>
+                    <span>{t("触发意图")}</span>
                     <textarea
                       rows={3}
                       style={{ flex: 1, background: "var(--input)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", padding: "4px 6px" }}
                       value={(selectedEdgeObj.data as { condition?: string } | undefined)?.condition ?? ""}
-                      placeholder="留空=默认边。填一句意图，如：用户想触发打包/角色管线CI/构建"
+                      placeholder={t("留空=默认边。填一句意图，如：用户想触发打包/角色管线CI/构建")}
                       onChange={(e) => setEdgeCondition(selectedEdgeObj.id, e.target.value)}
                     />
                   </label>
                   <div className="hint">
-                    同一节点有多条带意图的出边时，引擎用 LLM 判断消息属于哪条；都不命中走「留空」的默认边。
+                    {t("同一节点有多条带意图的出边时，引擎用 LLM 判断消息属于哪条；都不命中走「留空」的默认边。")}
                   </div>
                   <button
                     className="del-btn"
@@ -1873,7 +1877,7 @@ function Inner() {
                       setSelectedEdge(null);
                     }}
                   >
-                    🗑 删除连线
+                    {t("🗑 删除连线")}
                   </button>
                 </div>
               </div>
@@ -1889,16 +1893,16 @@ function Inner() {
                 className={`add-node-btn ${addMenuOpen ? "on" : ""}`}
                 data-popup="addmenu"
                 onClick={() => setAddMenuOpen((o) => !o)}
-                title="添加节点"
+                title={t("添加节点")}
               >
-                <span className="anb-plus">＋</span> 添加节点
+                <span className="anb-plus">＋</span> {t("添加节点")}
                 <span className="anb-caret">▾</span>
               </button>
               {addMenuOpen && (
                 <div className="add-menu">
                   {ADD_GROUPS.map((g) => (
                     <div className="add-group" key={g.title}>
-                      <div className="add-group-title">{g.title}</div>
+                      <div className="add-group-title">{t(g.title)}</div>
                       {g.items.map((it) => (
                         <button
                           className="add-item"
@@ -1911,7 +1915,7 @@ function Inner() {
                           <span className="add-item-icon" style={{ background: `${it.color}1f`, color: it.color }}>
                             {it.icon}
                           </span>
-                          {it.label}
+                          {t(it.label)}
                         </button>
                       ))}
                     </div>
@@ -1922,7 +1926,7 @@ function Inner() {
           </div>
 
           {/* 加节点：左上角工具条 / 右键空白处 / 从端口拖到空白；底部留一行淡提示 */}
-          <div className="canvas-hint">右键添加节点 · 从端口拖到空白接新节点 · 滚轮缩放 · Ctrl+Z 撤销</div>
+          <div className="canvas-hint">{t("右键添加节点 · 从端口拖到空白接新节点 · 滚轮缩放 · Ctrl+Z 撤销")}</div>
           </div>
           )}
 
@@ -1933,8 +1937,8 @@ function Inner() {
         {feishuOpen && (
           <div className="popup popup-feishu">
             <div className="popup-head">
-              <span>飞书连接</span>
-              <button className="popup-x" onClick={() => setFeishuOpen(false)} title="隐藏">
+              <span>{t("飞书连接")}</span>
+              <button className="popup-x" onClick={() => setFeishuOpen(false)} title={t("隐藏")}>
                 ×
               </button>
             </div>
@@ -2214,11 +2218,11 @@ function Inner() {
                 <div className="test-box">
                   <input
                     value={testText}
-                    placeholder="给该会话发测试消息（绕过飞书）"
+                    placeholder={t("给该会话发测试消息（绕过飞书）")}
                     onChange={(e) => setTestText(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && sendTest()}
                   />
-                  <button onClick={sendTest}>发送</button>
+                  <button onClick={sendTest}>{t("发送")}</button>
                 </div>
               )}
             </div>
@@ -2387,7 +2391,7 @@ function Inner() {
                           setCtxMenu(null);
                         }}
                       >
-                        ✎ 编辑
+                        {t("✎ 编辑")}
                       </button>
                       {n?.type === "claude-session" && (
                         <button
@@ -2397,28 +2401,28 @@ function Inner() {
                             setCtxMenu(null);
                           }}
                         >
-                          ⌨ 打开终端
+                          {t("⌨ 打开终端")}
                         </button>
                       )}
                       <button
                         className="ctx-item"
-                        title="就地生成一个副本（不经剪贴板）"
+                        title={t("就地生成一个副本（不经剪贴板）")}
                         onClick={() => {
                           duplicateNodeById(ctxMenu.id!);
                           setCtxMenu(null);
                         }}
                       >
-                        ⧉ 再制 <span className="ctx-kbd">Ctrl+D</span>
+                        {t("⧉ 再制")} <span className="ctx-kbd">Ctrl+D</span>
                       </button>
                       <button
                         className="ctx-item"
-                        title="放入剪贴板，可粘贴到别处（含组内连线）"
+                        title={t("放入剪贴板，可粘贴到别处（含组内连线）")}
                         onClick={() => {
                           copySelected(ctxMenu.id);
                           setCtxMenu(null);
                         }}
                       >
-                        ⎘ 复制 <span className="ctx-kbd">Ctrl+C</span>
+                        {t("⎘ 复制")} <span className="ctx-kbd">Ctrl+C</span>
                       </button>
                       <div className="ctx-sep" />
                       {(() => {
@@ -2426,14 +2430,14 @@ function Inner() {
                         return (
                           <button
                             className="ctx-item danger"
-                            title="删除节点及其连线（可 Ctrl+Z 撤销）"
+                            title={t("删除节点及其连线（可 Ctrl+Z 撤销）")}
                             onClick={() => {
                               const id = ctxMenu.id!;
                               setCtxMenu(null);
                               deleteNodeById(id);
                             }}
                           >
-                            🗑 删除{broken > 0 ? `（断开 ${broken} 条连线）` : ""}
+                            {t("🗑 删除")}{broken > 0 ? t("（断开 {0} 条连线）", broken) : ""}
                           </button>
                         );
                       })()}
@@ -2451,12 +2455,12 @@ function Inner() {
                       setCtxMenu(null);
                     }}
                   >
-                    ✎ 设置意图条件
+                    {t("✎ 设置意图条件")}
                   </button>
                   <div className="ctx-sep" />
                   <button
                     className="ctx-item danger"
-                    title="删除连线（可 Ctrl+Z 撤销）"
+                    title={t("删除连线（可 Ctrl+Z 撤销）")}
                     onClick={() => {
                       const id = ctxMenu.id;
                       setEdges((es) => es.filter((x) => x.id !== id));
@@ -2464,7 +2468,7 @@ function Inner() {
                       setCtxMenu(null);
                     }}
                   >
-                    🗑 删除连线
+                    {t("🗑 删除连线")}
                   </button>
                 </>
               )}
@@ -2479,12 +2483,12 @@ function Inner() {
                           setCtxMenu(null);
                         }}
                       >
-                        📋 粘贴到此处 <span className="ctx-kbd">Ctrl+V</span>
+                        {t("📋 粘贴到此处")} <span className="ctx-kbd">Ctrl+V</span>
                       </button>
                       <div className="ctx-sep" />
                     </>
                   )}
-                  <div className="ctx-head">在此处添加节点</div>
+                  <div className="ctx-head">{t("在此处添加节点")}</div>
                   {PALETTE.map(([kind, label]) => (
                     <button
                       key={kind}
@@ -2494,7 +2498,7 @@ function Inner() {
                         setCtxMenu(null);
                       }}
                     >
-                      ＋ {label}
+                      ＋ {t(label)}
                     </button>
                   ))}
                   <div className="ctx-sep" />
@@ -2505,7 +2509,7 @@ function Inner() {
                       setCtxMenu(null);
                     }}
                   >
-                    ⤢ 适应视图
+                    {t("⤢ 适应视图")}
                   </button>
                 </>
               )}
@@ -2519,7 +2523,7 @@ function Inner() {
         createPortal(
           <div className="ctx-backdrop" onClick={() => setDropMenu(null)} onContextMenu={(e) => { e.preventDefault(); setDropMenu(null); }}>
             <div className="ctx-menu" style={{ left: dropMenu.sx, top: dropMenu.sy }} onClick={(e) => e.stopPropagation()}>
-              <div className="ctx-head">在此处新建并连上</div>
+              <div className="ctx-head">{t("在此处新建并连上")}</div>
               {dropMenu.opts.map((opt) => (
                 <button
                   key={opt.kind + (opt.handle ?? "")}
@@ -2529,8 +2533,8 @@ function Inner() {
                     setDropMenu(null);
                   }}
                 >
-                  ＋ {NODE_LABEL[opt.kind] ?? opt.kind}
-                  {opt.handle === "fork" ? "（人格口）" : ""}
+                  ＋ {t(NODE_LABEL[opt.kind] ?? opt.kind)}
+                  {opt.handle === "fork" ? t("（人格口）") : ""}
                 </button>
               ))}
             </div>
@@ -2546,7 +2550,7 @@ function Inner() {
               <input
                 className="cmdk-input"
                 autoFocus
-                placeholder="搜索命令 / 添加节点…（↑↓ 选择，Enter 执行，Esc 关闭）"
+                placeholder={t("搜索命令 / 添加节点…（↑↓ 选择，Enter 执行，Esc 关闭）")}
                 value={cmdkQuery}
                 onChange={(e) => {
                   setCmdkQuery(e.target.value);
@@ -2573,7 +2577,7 @@ function Inner() {
                 }}
               />
               <div className="cmdk-list">
-                {cmdkFiltered.length === 0 && <div className="cmdk-empty">没有匹配的命令</div>}
+                {cmdkFiltered.length === 0 && <div className="cmdk-empty">{t("没有匹配的命令")}</div>}
                 {cmdkFiltered.map((c, i) => (
                   <button
                     key={c.id}
