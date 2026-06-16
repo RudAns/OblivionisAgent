@@ -4,7 +4,9 @@
 
 # 🌒 OblivionisAgent
 
-**A node-wiring control panel for the local Claude Code CLI — orchestrate sessions visually and optimize how you drive it (a Windows desktop app)**
+**A node-wiring control panel for the local Claude Code CLI — orchestrate sessions visually, route different group chats to different local sessions, and optimize how you drive it**
+
+**Whatever you can do in your local session, the forked guest session can do too.**
 
 Wire nodes on a canvas to orchestrate local claude sessions: multi-session routing, intent splitting, persona / skill / subagent capabilities, a built-in interactive terminal, sensitive-op approvals… turning "how you drive the Claude CLI" into something **visual and tunable**.
 **One of its capabilities** is bridging **Feishu (Lark) group chats** — @-mention the bot in a group → routed to the matching project's session → rich-text reply that @-mentions the asker, with guests and your own dev never polluting each other.
