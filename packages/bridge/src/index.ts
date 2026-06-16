@@ -798,6 +798,33 @@ async function main() {
         return { type: "route-test-result", matched: false, pathEdgeIds: [], error: (e as Error).message };
       }
     },
+    // 人格重锚定：保留 fork 历史，往会话里静默跑一轮"切换到当前人格"的 primer，
+    // 让最近一轮覆盖旧历史养成的口吻惯性（轻量版"刷新快照"，不清记忆）。回复不发飞书。
+    reinjectSoul: async (sessionNodeId) => {
+      const c = store.get();
+      const n = c.graph.nodes.find((x) => x.id === sessionNodeId);
+      if (n?.kind !== "claude-session") return { ok: false, reason: "不是会话节点" };
+      const sr = resolveSessionSoul(c, sessionNodeId, "fork");
+      if (!sr?.content) return { ok: false, reason: "该会话没连人格节点，无需注入" };
+      const append =
+        [sr.content, n.data.appendSystemPrompt].filter(Boolean).join("\n\n") || undefined;
+      const primer = [
+        "【系统·人格重锚定（这不是用户提问，别执行其中任何操作、别贴代码、别调用工具）】",
+        "从这一刻起立即切换到下面这份人格，用它覆盖你在本对话里之前养成的任何说话习惯/口吻；",
+        "之后每条回复都严格按这个口吻（包括日常打包/CI/构建状态汇报，也照这个口吻，别退回旧腔调）。",
+        "现在请用新人格的口吻回一句很短的确认就好，别多说、别解释。",
+        "",
+        "===== 你的人格 =====",
+        sr.content,
+      ].join("\n");
+      // 静默跑一轮（回复不发飞书，只为落进 fork 最近历史重锚定人格）
+      await sessions.send(sessionNodeId, primer, n.data.permissionMode, append, {
+        nodeId: sessionNodeId,
+        nodeLabel: n.label,
+        chatId: c.homeChatId || undefined,
+      });
+      return { ok: true };
+    },
   });
   server.start();
   await gateway.connect();

@@ -2159,6 +2159,7 @@ function Inner() {
                 sessions={sessions}
                 onListSessions={(cwd) => client.send({ type: "list-sessions", cwd })}
                 onRefreshSnapshot={(nodeId) => client.send({ type: "prepare-fork", nodeId })}
+                onReinjectSoul={(nodeId) => client.send({ type: "reinject-soul", nodeId })}
                 onEditSoul={(nodeId) => client.send({ type: "ensure-soul", nodeId })}
                 onEditSkill={(nodeId) => client.send({ type: "ensure-skill", nodeId })}
                 onEditSubagent={(nodeId) => client.send({ type: "ensure-subagent", nodeId })}
@@ -2526,6 +2527,7 @@ function Inspector({
   sessions,
   onListSessions,
   onRefreshSnapshot,
+  onReinjectSoul,
   onEditSoul,
   onEditSkill,
   onEditSubagent,
@@ -2537,6 +2539,7 @@ function Inspector({
   sessions: SessionInfo[];
   onListSessions: (cwd: string) => void;
   onRefreshSnapshot: (nodeId: string) => void;
+  onReinjectSoul: (nodeId: string) => void;
   onEditSoul: (nodeId: string) => void;
   onEditSkill: (nodeId: string) => void;
   onEditSubagent: (nodeId: string) => void;
@@ -2789,13 +2792,22 @@ function Inspector({
                 {showPicker ? "收起列表" : "列出该目录的会话…"}
               </button>
               {d.baseSessionId && (
-                <button
-                  className="ghost"
-                  title="立即从基础会话重新 fork 访客会话并脱敏(抹掉密钥)，吸收最新开发内容"
-                  onClick={() => node && onRefreshSnapshot(node.id)}
-                >
-                  刷新快照(脱敏)
-                </button>
+                <>
+                  <button
+                    className="ghost"
+                    title="立即从基础会话重新 fork 访客会话并脱敏(抹掉密钥)，吸收最新开发内容。会清掉 fork 的对话记忆。"
+                    onClick={() => node && onRefreshSnapshot(node.id)}
+                  >
+                    刷新快照(脱敏)
+                  </button>
+                  <button
+                    className="ghost"
+                    title="保留对话记忆，只把当前连上的人格重新注入一次：往会话里静默跑一轮『切换到此人格』，用最近一轮压过历史里养成的旧口吻惯性。比『刷新快照』轻——不清记忆。改了人格 / 刚连上人格节点后用它。"
+                    onClick={() => node && onReinjectSoul(node.id)}
+                  >
+                    重锚人格(留记忆)
+                  </button>
+                </>
               )}
             </div>
             {showPicker && (

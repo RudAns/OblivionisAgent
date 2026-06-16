@@ -30,6 +30,9 @@ export type ClientMessage =
   | { type: "lookup-openid"; mobile?: string; email?: string }
   /** 重新从基础会话 fork 出访客会话并脱敏（刷新快照） */
   | { type: "prepare-fork"; nodeId: string }
+  /** 人格重锚定：保留 fork 历史，往会话静默跑一轮"切换到当前人格"的 primer，
+   *  用最近一轮压过旧历史的口吻惯性（轻量版刷新快照，不清记忆） */
+  | { type: "reinject-soul"; nodeId: string }
   /** 请求审计历史（从 ~/.oblivionis/audit.jsonl 读取） */
   | { type: "get-audit" }
   /** 确保节点人格文件(SOUL.md)存在（无则播种 starter），回 soul-path */
