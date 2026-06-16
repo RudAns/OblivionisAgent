@@ -17,6 +17,7 @@ export function ConditionEdge({
   targetY,
   sourcePosition,
   targetPosition,
+  targetHandleId,
   markerEnd,
   style,
   data,
@@ -58,10 +59,16 @@ export function ConditionEdge({
   const showBadge = !!cond;
   // 赋能类连线(人格/技能/子代理 → 会话)：不是消息"流动"，而是给会话"挂能力"。
   // → 用虚线 + 按节点类型上色(人格紫/技能青/子代理粉) + 不带箭头，和实线的消息流一眼区分。
-  const isCapability =
-    d?.sourceKind === "soul" || d?.sourceKind === "skill" || d?.sourceKind === "subagent";
+  // 判定**优先用 targetHandleId==="fork"**：这是连线一等字段，只有 soul/skill/subagent 能连到
+  // 会话的「人格/技能/子代理口」(isValidConnection 保证)，即便 data.sourceKind 没传到也稳判。
+  // data.sourceKind 仅用于挑颜色(丢了就退回人格紫)。
+  const capKind =
+    d?.sourceKind === "soul" || d?.sourceKind === "skill" || d?.sourceKind === "subagent"
+      ? d.sourceKind
+      : undefined;
+  const isCapability = capKind !== undefined || targetHandleId === "fork";
   const capColor =
-    d?.sourceKind === "skill" ? "#3a8fa0" : d?.sourceKind === "subagent" ? "#c0517a" : "#8167b2";
+    capKind === "skill" ? "#3a8fa0" : capKind === "subagent" ? "#c0517a" : "#8167b2";
   // 静息色用 CSS 变量：随 data-theme 在绘制时解析(浅色更深)，不依赖 React 重渲染时机
   const baseStyle = { ...style, stroke: "var(--edge-rest)", ...(dimmed ? { opacity: 0.22 } : null) };
   // 优先级：赋能虚线 > 群消息流动(橙色虚线动画) > hover/选中(蓝) > 静息
