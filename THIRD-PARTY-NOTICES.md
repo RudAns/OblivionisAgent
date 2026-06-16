@@ -8,7 +8,7 @@ OblivionisAgent 的成品（桌面 exe / sidecar exe / 安装包）捆绑分发�
 
 ## JavaScript / TypeScript 依赖（生产，随前端与 bridge 打包）
 
-共 95 个包。
+共 96 个包。
 
 ### @larksuiteoapi/node-sdk@1.66.1  —  MIT
 https://github.com/larksuite/node-sdk
@@ -349,6 +349,32 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 https://github.com/tauri-apps/tauri#readme
 
 _(包内未附许可证文件；适用 Apache-2.0 OR MIT)_
+
+### @tauri-apps/plugin-global-shortcut@2.3.2  —  MIT OR Apache-2.0
+https://github.com/tauri-apps/plugins-workspace#readme
+
+```
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+PackageName: tauri
+DataFormat: SPDXRef-1
+PackageSupplier: Organization: The Tauri Programme in the Commons Conservancy
+PackageHomePage: https://tauri.app
+PackageLicenseDeclared: Apache-2.0
+PackageLicenseDeclared: MIT
+PackageCopyrightText: 2019-2022, The Tauri Programme in the Commons Conservancy
+PackageSummary: <text>Tauri is a rust project that enables developers to make secure
+and small desktop applications using a web frontend.
+                </text>
+PackageComment: <text>The package includes the following libraries; see
+Relationship information.
+                </text>
+Created: 2019-05-20T09:00:00Z
+PackageDownloadLocation: git://github.com/tauri-apps/tauri
+PackageDownloadLocation: git+https://github.com/tauri-apps/tauri.git
+PackageDownloadLocation: git+ssh://github.com/tauri-apps/tauri.git
+Creator: Person: Daniel Thompson-Yvetot
+```
 
 ### @tauri-apps/plugin-shell@2.3.5  —  MIT OR Apache-2.0
 https://github.com/tauri-apps/plugins-workspace#readme
@@ -2733,7 +2759,7 @@ SOFTWARE.
 
 ## Rust crate（静态链接进桌面 exe，含传递依赖）
 
-共 477 个 crate。Rust 生态约定每个 crate 在其源码仓库内附带许可证全文，按 SPDX 适用如下：
+共 520 个 crate。Rust 生态约定每个 crate 在其源码仓库内附带许可证全文，按 SPDX 适用如下：
 
 | Crate | 版本 | 许可证 | 仓库 |
 |---|---|---|---|
@@ -2744,6 +2770,16 @@ SOFTWARE.
 | android_system_properties | 0.1.5 | MIT/Apache-2.0 | https://github.com/nical/android_system_properties |
 | anyhow | 1.0.102 | MIT OR Apache-2.0 | https://github.com/dtolnay/anyhow |
 | arrayvec | 0.7.6 | MIT OR Apache-2.0 | https://github.com/bluss/arrayvec |
+| async-broadcast | 0.7.2 | MIT OR Apache-2.0 | https://github.com/smol-rs/async-broadcast |
+| async-channel | 2.5.0 | Apache-2.0 OR MIT | https://github.com/smol-rs/async-channel |
+| async-executor | 1.14.0 | Apache-2.0 OR MIT | https://github.com/smol-rs/async-executor |
+| async-io | 2.6.0 | Apache-2.0 OR MIT | https://github.com/smol-rs/async-io |
+| async-lock | 3.4.2 | Apache-2.0 OR MIT | https://github.com/smol-rs/async-lock |
+| async-process | 2.5.0 | Apache-2.0 OR MIT | https://github.com/smol-rs/async-process |
+| async-recursion | 1.1.1 | MIT OR Apache-2.0 | https://github.com/dcchut/async-recursion |
+| async-signal | 0.2.14 | Apache-2.0 OR MIT | https://github.com/smol-rs/async-signal |
+| async-task | 4.7.1 | Apache-2.0 OR MIT | https://github.com/smol-rs/async-task |
+| async-trait | 0.1.89 | MIT OR Apache-2.0 | https://github.com/dtolnay/async-trait |
 | atk | 0.18.2 | MIT | https://github.com/gtk-rs/gtk3-rs |
 | atk-sys | 0.18.2 | MIT | https://github.com/gtk-rs/gtk3-rs |
 | atomic-waker | 1.1.2 | Apache-2.0 OR MIT | https://github.com/smol-rs/atomic-waker |
@@ -2756,6 +2792,7 @@ SOFTWARE.
 | bitflags | 2.13.0 | MIT OR Apache-2.0 | https://github.com/bitflags/bitflags |
 | block-buffer | 0.10.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | block2 | 0.6.2 | MIT | https://github.com/madsmtm/objc2 |
+| blocking | 1.6.2 | Apache-2.0 OR MIT | https://github.com/smol-rs/blocking |
 | brotli | 8.0.3 | BSD-3-Clause AND MIT | https://github.com/dropbox/rust-brotli |
 | brotli-decompressor | 5.0.1 | BSD-3-Clause/MIT | https://github.com/dropbox/rust-brotli-decompressor |
 | bs58 | 0.5.1 | MIT/Apache-2.0 | https://github.com/Nullus157/bs58-rs |
@@ -2776,6 +2813,7 @@ SOFTWARE.
 | cfg-if | 1.0.4 | MIT OR Apache-2.0 | https://github.com/rust-lang/cfg-if |
 | chrono | 0.4.45 | MIT OR Apache-2.0 | https://github.com/chronotope/chrono |
 | combine | 4.6.7 | MIT | https://github.com/Marwes/combine |
+| concurrent-queue | 2.5.0 | Apache-2.0 OR MIT | https://github.com/smol-rs/concurrent-queue |
 | cookie | 0.18.1 | MIT OR Apache-2.0 | https://github.com/SergioBenitez/cookie-rs |
 | core-foundation | 0.10.1 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
 | core-foundation-sys | 0.8.7 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
@@ -2816,9 +2854,14 @@ SOFTWARE.
 | embed_plist | 1.2.2 | MIT OR Apache-2.0 | https://github.com/nvzqz/embed-plist-rs |
 | embed-resource | 3.0.9 | MIT | https://github.com/nabijaczleweli/rust-embed-resource |
 | encoding_rs | 0.8.35 | (Apache-2.0 OR MIT) AND BSD-3-Clause | https://github.com/hsivonen/encoding_rs |
+| endi | 1.1.1 | MIT | https://github.com/zeenix/endi |
+| enumflags2 | 0.7.12 | MIT OR Apache-2.0 | https://github.com/meithecatte/enumflags2 |
+| enumflags2_derive | 0.7.12 | MIT OR Apache-2.0 | https://github.com/meithecatte/enumflags2 |
 | equivalent | 1.0.2 | Apache-2.0 OR MIT | https://github.com/indexmap-rs/equivalent |
 | erased-serde | 0.4.10 | MIT OR Apache-2.0 | https://github.com/dtolnay/erased-serde |
 | errno | 0.3.14 | MIT OR Apache-2.0 | https://github.com/lambda-fairy/rust-errno |
+| event-listener | 5.4.1 | Apache-2.0 OR MIT | https://github.com/smol-rs/event-listener |
+| event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT | https://github.com/smol-rs/event-listener-strategy |
 | fastrand | 2.4.1 | Apache-2.0 OR MIT | https://github.com/smol-rs/fastrand |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 | https://github.com/image-rs/fdeflate |
 | field-offset | 0.3.6 | MIT OR Apache-2.0 | https://github.com/Diggsey/rust-field-offset |
@@ -2836,6 +2879,7 @@ SOFTWARE.
 | futures-core | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
 | futures-executor | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
 | futures-io | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
+| futures-lite | 2.6.1 | Apache-2.0 OR MIT | https://github.com/smol-rs/futures-lite |
 | futures-macro | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
 | futures-sink | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
 | futures-task | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
@@ -2848,6 +2892,7 @@ SOFTWARE.
 | gdkx11 | 0.18.2 | MIT | https://github.com/gtk-rs/gtk3-rs |
 | gdkx11-sys | 0.18.2 | MIT | https://github.com/gtk-rs/gtk3-rs |
 | generic-array | 0.14.7 | MIT | https://github.com/fizyk20/generic-array.git |
+| gethostname | 1.1.0 | Apache-2.0 | https://codeberg.org/swsnr/gethostname.rs.git |
 | getrandom | 0.2.17 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom |
 | getrandom | 0.3.4 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom |
 | getrandom | 0.4.2 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom |
@@ -2857,6 +2902,7 @@ SOFTWARE.
 | glib-macros | 0.18.5 | MIT | https://github.com/gtk-rs/gtk-rs-core |
 | glib-sys | 0.18.1 | MIT | https://github.com/gtk-rs/gtk-rs-core |
 | glob | 0.3.3 | MIT OR Apache-2.0 | https://github.com/rust-lang/glob |
+| global-hotkey | 0.8.0 | Apache-2.0 OR MIT | https://github.com/tauri-apps/global-hotkey |
 | gobject-sys | 0.18.0 | MIT | https://github.com/gtk-rs/gtk-rs-core |
 | gtk | 0.18.2 | MIT | https://github.com/gtk-rs/gtk3-rs |
 | gtk-sys | 0.18.2 | MIT | https://github.com/gtk-rs/gtk3-rs |
@@ -2866,6 +2912,7 @@ SOFTWARE.
 | hashbrown | 0.17.1 | MIT OR Apache-2.0 | https://github.com/rust-lang/hashbrown |
 | heck | 0.4.1 | MIT OR Apache-2.0 | https://github.com/withoutboats/heck |
 | heck | 0.5.0 | MIT OR Apache-2.0 | https://github.com/withoutboats/heck |
+| hermit-abi | 0.5.2 | MIT OR Apache-2.0 | https://github.com/hermit-os/hermit-rs |
 | hex | 0.4.3 | MIT OR Apache-2.0 | https://github.com/KokaKiwi/rust-hex |
 | html5ever | 0.38.0 | MIT OR Apache-2.0 | https://github.com/servo/html5ever |
 | http | 1.4.1 | MIT OR Apache-2.0 | https://github.com/hyperium/http |
@@ -2906,6 +2953,7 @@ SOFTWARE.
 | json-patch | 3.0.1 | MIT/Apache-2.0 | https://github.com/idubrov/json-patch |
 | jsonptr | 0.6.3 | MIT OR Apache-2.0 | https://github.com/chanced/jsonptr |
 | keyboard-types | 0.7.0 | MIT OR Apache-2.0 | https://github.com/pyfisch/keyboard-types |
+| keyring | 3.6.3 | MIT OR Apache-2.0 | https://github.com/hwchen/keyring-rs.git |
 | lazy_static | 1.5.0 | MIT OR Apache-2.0 | https://github.com/rust-lang-nursery/lazy-static.rs |
 | leb128fmt | 0.1.0 | MIT OR Apache-2.0 | https://github.com/bluk/leb128fmt |
 | libappindicator | 0.9.0 | Apache-2.0 OR MIT |  |
@@ -2914,6 +2962,7 @@ SOFTWARE.
 | libdbus-sys | 0.2.7 | Apache-2.0/MIT | https://github.com/diwic/dbus-rs |
 | libloading | 0.7.4 | ISC | https://github.com/nagisa/rust_libloading/ |
 | libredox | 0.1.17 | MIT | https://gitlab.redox-os.org/redox-os/libredox.git |
+| linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/sunfishcode/linux-raw-sys |
 | litemap | 0.8.2 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | lock_api | 0.4.14 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | log | 0.4.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/log |
@@ -2953,9 +3002,11 @@ SOFTWARE.
 | once_cell | 1.21.4 | MIT OR Apache-2.0 | https://github.com/matklad/once_cell |
 | open | 5.3.5 | MIT | https://github.com/Byron/open-rs |
 | option-ext | 0.2.0 | MPL-2.0 | https://github.com/soc/option-ext.git |
+| ordered-stream | 0.2.0 | MIT OR Apache-2.0 | https://github.com/danieldg/ordered-stream |
 | os_pipe | 1.2.3 | MIT | https://github.com/oconnor663/os_pipe.rs |
 | pango | 0.18.3 | MIT | https://github.com/gtk-rs/gtk-rs-core |
 | pango-sys | 0.18.0 | MIT | https://github.com/gtk-rs/gtk-rs-core |
+| parking | 2.2.1 | Apache-2.0 OR MIT | https://github.com/smol-rs/parking |
 | parking_lot | 0.12.5 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | parking_lot_core | 0.9.12 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | pathdiff | 0.2.3 | MIT/Apache-2.0 | https://github.com/Manishearth/pathdiff |
@@ -2967,10 +3018,12 @@ SOFTWARE.
 | phf_shared | 0.13.1 | MIT | https://github.com/rust-phf/rust-phf |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT | https://github.com/taiki-e/pin-project-lite |
 | pin-utils | 0.1.0 | MIT OR Apache-2.0 | https://github.com/rust-lang-nursery/pin-utils |
+| piper | 0.2.5 | MIT OR Apache-2.0 | https://github.com/smol-rs/piper |
 | pkg-config | 0.3.33 | MIT OR Apache-2.0 | https://github.com/rust-lang/pkg-config-rs |
 | plist | 1.9.0 | MIT | https://github.com/ebarnard/rust-plist/ |
 | png | 0.17.16 | MIT OR Apache-2.0 | https://github.com/image-rs/image-png |
 | png | 0.18.1 | MIT OR Apache-2.0 | https://github.com/image-rs/image-png |
+| polling | 3.11.0 | Apache-2.0 OR MIT | https://github.com/smol-rs/polling |
 | portable-pty | 0.8.1 | MIT | https://github.com/wez/wezterm |
 | potential_utf | 0.1.5 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | powerfmt | 0.2.0 | MIT OR Apache-2.0 | https://github.com/jhpratt/powerfmt |
@@ -2997,6 +3050,7 @@ SOFTWARE.
 | reqwest | 0.13.4 | MIT OR Apache-2.0 | https://github.com/seanmonstar/reqwest |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 | https://github.com/djc/rustc-version-rs |
 | rustc-hash | 2.1.2 | Apache-2.0 OR MIT | https://github.com/rust-lang/rustc-hash |
+| rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/bytecodealliance/rustix |
 | rustversion | 1.0.22 | MIT OR Apache-2.0 | https://github.com/dtolnay/rustversion |
 | same-file | 1.0.6 | Unlicense/MIT | https://github.com/BurntSushi/same-file |
 | schemars | 0.8.22 | MIT | https://github.com/GREsau/schemars |
@@ -3058,11 +3112,14 @@ SOFTWARE.
 | tauri-codegen | 2.6.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-macros | 2.6.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-plugin | 2.6.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
+| tauri-plugin-global-shortcut | 2.3.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
 | tauri-plugin-shell | 2.3.5 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
+| tauri-plugin-single-instance | 2.4.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
 | tauri-runtime | 2.11.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-runtime-wry | 2.11.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-utils | 2.9.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | tauri-winres | 0.3.6 | MIT | https://github.com/tauri-apps/winres |
+| tempfile | 3.27.0 | MIT OR Apache-2.0 | https://github.com/Stebalien/tempfile |
 | tendril | 0.5.0 | MIT OR Apache-2.0 | https://github.com/servo/html5ever |
 | termios | 0.2.2 | MIT | https://github.com/dcuddeback/termios-rs |
 | thiserror | 1.0.69 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror |
@@ -3093,11 +3150,13 @@ SOFTWARE.
 | tower-layer | 0.3.3 | MIT | https://github.com/tower-rs/tower |
 | tower-service | 0.3.3 | MIT | https://github.com/tower-rs/tower |
 | tracing | 0.1.44 | MIT | https://github.com/tokio-rs/tracing |
+| tracing-attributes | 0.1.31 | MIT | https://github.com/tokio-rs/tracing |
 | tracing-core | 0.1.36 | MIT | https://github.com/tokio-rs/tracing |
 | tray-icon | 0.23.1 | MIT OR Apache-2.0 | https://github.com/tauri-apps/tray-icon |
 | try-lock | 0.2.5 | MIT | https://github.com/seanmonstar/try-lock |
 | typeid | 1.0.3 | MIT OR Apache-2.0 | https://github.com/dtolnay/typeid |
 | typenum | 1.20.1 | MIT OR Apache-2.0 | https://github.com/paholg/typenum |
+| uds_windows | 1.2.1 | MIT | https://github.com/haraldh/rust_uds_windows |
 | unic-char-property | 0.9.0 | MIT/Apache-2.0 | https://github.com/open-i18n/rust-unic/ |
 | unic-char-range | 0.9.0 | MIT/Apache-2.0 | https://github.com/open-i18n/rust-unic/ |
 | unic-common | 0.9.0 | MIT/Apache-2.0 | https://github.com/open-i18n/rust-unic/ |
@@ -3206,14 +3265,24 @@ SOFTWARE.
 | wry | 0.55.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/wry |
 | x11 | 2.21.0 | MIT | https://github.com/AltF02/x11-rs.git |
 | x11-dl | 2.21.0 | MIT | https://github.com/AltF02/x11-rs.git |
+| x11rb | 0.13.2 | MIT OR Apache-2.0 | https://github.com/psychon/x11rb |
+| x11rb-protocol | 0.13.2 | MIT OR Apache-2.0 | https://github.com/psychon/x11rb |
+| xkeysym | 0.2.1 | MIT OR Apache-2.0 OR Zlib | https://github.com/notgull/xkeysym |
 | yoke | 0.8.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | yoke-derive | 0.8.2 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| zbus | 5.16.0 | MIT | https://github.com/z-galaxy/zbus/ |
+| zbus_macros | 5.16.0 | MIT | https://github.com/z-galaxy/zbus/ |
+| zbus_names | 4.3.2 | MIT | https://github.com/z-galaxy/zbus/ |
 | zerofrom | 0.1.8 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zerofrom-derive | 0.1.7 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| zeroize | 1.9.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils |
 | zerotrie | 0.2.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zerovec | 0.11.6 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zerovec-derive | 0.11.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | zmij | 1.0.21 | MIT | https://github.com/dtolnay/zmij |
+| zvariant | 5.12.0 | MIT | https://github.com/z-galaxy/zbus/ |
+| zvariant_derive | 5.12.0 | MIT | https://github.com/z-galaxy/zbus/ |
+| zvariant_utils | 3.4.0 | MIT | https://github.com/z-galaxy/zbus/ |
 
 ## 运行时
 
