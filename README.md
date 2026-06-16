@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/screenshots/cover.jpg" alt="OblivionisAgent" width="260" />
+
 # 🌒 OblivionisAgent
 
 **给本地 Claude Code CLI 的「连线式控制台」- 可视化编排会话、不同群聊指向不同的本地会话、优化你驱动它的方式**
@@ -10,9 +12,6 @@
 其中**一项能力**是接入**飞书群聊**——群里 @机器人 → 路由到对应项目的会话 → 富文本回帖并 @提问人，访客与你的开发互不污染。
 
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
-![Tauri](https://img.shields.io/badge/shell-Tauri%20v2-FFC131?logo=tauri&logoColor=black)
-![React](https://img.shields.io/badge/UI-React%2018-61DAFB?logo=react&logoColor=black)
-![Node](https://img.shields.io/badge/engine-Node%20%E2%89%A520-339933?logo=nodedotjs&logoColor=white)
 ![Claude](https://img.shields.io/badge/LLM-官方%20Claude%20CLI-D97757)
 ![License](https://img.shields.io/badge/License-GPL%20v3-3b82f6)
 ![Version](https://img.shields.io/badge/version-0.1.0-2ea44f)

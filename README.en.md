@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/screenshots/cover.jpg" alt="OblivionisAgent" width="260" />
+
 # 🌒 OblivionisAgent
 
 **A node-wiring control panel for the local Claude Code CLI — orchestrate sessions visually and optimize how you drive it (a Windows desktop app)**
@@ -8,9 +10,6 @@ Wire nodes on a canvas to orchestrate local claude sessions: multi-session routi
 **One of its capabilities** is bridging **Feishu (Lark) group chats** — @-mention the bot in a group → routed to the matching project's session → rich-text reply that @-mentions the asker, with guests and your own dev never polluting each other.
 
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
-![Tauri](https://img.shields.io/badge/shell-Tauri%20v2-FFC131?logo=tauri&logoColor=black)
-![React](https://img.shields.io/badge/UI-React%2018-61DAFB?logo=react&logoColor=black)
-![Node](https://img.shields.io/badge/engine-Node%20%E2%89%A520-339933?logo=nodedotjs&logoColor=white)
 ![Claude](https://img.shields.io/badge/LLM-Official%20Claude%20CLI-D97757)
 ![License](https://img.shields.io/badge/License-GPL%20v3-3b82f6)
 ![Version](https://img.shields.io/badge/version-0.1.0-2ea44f)
