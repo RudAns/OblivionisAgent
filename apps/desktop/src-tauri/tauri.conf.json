@@ -56,6 +56,17 @@
         "focus": false,
         "shadow": false,
         "visible": false
+      },
+      {
+        "label": "mdviewer",
+        "title": "文档查看器 · OblivionisAgent",
+        "width": 1080,
+        "height": 800,
+        "minWidth": 640,
+        "minHeight": 460,
+        "decorations": true,
+        "center": true,
+        "visible": false
       }
     ],
     "security": {

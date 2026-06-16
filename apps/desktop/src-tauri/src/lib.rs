@@ -291,23 +291,18 @@ fn reports_dir_path() -> std::path::PathBuf {
     std::path::Path::new(&home).join(".oblivionis").join("reports")
 }
 
-/// 打开（或聚焦）独立的「文档查看器」窗口——可以边看文档边继续用主窗。
+/// 显示（或聚焦）独立的「文档查看器」窗口——它是 tauri.conf 里声明的常驻隐藏窗（同 mascot 模式），
+/// 点关闭=隐藏而非销毁，所以这里 get 一定拿得到，只 show/focus。
 #[tauri::command]
 fn open_md_viewer(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("mdviewer") {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
-        return Ok(());
+        Ok(())
+    } else {
+        Err("文档查看器窗口未就绪".into())
     }
-    tauri::WebviewWindowBuilder::new(&app, "mdviewer", tauri::WebviewUrl::App("index.html".into()))
-        .title("文档查看器 · OblivionisAgent")
-        .inner_size(1080.0, 800.0)
-        .min_inner_size(640.0, 460.0)
-        .center()
-        .build()
-        .map_err(|e| e.to_string())?;
-    Ok(())
 }
 
 /// 路径归一化（去重用）：分隔符统一成 \、去尾斜杠、小写（Windows 大小写不敏感）。
@@ -613,8 +608,17 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            // 文档查看器：点关闭=隐藏而非销毁，保持常驻、随时可再 show（同 mascot 思路）。
+            // 不拦的话它会被销毁 → 下次 open_md_viewer get 不到 → "打不开"。
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "mdviewer" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    return;
+                }
+            }
             // 只有「主窗」销毁才等于应用退出 → 才杀后台服务。
-            // 闪屏(splashscreen)/小人(mascot)窗各自关闭也会触发 Destroyed，绝不能误杀 sidecar——
+            // 闪屏(splashscreen)/小人(mascot)/文档窗各自关闭也会触发 Destroyed，绝不能误杀 sidecar——
             // 曾导致闪屏 3s 后自动关闭就把刚起来的后台服务杀掉，表现为"刚连上又断了、再也起不来"。
             if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "main" {
                 let app = window.app_handle();
@@ -623,9 +627,9 @@ pub fn run() {
                         let _ = child.kill();
                     }
                 }
-                // 关主窗=用户要退出整个 App。但 mascot 是「隐藏常驻窗」(启动即建、只 show/hide
-                // 从不销毁)，只要它还在，进程就不退出 → 留下没有可见窗口的僵尸进程：单实例锁没释放，
-                // 下次启动只会去聚焦这个僵尸 → 表现为"打不开"。所以这里显式退出，连带关掉 mascot、
+                // 关主窗=用户要退出整个 App。但 mascot / 文档窗是「隐藏常驻窗」(启动即建、只 show/hide
+                // 从不销毁)，只要它们还在，进程就不退出 → 留下没有可见窗口的僵尸进程：单实例锁没释放，
+                // 下次启动只会去聚焦这个僵尸 → 表现为"打不开"。所以这里显式退出，连带关掉它们、
                 // 结束进程、释放单实例锁。（这也是之前反复攒出多个实例、互抢端口的总根子。）
                 app.exit(0);
             }

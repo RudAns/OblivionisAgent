@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -227,8 +228,10 @@ export function DocViewer() {
     [openFile],
   );
 
-  // 初次加载目录
-  useEffect(() => {
+  // 懒加载：窗口是「隐藏常驻窗」，启动时别扫盘；首次 show/聚焦再加载（避免每次启动都扫 Unity 大目录）。
+  const loadedRef = useRef(false);
+  const initRef = useRef<() => void>(() => {});
+  initRef.current = () => {
     void loadDirs().then((l) => {
       const first = l[0];
       if (first) {
@@ -236,6 +239,23 @@ export function DocViewer() {
         loadFiles(first.path, true);
       }
     });
+  };
+  useEffect(() => {
+    if (!inTauri()) return;
+    let un: (() => void) | undefined;
+    const tryInit = () => {
+      if (!loadedRef.current) {
+        loadedRef.current = true;
+        initRef.current();
+      }
+    };
+    const w = getCurrentWindow();
+    w.onFocusChanged(({ payload }) => payload && tryInit())
+      .then((u) => (un = u))
+      .catch(() => {});
+    // 兜底：若窗口已可见（理论上启动时隐藏，不会命中）
+    w.isVisible().then((v) => v && tryInit()).catch(() => {});
+    return () => un?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
