@@ -212,7 +212,9 @@ OblivionisAgent/
 
 | 文档 | 内容 |
 |---|---|
-| [architecture.md](.claude/docs/architecture.md) | 数据流图 + 每个核心文件干什么 |
+| [architecture.md](.claude/docs/architecture.md) | 数据流图 + 每个核心文件干什么（**地图**） |
+| [conventions.md](.claude/docs/conventions.md) | 代码规范 / 约定 / 安全硬约束（**写代码前读**） |
+| [extending.md](.claude/docs/extending.md) | **加功能 step-by-step 配方**：加节点 / 命令 / 面板 / 消息 / transport / i18n |
 | [pitfalls.md](.claude/docs/pitfalls.md) | 全部踩坑记录（会话路径编码、PTY 竞态、xterm 渲染、Windows 编码…） |
 | [workflows.md](.claude/docs/workflows.md) | 构建/调试/冒烟测试/接新群的标准流程 |
 | [research-hermes-oauth.md](.claude/docs/research-hermes-oauth.md) | 选型研究与订阅合规依据 |

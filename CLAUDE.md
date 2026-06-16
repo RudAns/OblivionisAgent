@@ -22,6 +22,21 @@
 - `apps/desktop` — Tauri v2 + React：连线画布(@xyflow)、xterm 终端、Rust PTY(lib.rs)
 - `rebuild-deploy.bat` — 一键构建+部署到便携版（先构建后关应用，顺序勿改）
 
+## 文档地图（贡献者 / 二次开发从这进）
+
+`.claude/docs/` 是给"想加功能的人（和他的 Claude Code）"准备的知识库，按需读：
+
+| 想干什么 | 看哪篇 |
+|---|---|
+| 搞懂数据流 + 每个核心文件干什么 | [architecture.md](.claude/docs/architecture.md) |
+| 写代码前的规范 / 约定 / 安全硬约束 | [conventions.md](.claude/docs/conventions.md) |
+| **加功能的 step-by-step 配方**（加节点 / 命令 / 面板 / 消息 / transport / i18n…） | [extending.md](.claude/docs/extending.md) |
+| 改终端 / 会话 / 配置前必查的踩坑库 | [pitfalls.md](.claude/docs/pitfalls.md) |
+| 构建 / 调试 / 冒烟测试 / PTY 探针 / 接新群 | [workflows.md](.claude/docs/workflows.md) |
+| 为什么遥控 CLI 而非调 API（选型依据） | [research-hermes-oauth.md](.claude/docs/research-hermes-oauth.md) |
+
+> 让 AI 加功能时，先让它读 **architecture（地图）+ extending（配方）+ conventions（规范）**，再动手。
+
 ## 常用命令
 
 ```bash

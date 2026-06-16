@@ -52,7 +52,7 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 ### packages/shared — 两端共享的契约
 | 文件 | 作用 |
 |---|---|
-| `config.ts` | **整个配置的 zod schema**（图/节点/边/owners/护栏）。节点种类: feishu-group / route / intent-switch / claude-session / cron / webhook / soul。改配置结构从这里开始 |
+| `config.ts` | **整个配置的 zod schema**（图/节点/边/owners/护栏）。节点种类: feishu-group / route / intent-switch / claude-session / cron / webhook / **soul / skill / subagent**（后三=连到会话「赋能口」的赋能节点）。改配置结构从这里开始（加节点种类见 [extending.md 配方 1](extending.md)） |
 | `protocol.ts` | GUI↔bridge 的 WS 消息类型 |
 | `stream-json.ts` | claude stream-json 事件类型 + 辅助函数(assistantText 等) |
 
@@ -70,6 +70,8 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 | `secrets.ts` | collectSecrets(appSecret + ~/.claude/.credentials.json) / redactText |
 | `transcript-store.ts` | **转录持久化**：旁路监听 Hub 的 session-event 落盘 `~/.oblivionis/transcripts/<nodeId>.jsonl`，保留 3 天/节点 600 条；GUI 连接时经 `transcript-history` 整包回放 |
 | `soul-store.ts` | **人格(SOUL.md)**：每节点 `~/.oblivionis/souls/<nodeId>.md`，原文注入 append-system-prompt 第一段；访客护栏永远压轴+优先级声明；首次播种 starter 绝不覆盖（设计依据见 vision-agentic-roadmap.md） |
+| `skill-store.ts` / `subagent-store.ts` | **赋能节点**：技能(SKILL.md，操作规范) / 子代理(Claude Code 原生 subagent，独立上下文做重活)。各自 `resolveSessionXxx` 按连到会话「赋能口(fork)」的节点解析，注入 fork 的 appendPrompt（人格管怎么说话、技能管怎么做事、子代理委派重活）。「重锚人格」= 把当前赋能内容静默重新注入所连会话(留记忆) |
+| `secret-store.ts` | **飞书 App Secret 运行时持有**：仅内存，来自外壳从 OS 凭据管理器读出经 env 注入；绝不写盘/广播（见 [conventions.md 安全约束](conventions.md)） |
 | `usage-monitor.ts` | **订阅用量**：每 5 分钟 `claude -p "/usage"`（零 token、合规）解析 5h/周窗口百分比，广播 `usage-status` 给顶栏 |
 | `knowledge-store.ts` + `claude/extract-knowledge.ts` | **知识收件箱**：问答后 haiku 提取"规则性指令"候选→`~/.oblivionis/knowledge-inbox.jsonl`→GUI 裁决→采纳追加 cwd 的 CLAUDE.md「群聊沉淀规则」小节 |
 | `cron-scheduler.ts` | **定时任务**：30s tick；cron 节点到点→下游会话(脱敏分身)跑 prompt→结果(出站脱敏)发节点群或 homeChatId。栅栏：运行中跳过/无特权/不暴露建任务能力 |
@@ -98,12 +100,14 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 | 文件 | 作用 |
 |---|---|
 | `src/App.tsx` | **主装配**：状态中枢、配置同步(首图不覆盖+自动保存)、WS 消息分发、终端开启逻辑 |
-| `src/layout/IconRail.tsx` | 左侧图标竖栏：画布开关/转录/终端/审计/日志/飞书（图标在 `icons.tsx`，**占位 SVG，待用户提供正式图标**） |
-| `src/layout/SessionSidebar.tsx` | 会话卡片列表(常驻)：单击=选中看转录，双击=开终端 |
+| `src/i18n/` | **中英双语**：`index.tsx`（`LangProvider`/`useT`/`tStatic`）+ `en.ts`（中文原文→English 词表）。中文原文即 key，漏译回退中文。规则见 [conventions.md](conventions.md) |
+| `src/layout/IconRail.tsx` | 左侧图标竖栏：节点图(画布开关) / 收件箱 / 审计 / 服务日志 / 设置（终端/转录改由选会话 + 面板顶部小页签进入）。图标在 `icons.tsx` |
+| `src/layout/SessionSidebar.tsx` | 会话卡片列表(常驻)：单击=选中该会话（**视图粘滞**：保持当前 终端/转录 视图，不强制跳终端）；节点视图下单击=定位节点 |
 | `src/layout/StatusBar.tsx` | 底部状态栏：引擎 WS/飞书连接/会话统计/当前终端 |
 | `src/canvas/FlowCanvas.tsx` | React Flow 画布（劲道贝塞尔 curvature 0.5+箭头、彩色缩略图） |
 | `src/canvas/nodes/NodeShell.tsx` | 节点卡片统一外壳（彩头+暗体，--nc 控色） |
-| `src/canvas/nodes/*` | 四种节点（基于 NodeShell） |
+| `src/canvas/nodes/*` | 九种节点卡片（基于 NodeShell）：飞书群/路由/意图分流/Claude会话/定时/Webhook/人格/技能/子代理 |
+| `src/canvas/edges/ConditionEdge.tsx` | 连线：意图条件徽标 + 运行时流动；赋能连线(人格/技能/子代理→会话)改虚线+按类型上色 |
 | `src/panels/TerminalsHost.tsx` | **交互式终端（最核心、坑最多）**：多终端保活、历史回放缓冲、贴图、Ctrl+A/Ctrl+F、URL/md/html 可点击、ANSI 16 色精修、终端信息条、尺寸竞态对账。改前必读 pitfalls.md |
 | `src/panels/TranscriptPanel.tsx` | 访客会话转录（含引擎回放的近 3 天历史） |
 | `src/panels/AuditPanel.tsx` | 审计（真实姓名由引擎经通讯录解析） |
