@@ -48,7 +48,7 @@ import { AuditPanel, type AuditItem } from "./panels/AuditPanel.js";
 import { InboxPanel } from "./panels/InboxPanel.js";
 import { FeishuPanel, FeishuStatusDot, type FeishuState } from "./panels/FeishuPanel.js";
 import { IconRail, type RailKey } from "./layout/IconRail.js";
-import { useI18n, type Lang } from "./i18n/index.js";
+import { useI18n, useT, type Lang } from "./i18n/index.js";
 import { IconMoon, IconSun, IconMonitor } from "./layout/icons.js";
 import { SessionSidebar } from "./layout/SessionSidebar.js";
 import { StatusBar } from "./layout/StatusBar.js";
@@ -2624,11 +2624,12 @@ function Inspector({
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [pickFilter, setPickFilter] = useState("");
+  const t = useT();
   useEffect(() => {
     setShowPicker(false);
     setPickFilter("");
   }, [node?.id]); // 切换节点自动收起列表
-  if (!node) return <div className="inspector empty">点画布上的节点进行编辑</div>;
+  if (!node) return <div className="inspector empty">{t("点画布上的节点进行编辑")}</div>;
   const d = node.data as Record<string, any>;
   const field = (label: string, value: string, key: string) => (
     <label className="field">
@@ -2651,29 +2652,29 @@ function Inspector({
   return (
     <div className="inspector">
       <div className="inspector-head">
-        <span className="inspector-title">{NODE_LABEL[node.type ?? ""] ?? node.type}</span>
-        <button className="del-btn" onClick={onDelete} title="删除此节点及其连线（可 Ctrl+Z 撤销）">
-          🗑 删除
+        <span className="inspector-title">{t(NODE_LABEL[node.type ?? ""] ?? node.type ?? "")}</span>
+        <button className="del-btn" onClick={onDelete} title={t("删除此节点及其连线（可 Ctrl+Z 撤销）")}>
+          {t("🗑 删除")}
         </button>
       </div>
-      {field("名称", d.label, "label")}
+      {field(t("名称"), d.label, "label")}
       {node.type === "feishu-group" && (
         <>
           {field("chatId (oc_...)", d.chatId, "chatId")}
           <label className="field">
-            <span>触发</span>
+            <span>{t("触发")}</span>
             <select value={d.triggerMode} onChange={(e) => onPatch({ triggerMode: e.target.value })}>
-              <option value="mention">@机器人才触发</option>
-              <option value="all">群内全部消息</option>
+              <option value="mention">{t("@机器人才触发")}</option>
+              <option value="all">{t("群内全部消息")}</option>
             </select>
           </label>
           <div className="fs-actions">
             <button
               disabled={!d.chatId}
-              title="查看/编辑机器人对本群积累的长期记忆（GROUP.md，会自动维护，注入到该群会话）"
+              title={t("查看/编辑机器人对本群积累的长期记忆（GROUP.md，会自动维护，注入到该群会话）")}
               onClick={() => d.chatId && onEditGroupMemory(d.chatId)}
             >
-              🧠 群记忆 (GROUP.md)
+              {t("🧠 群记忆 (GROUP.md)")}
             </button>
           </div>
         </>
@@ -2681,30 +2682,29 @@ function Inspector({
       {node.type === "route" && (
         <>
           <div className="hint" style={{ marginBottom: 6 }}>
-            发给 Claude 前会自动去掉飞书 @ 占位符（无需配置）。这里只设可选「前缀」。
+            {t("发给 Claude 前会自动去掉飞书 @ 占位符（无需配置）。这里只设可选「前缀」。")}
           </div>
-          {fieldArea("前缀", d.prefix, "prefix", 3, "可选。该路由下消息统一加的前缀（可多行）")}
+          {fieldArea(t("前缀"), d.prefix, "prefix", 3, t("可选。该路由下消息统一加的前缀（可多行）"))}
         </>
       )}
       {node.type === "soul" && (
         <>
           <div className="hint" style={{ marginBottom: 6 }}>
-            人格 (SOUL.md)。把本节点右侧 ● 连到「Claude 会话」的 <b>🎭人格口</b>；连上即作用于该会话的
-            所有飞书回复（fork 脱敏分身）。一个人格可连多个会话；未连任何会话则不生效。
+            {t("人格 (SOUL.md)。把本节点右侧 ● 连到「Claude 会话」的 🎭人格口；连上即作用于该会话的所有飞书回复（fork 脱敏分身）。一个人格可连多个会话；未连任何会话则不生效。")}
           </div>
           <div className="fs-actions">
             <button
-              title="编辑这份人格文件 SOUL.md（首次自动生成模板，保存即生效）。人格只影响表达风格，访客安全护栏始终优先。"
+              title={t("编辑这份人格文件 SOUL.md（首次自动生成模板，保存即生效）。人格只影响表达风格，访客安全护栏始终优先。")}
               onClick={() => node && onEditSoul(node.id)}
             >
-              🎭 编辑灵魂 (SOUL.md)
+              {t("🎭 编辑灵魂 (SOUL.md)")}
             </button>
             <button
               className="ghost"
-              title="把这份人格立即重新注入到所有连着它的会话(留记忆)：往每个会话的 fork 静默跑一轮『切换到此人格』，用最近一轮压过历史里养成的旧口吻惯性。改完人格 / 刚连上会话后用它，比『刷新快照』轻——不清记忆。"
+              title={t("把这份人格立即重新注入到所有连着它的会话(留记忆)：往每个会话的 fork 静默跑一轮『切换到此人格』，用最近一轮压过历史里养成的旧口吻惯性。改完人格 / 刚连上会话后用它，比『刷新快照』轻——不清记忆。")}
               onClick={() => node && onReinjectSoul(node.id)}
             >
-              🔁 重锚到所连会话
+              {t("🔁 重锚到所连会话")}
             </button>
           </div>
         </>
@@ -2712,15 +2712,14 @@ function Inspector({
       {node.type === "skill" && (
         <>
           <div className="hint" style={{ marginBottom: 6 }}>
-            技能 (SKILL.md)：操作性指令 / 话术 / 输出格式，和人格互补（人格管怎么说话，技能管怎么做事）。
-            把本节点右侧 ● 连到「Claude 会话」的 <b>🎭人格/🧩技能口</b>；一个会话可连多个技能。
+            {t("技能 (SKILL.md)：操作性指令 / 话术 / 输出格式，和人格互补（人格管怎么说话，技能管怎么做事）。把本节点右侧 ● 连到「Claude 会话」的 🎭人格/🧩技能口；一个会话可连多个技能。")}
           </div>
           <div className="fs-actions">
             <button
-              title="编辑这份技能文件 SKILL.md（首次自动生成模板，保存即生效）"
+              title={t("编辑这份技能文件 SKILL.md（首次自动生成模板，保存即生效）")}
               onClick={() => node && onEditSkill(node.id)}
             >
-              🧩 编辑技能 (SKILL.md)
+              {t("🧩 编辑技能 (SKILL.md)")}
             </button>
           </div>
         </>
@@ -2728,16 +2727,14 @@ function Inspector({
       {node.type === "subagent" && (
         <>
           <div className="hint" style={{ marginBottom: 6 }}>
-            子代理：一个 Claude Code 原生子代理（独立上下文 + 独立工具）。会话里的 claude 会用 Task 工具按它的
-            description <b>自动委派</b>给它做重活（文档/日志总结、消息分类），不污染主会话。连到会话的
-            <b>🎭人格/🧩技能口</b>作组织标识。
+            {t("子代理：一个 Claude Code 原生子代理（独立上下文 + 独立工具）。会话里的 claude 会用 Task 工具按它的 description 自动委派给它做重活（文档/日志总结、消息分类），不污染主会话。连到会话的 🎭人格/🧩技能口作组织标识。")}
           </div>
           <div className="fs-actions">
             <button
-              title="编辑子代理定义（首次自动生成模板，写在 ~/.claude/agents/，claude 自动发现）。务必改 name(英文唯一)+description(写清何时用)。"
+              title={t("编辑子代理定义（首次自动生成模板，写在 ~/.claude/agents/，claude 自动发现）。务必改 name(英文唯一)+description(写清何时用)。")}
               onClick={() => node && onEditSubagent(node.id)}
             >
-              🦾 编辑子代理
+              {t("🦾 编辑子代理")}
             </button>
           </div>
         </>
@@ -2745,29 +2742,29 @@ function Inspector({
       {node.type === "webhook" && (
         <>
           <div className="hint" style={{ marginBottom: 6 }}>
-            外部系统（Jenkins/CI/GitHub）POST 到下面这个地址即触发；把它连到一个「Claude 会话」节点。
+            {t("外部系统（Jenkins/CI/GitHub）POST 到下面这个地址即触发；把它连到一个「Claude 会话」节点。")}
           </div>
           <div className="base-session">
-            <div className="base-session-title">回调地址（POST · 同网段可达）</div>
+            <div className="base-session-title">{t("回调地址（POST · 同网段可达）")}</div>
             <div className="owner-row">
-              <span className="owner-id" title={`http://<本机IP>:8921/hook/${d.token ?? ""}`}>
-                http://&lt;本机IP&gt;:8921/hook/{d.token ?? ""}
+              <span className="owner-id" title={`http://<${t("本机IP")}>:8921/hook/${d.token ?? ""}`}>
+                {`http://<${t("本机IP")}>:8921/hook/${d.token ?? ""}`}
               </span>
               <button
                 onClick={() => navigator.clipboard?.writeText(`/hook/${d.token ?? ""}`).catch(() => {})}
-                title="复制路径"
+                title={t("复制路径")}
               >
-                复制
+                {t("复制")}
               </button>
             </div>
           </div>
-          {field("指令模板（{{body}}=请求体）", d.prompt, "prompt")}
-          {field("投递群 chatId", d.chatId, "chatId")}
+          {field(t("指令模板（{{body}}=请求体）"), d.prompt, "prompt")}
+          {field(t("投递群 chatId"), d.chatId, "chatId")}
           <div className="hint" style={{ marginBottom: 6 }}>
-            留空 = 发到 Home Chat。外网回调需自建隧道（cloudflared/ngrok 指向 8921）。
+            {t("留空 = 发到 Home Chat。外网回调需自建隧道（cloudflared/ngrok 指向 8921）。")}
           </div>
           <label className="field">
-            <span>启用</span>
+            <span>{t("启用")}</span>
             <input
               type="checkbox"
               checked={d.enabled !== false}
@@ -2778,17 +2775,17 @@ function Inspector({
       )}
       {node.type === "cron" && (
         <>
-          {field("触发时刻", d.schedule, "schedule")}
+          {field(t("触发时刻"), d.schedule, "schedule")}
           <div className="hint" style={{ marginBottom: 6 }}>
-            支持：<code>09:00</code>(每天) · <code>every 30m</code> / <code>every 2h</code>(间隔)
+            {t("支持：09:00(每天) · every 30m / every 2h(间隔)")}
           </div>
-          {field("指令 prompt", d.prompt, "prompt")}
-          {field("投递群 chatId", d.chatId, "chatId")}
+          {field(t("指令 prompt"), d.prompt, "prompt")}
+          {field(t("投递群 chatId"), d.chatId, "chatId")}
           <div className="hint" style={{ marginBottom: 6 }}>
-            留空 = 发到 Home Chat（在「飞书连接」面板设置）；连线到一个「Claude 会话」节点即生效
+            {t("留空 = 发到 Home Chat（在「飞书连接」面板设置）；连线到一个「Claude 会话」节点即生效")}
           </div>
           <label className="field">
-            <span>启用</span>
+            <span>{t("启用")}</span>
             <input
               type="checkbox"
               checked={d.enabled !== false}
@@ -2799,25 +2796,25 @@ function Inspector({
       )}
       {node.type === "intent-switch" && (
         <>
-          {field("分类模型(可空=haiku)", d.model, "model")}
+          {field(t("分类模型(可空=haiku)"), d.model, "model")}
           <label className="field">
-            <span>判定模式</span>
+            <span>{t("判定模式")}</span>
             <select value={d.mode ?? "best"} onChange={(e) => onPatch({ mode: e.target.value })}>
-              <option value="best">最佳匹配</option>
-              <option value="priority">优先级(连线顺序)</option>
+              <option value="best">{t("最佳匹配")}</option>
+              <option value="priority">{t("优先级(连线顺序)")}</option>
             </select>
           </label>
           <div className="hint">
-            从该节点右侧拉多条线到不同会话，点每条线设「触发意图」；留空的线=默认边。
+            {t("从该节点右侧拉多条线到不同会话，点每条线设「触发意图」；留空的线=默认边。")}
           </div>
         </>
       )}
       {node.type === "claude-session" && (
         <>
-          {field("工作目录 cwd", d.cwd, "cwd")}
-          {field("模型(可空)", d.model, "model")}
+          {field(t("工作目录 cwd"), d.cwd, "cwd")}
+          {field(t("模型(可空)"), d.model, "model")}
           <label className="field">
-            <span>主人权限(你@时)</span>
+            <span>{t("主人权限(你@时)")}</span>
             <select
               value={d.permissionMode}
               onChange={(e) => onPatch({ permissionMode: e.target.value })}
@@ -2830,7 +2827,7 @@ function Inspector({
             </select>
           </label>
           <label className="field">
-            <span>访客权限(他人@时)</span>
+            <span>{t("访客权限(他人@时)")}</span>
             <select
               value={d.guestPermissionMode ?? "default"}
               onChange={(e) => onPatch({ guestPermissionMode: e.target.value })}
@@ -2842,24 +2839,24 @@ function Inspector({
               ))}
             </select>
           </label>
-          {field("追加 system prompt", d.appendSystemPrompt, "appendSystemPrompt")}
+          {field(t("追加 system prompt"), d.appendSystemPrompt, "appendSystemPrompt")}
           <label className="field">
-            <span>敏感操作飞书审批</span>
+            <span>{t("敏感操作飞书审批")}</span>
             <input
               type="checkbox"
               checked={!!d.approvalMode}
-              title="工具调用需要授权时，向来源群发卡片由主人[允许/拒绝]（需 permissionMode=default 才会询问）"
+              title={t("工具调用需要授权时，向来源群发卡片由主人[允许/拒绝]（需 permissionMode=default 才会询问）")}
               onChange={(e) => onPatch({ approvalMode: e.target.checked })}
             />
           </label>
 
           <div className="base-session">
-            <div className="base-session-title">基础会话 (fork 来源，如「角色管线」会话)</div>
+            <div className="base-session-title">{t("基础会话 (fork 来源，如「角色管线」会话)")}</div>
             <div className="field">
               <span>baseSessionId</span>
               <input
                 value={d.baseSessionId ?? ""}
-                placeholder="留空=普通会话；填入则首次 fork 一份知识底座"
+                placeholder={t("留空=普通会话；填入则首次 fork 一份知识底座")}
                 onChange={(e) => onPatch({ baseSessionId: e.target.value || undefined })}
               />
             </div>
@@ -2873,15 +2870,15 @@ function Inspector({
                   }
                 }}
               >
-                {showPicker ? "收起列表" : "列出该目录的会话…"}
+                {showPicker ? t("收起列表") : t("列出该目录的会话…")}
               </button>
               {d.baseSessionId && (
                 <button
                   className="ghost"
-                  title="立即从基础会话重新 fork 访客会话并脱敏(抹掉密钥)，吸收最新开发内容。会清掉 fork 的对话记忆。（只想换人格口吻、不想丢记忆 → 去人格节点点「重锚到所连会话」）"
+                  title={t("立即从基础会话重新 fork 访客会话并脱敏(抹掉密钥)，吸收最新开发内容。会清掉 fork 的对话记忆。（只想换人格口吻、不想丢记忆 → 去人格节点点「重锚到所连会话」）")}
                   onClick={() => node && onRefreshSnapshot(node.id)}
                 >
-                  刷新快照(脱敏)
+                  {t("刷新快照(脱敏)")}
                 </button>
               )}
             </div>
@@ -2889,7 +2886,7 @@ function Inspector({
               <input
                 className="pick-filter"
                 value={pickFilter}
-                placeholder="粘贴 sessionId 或关键词搜索…"
+                placeholder={t("粘贴 sessionId 或关键词搜索…")}
                 onChange={(e) => setPickFilter(e.target.value.trim())}
               />
             )}
@@ -2912,7 +2909,7 @@ function Inspector({
                       setShowPicker(false);
                     }}
                   >
-                    <div className="si-preview">{s.preview || "(无预览)"}</div>
+                    <div className="si-preview">{s.preview || t("(无预览)")}</div>
                     <div className="si-meta">
                       {new Date(s.mtime).toLocaleString()} · {(s.sizeBytes / 1024).toFixed(0)}KB ·{" "}
                       {s.id.slice(0, 8)}…
@@ -2922,7 +2919,7 @@ function Inspector({
               </div>
             )}
             {showPicker && sessions.length === 0 && (
-              <div className="fs-detail">该目录暂无会话（确认 cwd 正确、且在该目录跑过 claude）</div>
+              <div className="fs-detail">{t("该目录暂无会话（确认 cwd 正确、且在该目录跑过 claude）")}</div>
             )}
             {showPicker &&
               pickFilter &&
@@ -2931,26 +2928,27 @@ function Inspector({
                 (s) => s.id.includes(pickFilter) || (s.preview || "").includes(pickFilter),
               ) && (
                 <div className="fs-detail">
-                  无匹配。确认该 sessionId 属于此 cwd 目录；也可直接把 ID 粘到上面的 baseSessionId。
+                  {t("无匹配。确认该 sessionId 属于此 cwd 目录；也可直接把 ID 粘到上面的 baseSessionId。")}
                 </div>
               )}
           </div>
 
           <div className="hint">
-            运行会话 sid: {d.sessionId ? d.sessionId : d.baseSessionId ? "首次 fork 后生成" : "首次运行生成"}
+            {t("运行会话 sid: ")}
+            {d.sessionId ? d.sessionId : d.baseSessionId ? t("首次 fork 后生成") : t("首次运行生成")}
           </div>
 
-          <div className="sec-summary" title="本会话的安全态势（脱敏 fork / 出站脱敏 / 护栏 / 权限分级）">
-            <div className="sec-title">🛡 安全态势</div>
+          <div className="sec-summary" title={t("本会话的安全态势（脱敏 fork / 出站脱敏 / 护栏 / 权限分级）")}>
+            <div className="sec-title">{t("🛡 安全态势")}</div>
             <div className={`sec-item ${d.baseSessionId ? "on" : "off"}`}>
-              {d.baseSessionId ? "✓" : "—"} 访客走脱敏 fork（开发会话只读不被污染）
+              {d.baseSessionId ? "✓" : "—"} {t("访客走脱敏 fork（开发会话只读不被污染）")}
             </div>
-            <div className="sec-item on">✓ 访客回复出站二次脱敏 + 安全护栏</div>
+            <div className="sec-item on">✓ {t("访客回复出站二次脱敏 + 安全护栏")}</div>
             <div className={`sec-item ${d.approvalMode ? "on" : "off"}`}>
-              {d.approvalMode ? "✓" : "—"} 敏感操作飞书审批{d.approvalMode ? "" : "（未开）"}
+              {d.approvalMode ? "✓" : "—"} {t("敏感操作飞书审批")}{d.approvalMode ? "" : t("（未开）")}
             </div>
             <div className="sec-item dim">
-              主人权限 {d.permissionMode} · 访客权限 {d.guestPermissionMode ?? "default"}
+              {t("主人权限 {0} · 访客权限 {1}", d.permissionMode, d.guestPermissionMode ?? "default")}
             </div>
           </div>
         </>

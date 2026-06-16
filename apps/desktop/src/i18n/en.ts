@@ -142,4 +142,94 @@ export const EN: Record<string, string> = {
   "底对齐": "Align bottom",
   "水平等距分布（需≥3）": "Distribute horizontally (needs ≥3)",
   "垂直等距分布（需≥3）": "Distribute vertically (needs ≥3)",
+
+  // ── 节点检视面板 Node inspector ────────────────────
+  "点画布上的节点进行编辑": "Click a node on the canvas to edit it",
+  "删除此节点及其连线（可 Ctrl+Z 撤销）": "Delete this node and its edges (Ctrl+Z to undo)",
+  "🗑 删除": "🗑 Delete",
+  "名称": "Name",
+  "指令模板（{{body}}=请求体）": "Prompt template ({{body}} = request body)",
+  "投递群 chatId": "Deliver-to group chatId",
+  "触发时刻": "Trigger time",
+  "指令 prompt": "Prompt",
+  "分类模型(可空=haiku)": "Classifier model (blank = haiku)",
+  "工作目录 cwd": "Working dir (cwd)",
+  "模型(可空)": "Model (optional)",
+  "追加 system prompt": "Extra system prompt",
+  // feishu-group
+  "@机器人才触发": "Only when @bot",
+  "群内全部消息": "All messages in the group",
+  "查看/编辑机器人对本群积累的长期记忆（GROUP.md，会自动维护，注入到该群会话）":
+    "View/edit the bot's long-term memory for this group (GROUP.md, auto-maintained, injected into this group's sessions)",
+  "🧠 群记忆 (GROUP.md)": "🧠 Group memory (GROUP.md)",
+  // route
+  "发给 Claude 前会自动去掉飞书 @ 占位符（无需配置）。这里只设可选「前缀」。":
+    "Feishu @ placeholders are stripped automatically before reaching Claude (no config needed). Here you only set an optional prefix.",
+  "可选。该路由下消息统一加的前缀（可多行）": "Optional. A prefix added to every message on this route (multi-line allowed)",
+  // soul / skill / subagent 说明（去掉了内联 <b>，整段翻译）
+  "人格 (SOUL.md)。把本节点右侧 ● 连到「Claude 会话」的 🎭人格口；连上即作用于该会话的所有飞书回复（fork 脱敏分身）。一个人格可连多个会话；未连任何会话则不生效。":
+    "Persona (SOUL.md). Drag this node's right ● to a Claude session's 🎭Persona port; once connected it applies to all of that session's Feishu replies (the redacted fork). One persona can feed multiple sessions; connected to none, it has no effect.",
+  "编辑这份人格文件 SOUL.md（首次自动生成模板，保存即生效）。人格只影响表达风格，访客安全护栏始终优先。":
+    "Edit this persona file SOUL.md (a template is generated on first use; saving takes effect immediately). Persona only affects expression style; the guest safety guardrail always wins.",
+  "🎭 编辑灵魂 (SOUL.md)": "🎭 Edit soul (SOUL.md)",
+  "把这份人格立即重新注入到所有连着它的会话(留记忆)：往每个会话的 fork 静默跑一轮『切换到此人格』，用最近一轮压过历史里养成的旧口吻惯性。改完人格 / 刚连上会话后用它，比『刷新快照』轻——不清记忆。":
+    "Immediately re-anchor this persona into every connected session (memory kept): silently run one 'switch to this persona' turn on each session's fork, using the latest turn to override the old tone built up in history. Use after editing the persona / just connecting a session — lighter than 'Refresh snapshot', it doesn't wipe memory.",
+  "🔁 重锚到所连会话": "🔁 Re-anchor connected sessions",
+  "技能 (SKILL.md)：操作性指令 / 话术 / 输出格式，和人格互补（人格管怎么说话，技能管怎么做事）。把本节点右侧 ● 连到「Claude 会话」的 🎭人格/🧩技能口；一个会话可连多个技能。":
+    "Skill (SKILL.md): operational instructions / phrasing / output format, complementing the persona (persona = how to speak, skill = how to do). Drag this node's right ● to a Claude session's 🎭Persona/🧩Skill port; a session can have multiple skills.",
+  "编辑这份技能文件 SKILL.md（首次自动生成模板，保存即生效）":
+    "Edit this skill file SKILL.md (a template is generated on first use; saving takes effect immediately)",
+  "🧩 编辑技能 (SKILL.md)": "🧩 Edit skill (SKILL.md)",
+  "子代理：一个 Claude Code 原生子代理（独立上下文 + 独立工具）。会话里的 claude 会用 Task 工具按它的 description 自动委派给它做重活（文档/日志总结、消息分类），不污染主会话。连到会话的 🎭人格/🧩技能口作组织标识。":
+    "Subagent: a native Claude Code subagent (isolated context + isolated tools). The session's claude uses the Task tool to auto-delegate heavy work to it by its description (doc/log summaries, message classification) without polluting the main session. Connect it to a session's 🎭Persona/🧩Skill port as an organizational marker.",
+  "编辑子代理定义（首次自动生成模板，写在 ~/.claude/agents/，claude 自动发现）。务必改 name(英文唯一)+description(写清何时用)。":
+    "Edit the subagent definition (a template is generated on first use under ~/.claude/agents/, auto-discovered by claude). Be sure to set name (unique, English) + description (state clearly when to use it).",
+  "🦾 编辑子代理": "🦾 Edit subagent",
+  // webhook
+  "外部系统（Jenkins/CI/GitHub）POST 到下面这个地址即触发；把它连到一个「Claude 会话」节点。":
+    "External systems (Jenkins/CI/GitHub) POST to the address below to trigger; connect it to a Claude session node.",
+  "回调地址（POST · 同网段可达）": "Callback URL (POST · reachable on the same network)",
+  "本机IP": "your-IP",
+  "复制路径": "Copy path",
+  "复制": "Copy",
+  "留空 = 发到 Home Chat。外网回调需自建隧道（cloudflared/ngrok 指向 8921）。":
+    "Blank = send to Home Chat. External callbacks need your own tunnel (cloudflared/ngrok → 8921).",
+  "启用": "Enabled",
+  // cron
+  "支持：09:00(每天) · every 30m / every 2h(间隔)": "Supports: 09:00 (daily) · every 30m / every 2h (interval)",
+  "留空 = 发到 Home Chat（在「飞书连接」面板设置）；连线到一个「Claude 会话」节点即生效":
+    "Blank = send to Home Chat (set it in the Feishu connection panel); takes effect once connected to a Claude session node",
+  // intent-switch
+  "判定模式": "Decision mode",
+  "优先级(连线顺序)": "Priority (edge order)",
+  "从该节点右侧拉多条线到不同会话，点每条线设「触发意图」；留空的线=默认边。":
+    "Drag multiple edges from the right to different sessions, click each edge to set its trigger intent; an edge left blank is the default.",
+  // claude-session
+  "主人权限(你@时)": "Owner perms (when you @)",
+  "访客权限(他人@时)": "Guest perms (when others @)",
+  "敏感操作飞书审批": "Feishu approval for sensitive ops",
+  "工具调用需要授权时，向来源群发卡片由主人[允许/拒绝]（需 permissionMode=default 才会询问）":
+    "When a tool call needs authorization, send a card to the source group for the owner to [Allow/Deny] (only asks when permissionMode = default)",
+  "基础会话 (fork 来源，如「角色管线」会话)": "Base session (fork source, e.g. the 'character pipeline' session)",
+  "留空=普通会话；填入则首次 fork 一份知识底座": "Blank = plain session; if set, forks a knowledge base on first run",
+  "收起列表": "Collapse list",
+  "列出该目录的会话…": "List sessions in this dir…",
+  "立即从基础会话重新 fork 访客会话并脱敏(抹掉密钥)，吸收最新开发内容。会清掉 fork 的对话记忆。（只想换人格口吻、不想丢记忆 → 去人格节点点「重锚到所连会话」）":
+    "Immediately re-fork the guest session from the base and redact it (strip secrets), absorbing the latest dev content. This wipes the fork's conversation memory. (Just want to change tone without losing memory → use 'Re-anchor connected sessions' on the persona node.)",
+  "刷新快照(脱敏)": "Refresh snapshot (redact)",
+  "粘贴 sessionId 或关键词搜索…": "Paste a sessionId or search by keyword…",
+  "(无预览)": "(no preview)",
+  "该目录暂无会话（确认 cwd 正确、且在该目录跑过 claude）":
+    "No sessions in this dir (check the cwd is correct and that you've run claude there)",
+  "无匹配。确认该 sessionId 属于此 cwd 目录；也可直接把 ID 粘到上面的 baseSessionId。":
+    "No match. Make sure the sessionId belongs to this cwd; you can also paste the ID directly into baseSessionId above.",
+  "运行会话 sid: ": "Running session sid: ",
+  "首次 fork 后生成": "created after first fork",
+  "🛡 安全态势": "🛡 Security posture",
+  "本会话的安全态势（脱敏 fork / 出站脱敏 / 护栏 / 权限分级）":
+    "This session's security posture (redacted fork / outbound redaction / guardrail / permission tiers)",
+  "访客走脱敏 fork（开发会话只读不被污染）": "Guests use a redacted fork (the dev session is read-only, never polluted)",
+  "访客回复出站二次脱敏 + 安全护栏": "Guest replies are re-redacted outbound + safety guardrail",
+  "（未开）": "(off)",
+  "主人权限 {0} · 访客权限 {1}": "Owner perms {0} · Guest perms {1}",
 };
