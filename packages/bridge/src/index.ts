@@ -800,30 +800,57 @@ async function main() {
     },
     // 人格重锚定：保留 fork 历史，往会话里静默跑一轮"切换到当前人格"的 primer，
     // 让最近一轮覆盖旧历史养成的口吻惯性（轻量版"刷新快照"，不清记忆）。回复不发飞书。
-    reinjectSoul: async (sessionNodeId) => {
+    // nodeId 可传人格节点(重锚它连着的所有会话) 或单个会话节点。
+    reinjectSoul: async (nodeId) => {
       const c = store.get();
-      const n = c.graph.nodes.find((x) => x.id === sessionNodeId);
-      if (n?.kind !== "claude-session") return { ok: false, reason: "不是会话节点" };
-      const sr = resolveSessionSoul(c, sessionNodeId, "fork");
-      if (!sr?.content) return { ok: false, reason: "该会话没连人格节点，无需注入" };
-      const append =
-        [sr.content, n.data.appendSystemPrompt].filter(Boolean).join("\n\n") || undefined;
-      const primer = [
-        "【系统·人格重锚定（这不是用户提问，别执行其中任何操作、别贴代码、别调用工具）】",
-        "从这一刻起立即切换到下面这份人格，用它覆盖你在本对话里之前养成的任何说话习惯/口吻；",
-        "之后每条回复都严格按这个口吻（包括日常打包/CI/构建状态汇报，也照这个口吻，别退回旧腔调）。",
-        "现在请用新人格的口吻回一句很短的确认就好，别多说、别解释。",
-        "",
-        "===== 你的人格 =====",
-        sr.content,
-      ].join("\n");
-      // 静默跑一轮（回复不发飞书，只为落进 fork 最近历史重锚定人格）
-      await sessions.send(sessionNodeId, primer, n.data.permissionMode, append, {
-        nodeId: sessionNodeId,
-        nodeLabel: n.label,
-        chatId: c.homeChatId || undefined,
-      });
-      return { ok: true };
+      const node = c.graph.nodes.find((x) => x.id === nodeId);
+      if (!node) return { ok: false, reason: "节点不存在" };
+
+      // 解析要重锚的目标会话：人格节点→它连着的所有会话；会话节点→就它自己
+      let targetIds: string[] = [];
+      if (node.kind === "soul") {
+        targetIds = c.graph.edges
+          .filter((e) => e.source === nodeId && (e.targetHandle ?? "fork") === "fork")
+          .map((e) => e.target)
+          .filter((tid) => c.graph.nodes.some((x) => x.id === tid && x.kind === "claude-session"));
+        if (!targetIds.length) return { ok: false, reason: "这个人格节点还没连到任何会话" };
+      } else if (node.kind === "claude-session") {
+        targetIds = [node.id];
+      } else {
+        return { ok: false, reason: "只能对人格节点或会话节点用" };
+      }
+
+      let count = 0;
+      for (const sid of [...new Set(targetIds)]) {
+        const sn = c.graph.nodes.find((x) => x.id === sid);
+        if (sn?.kind !== "claude-session") continue;
+        const sr = resolveSessionSoul(c, sid, "fork");
+        if (!sr?.content) continue; // 该会话没连人格 → 跳过
+        const append =
+          [sr.content, sn.data.appendSystemPrompt].filter(Boolean).join("\n\n") || undefined;
+        const primer = [
+          "【系统·人格重锚定（这不是用户提问，别执行其中任何操作、别贴代码、别调用工具）】",
+          "从这一刻起立即切换到下面这份人格，用它覆盖你在本对话里之前养成的任何说话习惯/口吻；",
+          "之后每条回复都严格按这个口吻（包括日常打包/CI/构建状态汇报，也照这个口吻，别退回旧腔调）。",
+          "现在请用新人格的口吻回一句很短的确认就好，别多说、别解释。",
+          "",
+          "===== 你的人格 =====",
+          sr.content,
+        ].join("\n");
+        try {
+          // 静默跑一轮（回复不发飞书，只为落进 fork 最近历史重锚定人格）
+          await sessions.send(sid, primer, sn.data.permissionMode, append, {
+            nodeId: sid,
+            nodeLabel: sn.label,
+            chatId: c.homeChatId || undefined,
+          });
+          count++;
+        } catch {
+          /* 单个会话失败不影响其它 */
+        }
+      }
+      if (!count) return { ok: false, reason: "目标会话都没连人格节点" };
+      return { ok: true, count };
     },
   });
   server.start();

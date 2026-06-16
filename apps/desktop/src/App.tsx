@@ -2622,6 +2622,13 @@ function Inspector({
             >
               🎭 编辑灵魂 (SOUL.md)
             </button>
+            <button
+              className="ghost"
+              title="把这份人格立即重新注入到所有连着它的会话(留记忆)：往每个会话的 fork 静默跑一轮『切换到此人格』，用最近一轮压过历史里养成的旧口吻惯性。改完人格 / 刚连上会话后用它，比『刷新快照』轻——不清记忆。"
+              onClick={() => node && onReinjectSoul(node.id)}
+            >
+              🔁 重锚到所连会话
+            </button>
           </div>
         </>
       )}
@@ -2792,22 +2799,13 @@ function Inspector({
                 {showPicker ? "收起列表" : "列出该目录的会话…"}
               </button>
               {d.baseSessionId && (
-                <>
-                  <button
-                    className="ghost"
-                    title="立即从基础会话重新 fork 访客会话并脱敏(抹掉密钥)，吸收最新开发内容。会清掉 fork 的对话记忆。"
-                    onClick={() => node && onRefreshSnapshot(node.id)}
-                  >
-                    刷新快照(脱敏)
-                  </button>
-                  <button
-                    className="ghost"
-                    title="保留对话记忆，只把当前连上的人格重新注入一次：往会话里静默跑一轮『切换到此人格』，用最近一轮压过历史里养成的旧口吻惯性。比『刷新快照』轻——不清记忆。改了人格 / 刚连上人格节点后用它。"
-                    onClick={() => node && onReinjectSoul(node.id)}
-                  >
-                    重锚人格(留记忆)
-                  </button>
-                </>
+                <button
+                  className="ghost"
+                  title="立即从基础会话重新 fork 访客会话并脱敏(抹掉密钥)，吸收最新开发内容。会清掉 fork 的对话记忆。（只想换人格口吻、不想丢记忆 → 去人格节点点「重锚到所连会话」）"
+                  onClick={() => node && onRefreshSnapshot(node.id)}
+                >
+                  刷新快照(脱敏)
+                </button>
               )}
             </div>
             {showPicker && (

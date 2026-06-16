@@ -58,8 +58,9 @@ export interface ServerDeps {
   onConfigChanged: () => void;
   /** 干跑路由(含意图分类)，返回 route-test-result，不真发飞书/不真跑会话 */
   routeTest: (chatId: string, text: string) => Promise<BridgeMessage>;
-  /** 人格重锚定：保留 fork 历史，静默跑一轮 primer 让最近一轮覆盖旧口吻惯性 */
-  reinjectSoul: (nodeId: string) => Promise<{ ok: boolean; reason?: string }>;
+  /** 人格重锚定：保留 fork 历史，静默跑一轮 primer 让最近一轮覆盖旧口吻惯性。
+   *  nodeId 可传人格节点(重锚它连着的所有会话)或单个会话节点 */
+  reinjectSoul: (nodeId: string) => Promise<{ ok: boolean; reason?: string; count?: number }>;
 }
 
 /**
@@ -208,10 +209,10 @@ export class ControlServer {
           .reinjectSoul(msg.nodeId)
           .then((r) =>
             r.ok
-              ? log.info("✅ 已重新注入人格(保留记忆)——该会话之后按新人格说话")
-              : log.warn(`⚠️ 重新注入人格未执行：${r.reason ?? ""}`),
+              ? log.info(`✅ 已重锚人格到 ${r.count ?? 1} 个会话(保留记忆)——之后按新人格说话`)
+              : log.warn(`⚠️ 重锚人格未执行：${r.reason ?? ""}`),
           )
-          .catch((e) => log.error(`重新注入人格失败: ${e.message}`));
+          .catch((e) => log.error(`重锚人格失败: ${e.message}`));
         break;
       case "lookup-openid":
         this.deps
