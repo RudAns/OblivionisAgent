@@ -54,7 +54,7 @@ import { useI18n, useT, tStatic, type Lang } from "./i18n/index.js";
 import { IconMoon, IconSun, IconMonitor } from "./layout/icons.js";
 import { SessionSidebar } from "./layout/SessionSidebar.js";
 import { StatusBar } from "./layout/StatusBar.js";
-import { StatsChip, StatusChip, type StatsData, type StatusData } from "./layout/GlanceChips.js";
+import { StatsChip, BrandInfo, type StatsData, type StatusData, type AppVer } from "./layout/GlanceChips.js";
 
 type Tab = "transcript" | "terminal" | "audit" | "logs" | "inbox";
 type ThemePref = "dark" | "light" | "system";
@@ -1623,9 +1623,14 @@ function Inner() {
     return () => clearInterval(id);
   }, [activeTerminalId, fetchCtx]);
 
-  // 顶部「周活跃」+「状态」小标：读 ~/.claude 的本地缓存/配置，不耗 token。
+  // 顶部活动趋势小标 + 左上角品牌悬停信息：读 ~/.claude 的本地缓存/配置，不耗 token。
   const [glanceStats, setGlanceStats] = useState<StatsData | null>(null);
   const [glanceStatus, setGlanceStatus] = useState<StatusData | null>(null);
+  const [appVer, setAppVer] = useState<AppVer | null>(null);
+  useEffect(() => {
+    // 本软件版本+构建时间：运行期不变，开机取一次即可
+    void invoke<AppVer>("app_version").then(setAppVer).catch(() => {});
+  }, []);
   const fetchGlance = useCallback(() => {
     void invoke<StatsData>("claude_stats")
       .then((s) => setGlanceStats(s && s.dailyActivity?.length ? s : null))
@@ -1770,9 +1775,7 @@ function Inner() {
   return (
     <div className="app">
       <header className="toolbar" data-tauri-drag-region>
-        <strong className="brand" data-tauri-drag-region>
-          Oblivionis<span className="brand-accent">Agent</span>
-        </strong>
+        <BrandInfo status={glanceStatus} app={appVer} />
         <button
           className={`fs-chip ${feishuOpen ? "on" : ""}`}
           data-popup="feishu"
@@ -1789,7 +1792,6 @@ function Inner() {
         )}
         <div className="spacer" data-tauri-drag-region />
         {glanceStats && <StatsChip stats={glanceStats} onHover={fetchGlance} />}
-        {glanceStatus && <StatusChip status={glanceStatus} onHover={fetchGlance} />}
         {usage?.sessionPct != null && (
           <span
             className={`usage-chip ${usage.sessionPct >= 85 ? "hot" : usage.sessionPct >= 60 ? "warm" : ""}`}

@@ -20,6 +20,10 @@ export interface StatusData {
   org: string;
   tier: string;
 }
+export interface AppVer {
+  version: string;
+  buildMs: number;
+}
 
 function fmtN(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -33,6 +37,14 @@ function ymd(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+/** epoch ms → "YYYY-MM-DD HH:mm"（本地） */
+function fmtBuild(ms: number): string {
+  if (!ms) return "—";
+  const d = new Date(ms);
+  const p = (x: number) => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 /** "claude_max" + "default_claude_max_20x" → "Max 20x" */
@@ -50,22 +62,54 @@ function prettyPlan(org: string, tier: string): string {
   return mult ? `${name} ${mult}x` : name;
 }
 
-/** 顶部「周活跃」小标：读 stats-cache，悬停看本周明细 + 7 日趋势 */
+/** 建 N 天序列 [today-(n-1) .. today]，每天的消息数(没数据=0) */
+function buildSeries(now: Date, n: number, by: Map<string, DailyActivity>): { date: string; v: number }[] {
+  const out: { date: string; v: number }[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const key = ymd(d);
+    out.push({ date: key, v: by.get(key)?.messageCount ?? 0 });
+  }
+  return out;
+}
+
+/** 一排迷你柱状图，最后一根(今天)由 CSS :last-child 高亮 */
+function Bars({ data, cls }: { data: { date: string; v: number }[]; cls: string }) {
+  const max = Math.max(1, ...data.map((d) => d.v));
+  return (
+    <span className={cls}>
+      {data.map((s) => (
+        <span
+          key={s.date}
+          className="glance-bar"
+          style={{ height: `${Math.max(6, Math.round((s.v / max) * 100))}%` }}
+          title={`${s.date.slice(5)} · ${fmtN(s.v)}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** 顶部「活动趋势」小标：chip 本身就是近 7 天迷你趋势；悬停看 30 天用量看板 + 本周统计。读本地缓存、不耗 token。 */
 export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () => void }) {
   const t = useT();
   const da = stats.dailyActivity ?? [];
+  const by = new Map(da.map((d): [string, DailyActivity] => [d.date, d]));
   const active = new Set(da.map((d) => d.date));
-
-  // 本周窗口=最近 7 天(含今天)。缓存只到昨天，所以今天通常计不到——悬停里标注「截至 X」。
   const now = new Date();
+  const spark7 = buildSeries(now, 7, by);
+  const days30 = buildSeries(now, 30, by);
+
+  // 本周：从本周一(含)到今天。缓存只到昨天，今天的活动不在里面——所以周三看到的多半是周一+周二。
+  const dow = (now.getDay() + 6) % 7; // 周一=0
   const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - 6);
-  const weekStartStr = ymd(weekStart);
-  const inWeek = da.filter((d) => d.date >= weekStartStr);
+  weekStart.setDate(now.getDate() - dow);
+  const wStart = ymd(weekStart);
+  const inWeek = da.filter((d) => d.date >= wStart);
   const weekDays = inWeek.length;
   const weekMsgs = inWeek.reduce((s, d) => s + d.messageCount, 0);
   const weekSessions = inWeek.reduce((s, d) => s + d.sessionCount, 0);
-  const weekTools = inWeek.reduce((s, d) => s + d.toolCallCount, 0);
 
   // 连续活跃天数：从最近一个有活动的日子往回数
   let streak = 0;
@@ -78,36 +122,17 @@ export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () =
     }
   }
 
-  // 7 日趋势：today-6 .. today，每天的消息数(没数据=0)
-  const spark: { date: string; v: number }[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const dd = new Date(now);
-    dd.setDate(now.getDate() - i);
-    const key = ymd(dd);
-    spark.push({ date: key, v: da.find((x) => x.date === key)?.messageCount ?? 0 });
-  }
-  const sparkMax = Math.max(1, ...spark.map((s) => s.v));
-
   return (
-    <span className="glance-chip" onMouseEnter={() => onHover?.()} title={t("Claude 活动统计（读本地缓存，不耗 token）")}>
-      📊 {t("周 {0} 天", weekDays)}
-      <span className="glance-pop">
-        <div className="glance-h">{t("活动统计（估算）")}</div>
-        <div className="glance-row">
-          <span>{t("连续活跃")}</span>
-          <b>🔥 {t("{0} 天", streak)}</b>
-        </div>
-        <div className="glance-spark">
-          {spark.map((s) => (
-            <span
-              key={s.date}
-              className="glance-bar"
-              style={{ height: `${Math.max(8, Math.round((s.v / sparkMax) * 100))}%` }}
-              title={`${s.date.slice(5)} · ${fmtN(s.v)}`}
-            />
-          ))}
-        </div>
-        <div className="glance-sub glance-spark-lbl">{t("近 7 天消息量")}</div>
+    <span
+      className="glance-chip stats-chip"
+      onMouseEnter={() => onHover?.()}
+      title={t("近 7 天活动趋势 · 悬停看 30 天用量")}
+    >
+      <Bars data={spark7} cls="chip-spark" />
+      <span className="glance-pop glance-pop-wide">
+        <div className="glance-h">{t("活动用量（读本地缓存，不耗 token）")}</div>
+        <Bars data={days30} cls="glance-spark30" />
+        <div className="glance-sub glance-spark-lbl">{t("近 30 天每日消息（今天高亮）")}</div>
         <div className="glance-grid">
           <div>
             <i>{t("本周消息")}</i>
@@ -119,11 +144,11 @@ export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () =
           </div>
           <div>
             <i>{t("本周活跃")}</i>
-            <b>{t("{0}/7 天", weekDays)}</b>
+            <b>{t("{0} 天", weekDays)}</b>
           </div>
           <div>
-            <i>{t("本周工具调用")}</i>
-            <b>{fmtN(weekTools)}</b>
+            <i>{t("连续活跃")}</i>
+            <b>🔥 {t("{0} 天", streak)}</b>
           </div>
         </div>
         <div className="glance-sub">
@@ -135,38 +160,52 @@ export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () =
   );
 }
 
-/** 顶部「状态」小标：Claude 版本，悬停看账号 + 套餐 + 版本 */
-export function StatusChip({ status, onHover }: { status: StatusData; onHover?: () => void }) {
+/** 左上角品牌名：悬停显示本软件版本+构建时间，以及 Claude CLI 版本/账号/套餐。读本地、不耗 token。 */
+export function BrandInfo({ status, app }: { status: StatusData | null; app: AppVer | null }) {
   const t = useT();
-  const plan = prettyPlan(status.org, status.tier);
+  const plan = status ? prettyPlan(status.org, status.tier) : "";
   return (
-    <span className="glance-chip" onMouseEnter={() => onHover?.()} title={t("Claude 状态（读本地配置，不耗 token）")}>
-      <span className="glance-dot" />
-      {status.version ? `v${status.version}` : "Claude"}
-      <span className="glance-pop">
-        <div className="glance-h">{t("Claude 状态")}</div>
-        {status.name && (
-          <div className="glance-row">
-            <span>{t("账号")}</span>
-            <b>{status.name}</b>
-          </div>
-        )}
-        {status.email && (
-          <div className="glance-row">
-            <span>{t("邮箱")}</span>
-            <b className="glance-mono">{status.email}</b>
-          </div>
-        )}
-        {plan && (
-          <div className="glance-row">
-            <span>{t("套餐")}</span>
-            <b>{plan}</b>
-          </div>
-        )}
+    <span className="brand-wrap">
+      <strong className="brand" data-tauri-drag-region>
+        Oblivionis<span className="brand-accent">Agent</span>
+      </strong>
+      <span className="brand-pop">
+        <div className="glance-h">OblivionisAgent</div>
         <div className="glance-row">
-          <span>{t("CLI 版本")}</span>
-          <b>{status.version ? `v${status.version}` : "—"}</b>
+          <span>{t("版本")}</span>
+          <b>v{app?.version ?? "—"}</b>
         </div>
+        <div className="glance-row">
+          <span>{t("构建")}</span>
+          <b>{app ? fmtBuild(app.buildMs) : "—"}</b>
+        </div>
+        {status && (
+          <>
+            <div className="brand-div" />
+            <div className="glance-row">
+              <span>Claude CLI</span>
+              <b>{status.version ? `v${status.version}` : "—"}</b>
+            </div>
+            {status.name && (
+              <div className="glance-row">
+                <span>{t("账号")}</span>
+                <b>{status.name}</b>
+              </div>
+            )}
+            {status.email && (
+              <div className="glance-row">
+                <span>{t("邮箱")}</span>
+                <b className="glance-mono">{status.email}</b>
+              </div>
+            )}
+            {plan && (
+              <div className="glance-row">
+                <span>{t("套餐")}</span>
+                <b>{plan}</b>
+              </div>
+            )}
+          </>
+        )}
       </span>
     </span>
   );

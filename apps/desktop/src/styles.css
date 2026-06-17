@@ -628,6 +628,57 @@ button.primary {
   color: var(--muted);
   line-height: 1.45;
 }
+/* chip 本身=近 7 天迷你趋势(当图标用)；30 天看板在悬停浮框里 */
+.stats-chip {
+  padding: 3px 9px;
+}
+.chip-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  width: 42px;
+  height: 16px;
+}
+.glance-pop-wide {
+  width: 332px;
+}
+.glance-spark30 {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 46px;
+  margin: 8px 0 3px;
+}
+/* 左上角品牌名悬停框 */
+.brand-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.brand-pop {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 236px;
+  padding: 11px 13px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
+  z-index: 60;
+  text-align: left;
+  white-space: normal;
+  cursor: default;
+}
+.brand-wrap:hover .brand-pop {
+  display: block;
+}
+.brand-div {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
 
 /* 右侧面板标题（替代原 tabs 行，切换由左侧竖栏负责） */
 .panel-title {

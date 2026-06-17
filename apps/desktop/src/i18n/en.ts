@@ -540,6 +540,11 @@ export const EN: Record<string, string> = {
   邮箱: "Email",
   套餐: "Plan",
   "CLI 版本": "CLI version",
+  版本: "Version",
+  构建: "Build",
+  "近 7 天活动趋势 · 悬停看 30 天用量": "7-day activity · hover for 30-day usage",
+  "活动用量（读本地缓存，不耗 token）": "Activity & usage (local cache, no tokens)",
+  "近 30 天每日消息（今天高亮）": "Daily messages, last 30 days (today highlighted)",
   "各会话的 token 花费：累计 / 今日 / 按会话 / 按天（数据来自每次运行的 cost_usd）":
     "Token spend per session: total / today / by session / by day (from each run's cost_usd)",
   "还没有花费记录。": "No cost records yet.",

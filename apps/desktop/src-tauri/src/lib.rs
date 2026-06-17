@@ -505,6 +505,20 @@ fn claude_status() -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({ "version": version, "name": name, "email": email, "org": org, "tier": tier }))
 }
 
+/// OblivionisAgent 自己的版本号 + 构建时间。构建时间=运行中 exe 的修改时间，约等于打包/部署那一刻。
+/// 给左上角品牌名悬停用。一次性、纯读、不耗 token。
+#[tauri::command]
+fn app_version() -> serde_json::Value {
+    let build_ms = std::env::current_exe()
+        .ok()
+        .and_then(|p| std::fs::metadata(p).ok())
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    serde_json::json!({ "version": env!("CARGO_PKG_VERSION"), "buildMs": build_ms })
+}
+
 // ── 阅读清单：Claude 生成的、给人看的报告/文档统一落在 ~/.oblivionis/reports/ ──────
 // 与代码/配置改动彻底分开——只有显式写进这个目录的文件才会出现在 GUI 的「阅读清单」里。
 fn reports_dir_path() -> std::path::PathBuf {
@@ -817,7 +831,7 @@ pub fn run() {
         .manage(PtyState::default())
         .invoke_handler(tauri::generate_handler![
             pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
-            context_estimate, claude_stats, claude_status, set_feishu_secret, has_feishu_secret,
+            context_estimate, claude_stats, claude_status, app_version, set_feishu_secret, has_feishu_secret,
             reports_dir, open_md_viewer, session_dirs, list_md_files, read_md, read_file_b64
         ])
         .setup(|app| {
