@@ -14,7 +14,6 @@
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Claude](https://img.shields.io/badge/LLM-官方%20Claude%20CLI-D97757)
 ![License](https://img.shields.io/badge/License-GPL%20v3-3b82f6)
-[![Version](https://img.shields.io/github/v/release/RudAns/OblivionisAgent?label=version&color=2ea44f)](https://github.com/RudAns/OblivionisAgent/releases)
 [![CI](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml)
 
 [English](README.en.md) · **简体中文**
