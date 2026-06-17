@@ -513,6 +513,11 @@ export const EN: Record<string, string> = {
   // 状态栏上下文用量
   "当前终端 · 悬停看上下文用量": "Current terminal · hover for context usage",
   "上下文用量（估算）": "Context usage (estimated)",
+  "固定开销": "Fixed overhead",
+  "对话消息": "Conversation",
+  空闲: "Free",
+  "接近自动压缩，建议尽快 /compact 控制保留内容":
+    "Near auto-compact — run /compact soon to control what's kept",
   "上次回合输出 {0} · 读 transcript 估算，不耗 token":
     "Last turn output {0} · estimated from transcript, no tokens spent",
   "各会话的 token 花费：累计 / 今日 / 按会话 / 按天（数据来自每次运行的 cost_usd）":

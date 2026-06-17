@@ -82,7 +82,7 @@ fn session_exists(cwd: &str, sid: &str) -> bool {
 /// (input + cache_read + cache_creation = 这一轮加载进去的上下文)。纯读文件、不调模型、不耗 token。
 #[tauri::command]
 fn context_estimate(cwd: String, session_id: String) -> Result<serde_json::Value, String> {
-    let none = serde_json::json!({ "ctxTokens": 0, "outTokens": 0, "model": serde_json::Value::Null });
+    let none = serde_json::json!({ "ctxTokens": 0, "outTokens": 0, "model": serde_json::Value::Null, "baseTokens": 0 });
     if session_id.is_empty() {
         return Ok(none);
     }
@@ -118,27 +118,54 @@ fn context_estimate(cwd: String, session_id: String) -> Result<serde_json::Value
         Ok(s) => s,
         Err(_) => return Ok(none),
     };
-    // 从后往前找最后一条带 message.usage 的(assistant 回合)
+    // 小工具：从一行 JSON 里取 message.usage 的上下文体量(input+cache_read+cache_creation)
+    let usage_tokens = |line: &str| -> Option<(u64, u64, String)> {
+        let v = serde_json::from_str::<serde_json::Value>(line).ok()?;
+        let u = v.get("message").and_then(|m| m.get("usage"))?;
+        let g = |k: &str| u.get(k).and_then(|x| x.as_u64()).unwrap_or(0);
+        let ctx = g("input_tokens") + g("cache_read_input_tokens") + g("cache_creation_input_tokens");
+        let out = g("output_tokens");
+        let model = v
+            .get("message")
+            .and_then(|m| m.get("model"))
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
+        Some((ctx, out, model))
+    };
+    // 从后往前找最后一条带 message.usage 的(assistant 回合)= 当前上下文体量
+    let mut ctx_tokens = 0u64;
+    let mut out_tokens = 0u64;
+    let mut model = String::new();
     for line in raw.lines().rev() {
         let line = line.trim();
         if line.is_empty() {
             continue;
         }
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
-            if let Some(u) = v.get("message").and_then(|m| m.get("usage")) {
-                let g = |k: &str| u.get(k).and_then(|x| x.as_u64()).unwrap_or(0);
-                let ctx = g("input_tokens") + g("cache_read_input_tokens") + g("cache_creation_input_tokens");
-                let out = g("output_tokens");
-                let model = v
-                    .get("message")
-                    .and_then(|m| m.get("model"))
-                    .and_then(|x| x.as_str())
-                    .unwrap_or("");
-                return Ok(serde_json::json!({ "ctxTokens": ctx, "outTokens": out, "model": model }));
-            }
+        if let Some((c, o, m)) = usage_tokens(line) {
+            ctx_tokens = c;
+            out_tokens = o;
+            model = m;
+            break;
         }
     }
-    Ok(none)
+    if ctx_tokens == 0 {
+        return Ok(none);
+    }
+    // 从前往后找第一条带 usage 的 = 基线开销(系统提示+工具+记忆+技能+首条消息)，
+    // 用来把当前上下文粗分成「固定开销」vs「对话消息」。压缩(/compact)后首行不变，故基线稳定。
+    let mut base_tokens = 0u64;
+    for line in raw.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if let Some((c, _, _)) = usage_tokens(line) {
+            base_tokens = c;
+            break;
+        }
+    }
+    Ok(serde_json::json!({ "ctxTokens": ctx_tokens, "outTokens": out_tokens, "model": model, "baseTokens": base_tokens }))
 }
 
 #[tauri::command]

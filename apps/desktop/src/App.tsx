@@ -481,7 +481,9 @@ function Inner() {
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [cost, setCost] = useState<CostSnapshot | null>(null); // 成本看板汇总
   const [costOpen, setCostOpen] = useState(false); // 成本看板浮层（盖在主界面、点外部关）
-  const [ctx, setCtx] = useState<{ ctxTokens: number; outTokens: number; model: string } | null>(null); // 当前终端会话上下文体量(读 transcript 估算)
+  const [ctx, setCtx] = useState<{ ctxTokens: number; outTokens: number; model: string; baseTokens: number } | null>(
+    null,
+  ); // 当前终端会话上下文体量(读 transcript 估算)
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
   const eventsRef = useRef<Record<string, ClaudeStreamEvent[]>>({});
   const [, forceRender] = useState(0);
@@ -1585,7 +1587,7 @@ function Inner() {
       setCtx(null);
       return;
     }
-    void invoke<{ ctxTokens: number; outTokens: number; model: string }>("context_estimate", {
+    void invoke<{ ctxTokens: number; outTokens: number; model: string; baseTokens: number }>("context_estimate", {
       cwd: d?.cwd ?? "",
       sessionId: sid,
     })
@@ -1594,6 +1596,9 @@ function Inner() {
   }, []);
   useEffect(() => {
     fetchCtx();
+    // 轮询刷新：捕捉后台变化(如 /compact 压缩后体量骤降、对话继续增长)。读本地文件、不耗 token。
+    const id = setInterval(fetchCtx, 10000);
+    return () => clearInterval(id);
   }, [activeTerminalId, fetchCtx]);
   const selectedEdgeObj = edges.find((e) => e.id === selectedEdge) ?? null;
   const edgeEndLabel = (id: string) =>

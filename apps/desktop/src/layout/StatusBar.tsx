@@ -4,6 +4,8 @@ interface CtxInfo {
   ctxTokens: number;
   outTokens: number;
   model: string;
+  /** 基线开销(系统提示+工具+记忆+技能+首条)，用于把上下文粗分成「固定开销」vs「对话消息」 */
+  baseTokens: number;
 }
 interface Props {
   bridgeUp: boolean;
@@ -19,9 +21,18 @@ interface Props {
 }
 
 function fmtK(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1000) return (n / 1000).toFixed(0) + "k";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
+  if (n >= 1000) return (n / 1000).toFixed(n >= 100_000 ? 0 : 1) + "k";
   return String(n);
+}
+
+/** "claude-opus-4-8" → "Opus 4.8"，认不出就回退原串 */
+function prettyModel(id: string): string {
+  const m = /claude-(opus|sonnet|haiku|fable)-(\d+)-?(\d+)?/i.exec(id || "");
+  if (!m) return id || "—";
+  const fam0 = m[1] ?? "";
+  const fam = fam0.charAt(0).toUpperCase() + fam0.slice(1);
+  return `${fam} ${m[2] ?? ""}${m[3] ? "." + m[3] : ""}`;
 }
 
 /** 底部状态栏（参考专业 IDE）：后台服务状态、会话统计、当前终端（悬停看上下文用量）、自动保存提示 */
@@ -30,6 +41,13 @@ export function StatusBar({ bridgeUp, sessionCount, openTerminals, activeLabel, 
   // 上下文窗口按模型粗判：Opus 4.x 是 1M，其余按 200k（仅用于百分比展示）
   const win = ctx && /opus/i.test(ctx.model) ? 1_000_000 : 200_000;
   const pct = ctx ? Math.min(100, Math.round((ctx.ctxTokens / win) * 100)) : 0;
+  // 把已用上下文粗分成「固定开销(基线)」与「对话消息」，空闲=窗口-已用
+  const overhead = ctx ? Math.min(ctx.baseTokens, ctx.ctxTokens) : 0;
+  const messages = ctx ? Math.max(0, ctx.ctxTokens - overhead) : 0;
+  const free = ctx ? Math.max(0, win - ctx.ctxTokens) : 0;
+  const overPct = ctx ? (overhead / win) * 100 : 0;
+  const msgPct = ctx ? (messages / win) * 100 : 0;
+  const fillClass = pct >= 85 ? "hot" : pct >= 60 ? "warm" : "";
   return (
     <footer className="statusbar">
       {/* 服务就绪是常态，无需常驻提示；只有还没就绪(启动中/掉线)才显示 */}
@@ -46,16 +64,40 @@ export function StatusBar({ bridgeUp, sessionCount, openTerminals, activeLabel, 
       {activeLabel && (
         <span className="sb-item sb-term" title={t("当前终端 · 悬停看上下文用量")} onMouseEnter={() => onCtxHover?.()}>
           ⌨ {activeLabel}
-          {ctx && <span className="sb-ctx-mini">{pct}%</span>}
+          {ctx && <span className={`sb-ctx-mini ${fillClass}`}>{pct}%</span>}
           {ctx && (
             <span className="sb-ctx-pop">
-              <div className="sb-ctx-h">{t("上下文用量（估算）")}</div>
+              <div className="sb-ctx-h">
+                {t("上下文用量（估算）")}
+                <span className="sb-ctx-model">{prettyModel(ctx.model)}</span>
+              </div>
               <div className="sb-ctx-num">
-                {fmtK(ctx.ctxTokens)} / {fmtK(win)} <b>({pct}%)</b>
+                {fmtK(ctx.ctxTokens)}
+                <span className="sb-ctx-win"> / {fmtK(win)}</span>
+                <b className={fillClass}>{pct}%</b>
               </div>
-              <div className="sb-ctx-bar">
-                <span className={pct >= 85 ? "hot" : pct >= 60 ? "warm" : ""} style={{ width: `${pct}%` }} />
+              <div className="sb-ctx-seg">
+                <span className="seg-over" style={{ width: `${overPct}%` }} />
+                <span className={`seg-msg ${fillClass}`} style={{ width: `${msgPct}%` }} />
               </div>
+              <div className="sb-ctx-legs">
+                <span className="sb-ctx-leg">
+                  <i className="d-over" />
+                  {t("固定开销")}
+                  <b>{fmtK(overhead)}</b>
+                </span>
+                <span className="sb-ctx-leg">
+                  <i className="d-msg" />
+                  {t("对话消息")}
+                  <b>{fmtK(messages)}</b>
+                </span>
+                <span className="sb-ctx-leg">
+                  <i className="d-free" />
+                  {t("空闲")}
+                  <b>{fmtK(free)}</b>
+                </span>
+              </div>
+              {pct >= 85 && <div className="sb-ctx-warn">{t("接近自动压缩，建议尽快 /compact 控制保留内容")}</div>}
               <div className="sb-ctx-sub">
                 {t("上次回合输出 {0} · 读 transcript 估算，不耗 token", fmtK(ctx.outTokens))}
               </div>
