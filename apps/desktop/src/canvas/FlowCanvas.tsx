@@ -189,6 +189,7 @@ export function FlowCanvas(props: Props) {
       panOnDrag={[1]}
       selectionOnDrag
       selectionMode={SelectionMode.Partial}
+      panActivationKeyCode="Space"
       fitView
       proOptions={{ hideAttribution: true }}
     >
