@@ -34,8 +34,11 @@
 | 改终端 / 会话 / 配置前必查的踩坑库 | [pitfalls.md](.claude/docs/pitfalls.md) |
 | 构建 / 调试 / 冒烟测试 / PTY 探针 / 接新群 | [workflows.md](.claude/docs/workflows.md) |
 | 为什么遥控 CLI 而非调 API（选型依据） | [research-hermes-oauth.md](.claude/docs/research-hermes-oauth.md) |
+| 生成**报告 / 演示型 HTML** 的视觉规范（Claude 暖色书卷风） | [docs/html-design.md](docs/html-design.md) |
 
 > 让 AI 加功能时，先让它读 **architecture（地图）+ extending（配方）+ conventions（规范）**，再动手。
+
+> 📐 **生成报告式（非玩法式）HTML 一律遵循 [`docs/html-design.md`](docs/html-design.md)**（软件介绍页 `docs/presentation.html` 就按它做）。要让某个会话产出的 HTML 自动套这套规范，把 [`docs/html-design.skill.md`](docs/html-design.skill.md) 贴进一个 🧩 技能节点连上去即可。
 
 ## 常用命令
 
