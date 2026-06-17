@@ -1382,6 +1382,22 @@ button.primary {
   top: 12px;
   left: 408px;
 }
+/* 成本看板浮层：盖在主界面上的临时弹窗，锚在左侧栏右边；点外部自动关。 */
+.popup-cost {
+  position: fixed;
+  top: 56px;
+  left: 58px;
+  width: 460px;
+  height: min(640px, calc(100vh - 96px));
+  max-height: none;
+  z-index: 30;
+}
+.popup-cost-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
 /* 设置浮窗：固定在左下角设置按钮旁边（rail 宽 46px，紧贴其右） */
 .popup-settings {
   position: fixed;

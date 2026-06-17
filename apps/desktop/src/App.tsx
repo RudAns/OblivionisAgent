@@ -32,6 +32,7 @@ import {
   type SessionInfo,
   type Owner,
   type UsageSnapshot,
+  type CostSnapshot,
   type KnowledgeItem,
 } from "@oblivionis/shared";
 import { invoke } from "@tauri-apps/api/core";
@@ -46,6 +47,7 @@ import { TerminalsHost, type TermInfo } from "./panels/TerminalsHost.js";
 import { LogPanel, type LogLine } from "./panels/LogPanel.js";
 import { AuditPanel, type AuditItem } from "./panels/AuditPanel.js";
 import { InboxPanel } from "./panels/InboxPanel.js";
+import { CostPanel } from "./panels/CostPanel.js";
 import { FeishuPanel, FeishuStatusDot, type FeishuState } from "./panels/FeishuPanel.js";
 import { IconRail, type RailKey } from "./layout/IconRail.js";
 import { useI18n, useT, tStatic, type Lang } from "./i18n/index.js";
@@ -477,6 +479,8 @@ function Inner() {
   }, [settingsOpen]);
   const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
+  const [cost, setCost] = useState<CostSnapshot | null>(null); // 成本看板汇总
+  const [costOpen, setCostOpen] = useState(false); // 成本看板浮层（盖在主界面、点外部关）
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
   const eventsRef = useRef<Record<string, ClaudeStreamEvent[]>>({});
   const [, forceRender] = useState(0);
@@ -618,6 +622,9 @@ function Inner() {
           break;
         case "usage-status":
           setUsage(msg);
+          break;
+        case "cost-summary":
+          setCost(msg);
           break;
         case "soul-path":
           // 人格文件已就绪（必要时刚播种了 starter）→ 用 VSCode 打开让用户编辑，保存即生效
@@ -1132,13 +1139,14 @@ function Inner() {
   // 点浮窗外部 → 关闭浮窗（设置/飞书/节点·连线编辑）。点浮窗内、或点该浮窗自己的触发器
   // (data-popup)不关——触发器自身的 onClick 负责 toggle；点别的浮窗触发器则照常关本浮窗。
   useEffect(() => {
-    if (!feishuOpen && !settingsOpen && !inspectorOpen && !addMenuOpen) return;
+    if (!feishuOpen && !settingsOpen && !inspectorOpen && !addMenuOpen && !costOpen) return;
     const onDown = (e: MouseEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t || t.closest(".popup")) return; // 点在某浮窗内部
       const trig = t.closest("[data-popup]")?.getAttribute("data-popup");
       if (trig !== "settings") setSettingsOpen(false);
       if (trig !== "feishu") setFeishuOpen(false);
+      if (trig !== "cost") setCostOpen(false);
       // 添加节点下拉：点按钮自身(data-popup=addmenu)或菜单内部不关，点别处才关
       if (trig !== "addmenu" && !t.closest(".add-menu")) setAddMenuOpen(false);
       // 节点检视：点节点不关(让 onNodeClick 切换/拖动保持)，点真正的外部(空白/面板/侧栏)才关
@@ -1147,7 +1155,7 @@ function Inner() {
     // 用捕获阶段：React Flow 会吞掉画布上的 mousedown 冒泡，捕获能先收到，保证点画布也能关
     document.addEventListener("mousedown", onDown, true);
     return () => document.removeEventListener("mousedown", onDown, true);
-  }, [feishuOpen, settingsOpen, inspectorOpen, addMenuOpen]);
+  }, [feishuOpen, settingsOpen, inspectorOpen, addMenuOpen, costOpen]);
 
   // 切到某会话(显示其终端)时：记录"在看谁"，并清掉它的完成红点
   useEffect(() => {
@@ -1599,7 +1607,7 @@ function Inner() {
         void invoke("open_md_viewer"); // 文档查看器是独立窗口，可边看边继续用主窗
         break;
       case "cost":
-        void invoke("open_cost_window"); // 成本看板独立窗口，避免和主窗「选会话/切终端」抢面板
+        setCostOpen((o) => !o); // 成本看板浮层：盖在主界面上，点外部自动关（不占面板/不和选会话冲突）
         break;
       default:
         setTab(key);
@@ -1746,6 +1754,7 @@ function Inner() {
           canvasOpen={!canvasCollapsed}
           tab={tab}
           settingsOpen={settingsOpen}
+          costOpen={costOpen}
           inboxBadge={pendingKnowledge}
           onAction={onRailAction}
         />
@@ -1948,6 +1957,19 @@ function Inner() {
         )}
 
         {/* 设置浮窗（左下角设置按钮触发）：当前放主题切换 */}
+        {costOpen && (
+          <div className="popup popup-cost">
+            <div className="popup-head">
+              <span>📊 {t("成本看板")}</span>
+              <button className="popup-x" onClick={() => setCostOpen(false)} title={t("隐藏")}>
+                ×
+              </button>
+            </div>
+            <div className="popup-body popup-cost-body">
+              <CostPanel cost={cost} />
+            </div>
+          </div>
+        )}
         {settingsOpen && (
           <div className="popup popup-settings">
             <div className="popup-head">

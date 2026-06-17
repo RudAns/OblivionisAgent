@@ -67,17 +67,6 @@
         "decorations": true,
         "center": true,
         "visible": false
-      },
-      {
-        "label": "cost",
-        "title": "成本看板 · OblivionisAgent",
-        "width": 820,
-        "height": 720,
-        "minWidth": 520,
-        "minHeight": 440,
-        "decorations": true,
-        "center": true,
-        "visible": false
       }
     ],
     "security": {

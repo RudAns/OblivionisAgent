@@ -10,6 +10,8 @@ interface Props {
   /** 右侧面板当前标签 */
   tab: string;
   settingsOpen: boolean;
+  /** 成本看板浮层是否打开（高亮入口） */
+  costOpen?: boolean;
   /** 知识收件箱待裁决数（徽标） */
   inboxBadge?: number;
   onAction: (key: RailKey) => void;
@@ -49,7 +51,7 @@ function RailButton({
  * 主视图=节点图(画布)；终端/转录已改为"左侧选会话 + 面板顶部切换"，不再占图标栏。
  * 这里只放全局面板：收件箱 / 审计 / 服务日志；底部：设置。
  */
-export function IconRail({ canvasOpen, tab, settingsOpen, inboxBadge, onAction }: Props) {
+export function IconRail({ canvasOpen, tab, settingsOpen, costOpen, inboxBadge, onAction }: Props) {
   const t = useT();
   return (
     <nav className="railbar">
@@ -73,7 +75,7 @@ export function IconRail({ canvasOpen, tab, settingsOpen, inboxBadge, onAction }
       <RailButton title={t("服务日志")} active={tab === "logs"} onClick={() => onAction("logs")}>
         <IconLogs />
       </RailButton>
-      <RailButton title={t("成本看板 · 各会话 token 花费（独立窗口）")} onClick={() => onAction("cost")}>
+      <RailButton title={t("成本看板 · 各会话 token 花费")} active={!!costOpen} dataPopup="cost" onClick={() => onAction("cost")}>
         <IconCost />
       </RailButton>
       <div className="railbar-spacer" />
