@@ -510,6 +510,11 @@ export const EN: Record<string, string> = {
   "成本看板 · 各会话 token 花费": "Cost · token spend per session",
   "成本看板 · 各会话 token 花费（独立窗口）": "Cost · token spend per session (separate window)",
   "各会话 token 花费（数据来自每次运行的 cost_usd）": "Token spend per session (from each run's cost_usd)",
+  // 状态栏上下文用量
+  "当前终端 · 悬停看上下文用量": "Current terminal · hover for context usage",
+  "上下文用量（估算）": "Context usage (estimated)",
+  "上次回合输出 {0} · 读 transcript 估算，不耗 token":
+    "Last turn output {0} · estimated from transcript, no tokens spent",
   "各会话的 token 花费：累计 / 今日 / 按会话 / 按天（数据来自每次运行的 cost_usd）":
     "Token spend per session: total / today / by session / by day (from each run's cost_usd)",
   "还没有花费记录。": "No cost records yet.",

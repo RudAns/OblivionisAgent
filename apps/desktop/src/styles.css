@@ -3355,3 +3355,69 @@ button.primary {
   background: var(--accent);
   color: #fff;
 }
+
+/* ── 状态栏：当前终端名 hover → 上下文用量悬浮框 ───────────────── */
+.sb-term {
+  position: relative;
+  cursor: default;
+}
+.sb-ctx-mini {
+  margin-left: 5px;
+  font-size: 10.5px;
+  color: var(--muted);
+  opacity: 0.85;
+}
+.sb-ctx-pop {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  width: 232px;
+  padding: 9px 11px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
+  z-index: 40;
+  text-align: left;
+}
+.sb-term:hover .sb-ctx-pop {
+  display: block;
+}
+.sb-ctx-h {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.sb-ctx-num {
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.sb-ctx-num b {
+  color: var(--accent);
+}
+.sb-ctx-bar {
+  height: 7px;
+  background: var(--input);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.sb-ctx-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--st-ok);
+  border-radius: 4px;
+}
+.sb-ctx-bar > span.warm {
+  background: var(--st-run);
+}
+.sb-ctx-bar > span.hot {
+  background: var(--st-err);
+}
+.sb-ctx-sub {
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.45;
+}

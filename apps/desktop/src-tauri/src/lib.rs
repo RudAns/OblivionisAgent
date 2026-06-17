@@ -78,6 +78,69 @@ fn session_exists(cwd: &str, sid: &str) -> bool {
     false
 }
 
+/// 估算某会话当前上下文体量：读它的 transcript 最后一回合的 usage
+/// (input + cache_read + cache_creation = 这一轮加载进去的上下文)。纯读文件、不调模型、不耗 token。
+#[tauri::command]
+fn context_estimate(cwd: String, session_id: String) -> Result<serde_json::Value, String> {
+    let none = serde_json::json!({ "ctxTokens": 0, "outTokens": 0, "model": serde_json::Value::Null });
+    if session_id.is_empty() {
+        return Ok(none);
+    }
+    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
+    if home.is_empty() {
+        return Ok(none);
+    }
+    let projects = std::path::Path::new(&home).join(".claude").join("projects");
+    let file = format!("{session_id}.jsonl");
+    // 先按 cwd 编码(非字母数字→'-')定位；没有再扫所有 project 目录(同 session_exists 思路)
+    let enc: String = cwd
+        .trim_end_matches(['/', '\\'])
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    let mut path = projects.join(&enc).join(&file);
+    if !path.exists() {
+        path = std::path::PathBuf::new();
+        if let Ok(rd) = std::fs::read_dir(&projects) {
+            for e in rd.flatten() {
+                let p = e.path().join(&file);
+                if p.exists() {
+                    path = p;
+                    break;
+                }
+            }
+        }
+    }
+    if path.as_os_str().is_empty() || !path.exists() {
+        return Ok(none);
+    }
+    let raw = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return Ok(none),
+    };
+    // 从后往前找最后一条带 message.usage 的(assistant 回合)
+    for line in raw.lines().rev() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+            if let Some(u) = v.get("message").and_then(|m| m.get("usage")) {
+                let g = |k: &str| u.get(k).and_then(|x| x.as_u64()).unwrap_or(0);
+                let ctx = g("input_tokens") + g("cache_read_input_tokens") + g("cache_creation_input_tokens");
+                let out = g("output_tokens");
+                let model = v
+                    .get("message")
+                    .and_then(|m| m.get("model"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("");
+                return Ok(serde_json::json!({ "ctxTokens": ctx, "outTokens": out, "model": model }));
+            }
+        }
+    }
+    Ok(none)
+}
+
 #[tauri::command]
 fn pty_open(
     app: tauri::AppHandle,
@@ -596,7 +659,7 @@ pub fn run() {
         .manage(PtyState::default())
         .invoke_handler(tauri::generate_handler![
             pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
-            set_feishu_secret, has_feishu_secret,
+            context_estimate, set_feishu_secret, has_feishu_secret,
             reports_dir, open_md_viewer, session_dirs, list_md_files, read_md, read_file_b64
         ])
         .setup(|app| {

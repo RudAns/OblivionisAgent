@@ -481,6 +481,7 @@ function Inner() {
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [cost, setCost] = useState<CostSnapshot | null>(null); // 成本看板汇总
   const [costOpen, setCostOpen] = useState(false); // 成本看板浮层（盖在主界面、点外部关）
+  const [ctx, setCtx] = useState<{ ctxTokens: number; outTokens: number; model: string } | null>(null); // 当前终端会话上下文体量(读 transcript 估算)
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
   const eventsRef = useRef<Record<string, ClaudeStreamEvent[]>>({});
   const [, forceRender] = useState(0);
@@ -1571,6 +1572,29 @@ function Inner() {
     activeTerminal && openedTerminals.includes(activeTerminal)
       ? activeTerminal
       : openedTerminals[openedTerminals.length - 1] ?? null;
+  // 当前终端会话的上下文体量估算（读其 transcript 最后一回合 usage，不耗 token）。
+  // 用 ref 取当前 activeTerminalId/nodes，避免 nodes 频繁变动导致 fetchCtx 重建/狂刷。
+  const ctxDepsRef = useRef({ activeTerminalId, nodes });
+  ctxDepsRef.current = { activeTerminalId, nodes };
+  const fetchCtx = useCallback(() => {
+    const { activeTerminalId: aid, nodes: ns } = ctxDepsRef.current;
+    const n = aid ? ns.find((x) => x.id === aid) : null;
+    const d = n?.data as { cwd?: string; baseSessionId?: string; sessionId?: string } | undefined;
+    const sid = d?.baseSessionId || d?.sessionId || "";
+    if (!sid) {
+      setCtx(null);
+      return;
+    }
+    void invoke<{ ctxTokens: number; outTokens: number; model: string }>("context_estimate", {
+      cwd: d?.cwd ?? "",
+      sessionId: sid,
+    })
+      .then((r) => setCtx(r && r.ctxTokens > 0 ? r : null))
+      .catch(() => setCtx(null));
+  }, []);
+  useEffect(() => {
+    fetchCtx();
+  }, [activeTerminalId, fetchCtx]);
   const selectedEdgeObj = edges.find((e) => e.id === selectedEdge) ?? null;
   const edgeEndLabel = (id: string) =>
     ((nodes.find((n) => n.id === id)?.data as { label?: string } | undefined)?.label as string) ?? id.slice(0, 6);
@@ -2357,6 +2381,8 @@ function Inner() {
             ? ((nodes.find((n) => n.id === activeTerminalId)?.data as { label?: string })?.label ?? null)
             : null
         }
+        ctx={ctx}
+        onCtxHover={fetchCtx}
         saved={savedFlash}
       />
 
