@@ -207,30 +207,39 @@ export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () =
       </span>
       <span className="glance-pop glance-pop-stats">
         <div className="glance-h">{t("活动用量（读本地缓存，不耗 token）")}</div>
-        <div className="cal-head">
-          {t("本月")} · {monthLabel}
-        </div>
-        <div className="cal-grid">
-          {cells.map((c, i) =>
-            c ? (
-              <span
-                key={i}
-                className={`cal-cell cal-l${c.lvl}${c.today ? " today" : ""}`}
-                title={`${monthLabel}-${String(c.day).padStart(2, "0")} · ${fmtN(c.v)}`}
-              />
-            ) : (
-              <span key={i} className="cal-cell empty" />
-            ),
-          )}
-        </div>
-        <div className="cal-legend">
-          {t("少")}
-          <i className="cal-l0" />
-          <i className="cal-l1" />
-          <i className="cal-l2" />
-          <i className="cal-l3" />
-          <i className="cal-l4" />
-          {t("多")}
+        <div className="cal">
+          <div className="cal-title">
+            {t("本月")} · {monthLabel}
+          </div>
+          <div className="cal-week">
+            {t("一 二 三 四 五 六 日")
+              .split(" ")
+              .map((w, i) => (
+                <span key={i}>{w}</span>
+              ))}
+          </div>
+          <div className="cal-grid">
+            {cells.map((c, i) =>
+              c ? (
+                <span
+                  key={i}
+                  className={`cal-cell cal-l${c.lvl}${c.today ? " today" : ""}`}
+                  title={`${monthLabel}-${String(c.day).padStart(2, "0")} · ${fmtN(c.v)}`}
+                />
+              ) : (
+                <span key={i} className="cal-cell empty" />
+              ),
+            )}
+          </div>
+          <div className="cal-legend">
+            {t("少")}
+            <i className="cal-l0" />
+            <i className="cal-l1" />
+            <i className="cal-l2" />
+            <i className="cal-l3" />
+            <i className="cal-l4" />
+            {t("多")}
+          </div>
         </div>
         <div className="glance-grid stats-grid">
           <div>
