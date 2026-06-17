@@ -54,6 +54,7 @@ import { useI18n, useT, tStatic, type Lang } from "./i18n/index.js";
 import { IconMoon, IconSun, IconMonitor } from "./layout/icons.js";
 import { SessionSidebar } from "./layout/SessionSidebar.js";
 import { StatusBar } from "./layout/StatusBar.js";
+import { StatsChip, StatusChip, type StatsData, type StatusData } from "./layout/GlanceChips.js";
 
 type Tab = "transcript" | "terminal" | "audit" | "logs" | "inbox";
 type ThemePref = "dark" | "light" | "system";
@@ -1621,6 +1622,25 @@ function Inner() {
     const id = setInterval(fetchCtx, 180000);
     return () => clearInterval(id);
   }, [activeTerminalId, fetchCtx]);
+
+  // 顶部「周活跃」+「状态」小标：读 ~/.claude 的本地缓存/配置，不耗 token。
+  const [glanceStats, setGlanceStats] = useState<StatsData | null>(null);
+  const [glanceStatus, setGlanceStatus] = useState<StatusData | null>(null);
+  const fetchGlance = useCallback(() => {
+    void invoke<StatsData>("claude_stats")
+      .then((s) => setGlanceStats(s && s.dailyActivity?.length ? s : null))
+      .catch(() => {});
+    void invoke<StatusData>("claude_status")
+      .then((s) => setGlanceStatus(s && (s.version || s.name) ? s : null))
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    fetchGlance();
+    // 很慢(5 分钟)：两个小本地文件(19KB+52KB)、版本号已缓存。悬停时还会即时重读。
+    const id = setInterval(fetchGlance, 300000);
+    return () => clearInterval(id);
+  }, [fetchGlance]);
+
   const selectedEdgeObj = edges.find((e) => e.id === selectedEdge) ?? null;
   const edgeEndLabel = (id: string) =>
     ((nodes.find((n) => n.id === id)?.data as { label?: string } | undefined)?.label as string) ?? id.slice(0, 6);
@@ -1768,6 +1788,8 @@ function Inner() {
           </button>
         )}
         <div className="spacer" data-tauri-drag-region />
+        {glanceStats && <StatsChip stats={glanceStats} onHover={fetchGlance} />}
+        {glanceStatus && <StatusChip status={glanceStatus} onHover={fetchGlance} />}
         {usage?.sessionPct != null && (
           <span
             className={`usage-chip ${usage.sessionPct >= 85 ? "hot" : usage.sessionPct >= 60 ? "warm" : ""}`}

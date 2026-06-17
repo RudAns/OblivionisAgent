@@ -418,6 +418,93 @@ fn open_path(path: String, base: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 读 Claude 自己的活动统计缓存(~/.claude/stats-cache.json)给 GUI 顶部「周活跃」用。
+/// 纯读本地 ~19KB JSON、不耗 token。只回传最近 31 天日活 + 累计，周指标/连续天数在前端算。
+/// 注：缓存只到「昨天」(lastComputedDate)，今天的活动 CLI 是实时算的、不在缓存里——前端标注一下即可。
+#[tauri::command]
+fn claude_stats() -> Result<serde_json::Value, String> {
+    let empty = serde_json::json!({ "dailyActivity": [], "totalSessions": 0, "totalMessages": 0, "lastComputedDate": serde_json::Value::Null });
+    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
+    if home.is_empty() {
+        return Ok(empty);
+    }
+    let path = std::path::Path::new(&home).join(".claude").join("stats-cache.json");
+    let raw = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return Ok(empty),
+    };
+    let v: serde_json::Value = match serde_json::from_str(&raw) {
+        Ok(v) => v,
+        Err(_) => return Ok(empty),
+    };
+    let da = v.get("dailyActivity").and_then(|x| x.as_array()).cloned().unwrap_or_default();
+    // 只取最近 31 天(够画周趋势+算连续天数)，别把全量历史塞过去
+    let tail: Vec<serde_json::Value> = if da.len() > 31 { da[da.len() - 31..].to_vec() } else { da };
+    Ok(serde_json::json!({
+        "dailyActivity": tail,
+        "totalSessions": v.get("totalSessions").and_then(|x| x.as_u64()).unwrap_or(0),
+        "totalMessages": v.get("totalMessages").and_then(|x| x.as_u64()).unwrap_or(0),
+        "lastComputedDate": v.get("lastComputedDate").cloned().unwrap_or(serde_json::Value::Null),
+    }))
+}
+
+/// 取 Claude CLI 版本号："2.1.179 (Claude Code)" → "2.1.179"。
+/// 优先读 ~/.claude/.last-update-result.json 的 version_to(原生更新器每次写、便宜)；
+/// 没有再 spawn 一次 `claude --version`(结果缓存进 OnceLock，永不重复 spawn)。
+fn claude_cli_version(claude_dir: &std::path::Path) -> String {
+    if let Ok(s) = std::fs::read_to_string(claude_dir.join(".last-update-result.json")) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
+            if let Some(ver) = v.get("version_to").and_then(|x| x.as_str()) {
+                if !ver.is_empty() {
+                    return ver.to_string();
+                }
+            }
+        }
+    }
+    use std::sync::OnceLock;
+    static VER: OnceLock<String> = OnceLock::new();
+    VER.get_or_init(|| {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let comspec = std::env::var("ComSpec").unwrap_or_else(|_| "cmd.exe".to_string());
+        match std::process::Command::new(&comspec)
+            .args(["/c", "claude", "--version"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+        {
+            Ok(o) => String::from_utf8_lossy(&o.stdout).split_whitespace().next().unwrap_or("").to_string(),
+            Err(_) => String::new(),
+        }
+    })
+    .clone()
+}
+
+/// 给 GUI 顶部「状态」小标用：Claude CLI 版本 + 登录账号 + 套餐。纯读本地文件(+至多一次缓存的版本探测)、不耗 token。
+/// 账号读 ~/.claude.json 的 oauthAccount(displayName/emailAddress/组织类型/限额档)，敏感令牌在 .credentials.json 里、不碰。
+#[tauri::command]
+fn claude_status() -> Result<serde_json::Value, String> {
+    let none = serde_json::json!({ "version": "", "name": "", "email": "", "org": "", "tier": "" });
+    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
+    if home.is_empty() {
+        return Ok(none);
+    }
+    let version = claude_cli_version(&std::path::Path::new(&home).join(".claude"));
+    let cfg = std::path::Path::new(&home).join(".claude.json");
+    let (mut name, mut email, mut org, mut tier) = (String::new(), String::new(), String::new(), String::new());
+    if let Ok(raw) = std::fs::read_to_string(&cfg) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+            if let Some(a) = v.get("oauthAccount") {
+                let g = |k: &str| a.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+                name = g("displayName");
+                email = g("emailAddress");
+                org = g("organizationType");
+                tier = g("organizationRateLimitTier");
+            }
+        }
+    }
+    Ok(serde_json::json!({ "version": version, "name": name, "email": email, "org": org, "tier": tier }))
+}
+
 // ── 阅读清单：Claude 生成的、给人看的报告/文档统一落在 ~/.oblivionis/reports/ ──────
 // 与代码/配置改动彻底分开——只有显式写进这个目录的文件才会出现在 GUI 的「阅读清单」里。
 fn reports_dir_path() -> std::path::PathBuf {
@@ -730,7 +817,7 @@ pub fn run() {
         .manage(PtyState::default())
         .invoke_handler(tauri::generate_handler![
             pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
-            context_estimate, set_feishu_secret, has_feishu_secret,
+            context_estimate, claude_stats, claude_status, set_feishu_secret, has_feishu_secret,
             reports_dir, open_md_viewer, session_dirs, list_md_files, read_md, read_file_b64
         ])
         .setup(|app| {
