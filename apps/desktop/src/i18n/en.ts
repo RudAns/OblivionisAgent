@@ -547,6 +547,7 @@ export const EN: Record<string, string> = {
   "活动用量（读本地缓存，不耗 token）": "Activity & usage (local cache, no tokens)",
   "近 30 天每日消息（今天高亮）": "Daily messages, last 30 days (today highlighted)",
   本月: "This month",
+  今日宜忌: "Today's almanac",
   "一 二 三 四 五 六 日": "M T W T F S S",
   少: "Less",
   多: "More",

@@ -642,6 +642,51 @@ button.primary {
 .glance-pop-stats {
   width: 320px;
 }
+/* 乐子：开发版「今日宜忌」黄历 */
+.alm {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.alm-h {
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.alm-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11.5px;
+  margin-bottom: 5px;
+}
+.alm-row:last-child {
+  margin-bottom: 0;
+}
+.alm-badge {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+.alm-badge.yi {
+  background: #d4502b;
+}
+.alm-badge.ji {
+  background: #5a6270;
+}
+.alm-items {
+  color: var(--text);
+  line-height: 1.55;
+}
 /* 本月日历热力图（参考 GitHub contribution graph 配色） */
 .cal {
   width: max-content;

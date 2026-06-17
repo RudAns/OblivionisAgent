@@ -109,7 +109,87 @@ function buildSeries(now: Date, n: number, by: Map<string, DailyActivity>): { da
   return out;
 }
 
-/** 顶部「活动趋势」小标：chip 本身=近 7 天迷你趋势(图标)；悬停=本月日历热力图 + 全量统计。读本地、不耗 token。 */
+// ── 乐子：开发版「今日宜忌」黄历（程序 + 游戏开发用语，图一乐）──
+const ALMANAC: string[] = [
+  "代码 Review",
+  "开新功能",
+  "重构祖传代码",
+  "删库跑路",
+  "提测上线",
+  "改需求",
+  "加注释",
+  "写单元测试",
+  "抄 StackOverflow",
+  "在 main 直接提交",
+  "force push",
+  "解合并冲突",
+  "摸鱼",
+  "早会发言",
+  "估工时",
+  "拒绝排期",
+  "甩锅",
+  "背锅",
+  "修 bug",
+  "顺手制造 bug",
+  "通宵赶版本",
+  "给变量起名",
+  "升级依赖",
+  "跳过 QA",
+  "周五上线",
+  "假装在看文档",
+  "答应「明天就好」",
+  "给老板演示 Demo",
+  "关掉报警继续睡",
+  "优化性能（其实改了个数字）",
+  "立 flag",
+  "周报注水",
+  "听从策划建议",
+  "功能宣讲",
+  "数值平衡",
+  "公示抽卡概率",
+  "给 Boss 偷偷加血",
+  "砍需求",
+  "信策划「就改一点点」",
+  "玩家反馈已读不回",
+  "热更新",
+  "调手感",
+  "削版本之子",
+  "加新皮肤",
+];
+function hashStr(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function mulberry32(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/** 按日期稳定抽「今日宜忌」：宜 2-3 个、忌 2-3 个、互不重复。同一天结果固定。 */
+function dayFortune(dateStr: string): { yi: string[]; ji: string[] } {
+  const rnd = mulberry32(hashStr(dateStr) || 1);
+  const a = ALMANAC.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const tmp = a[i]!;
+    a[i] = a[j]!;
+    a[j] = tmp;
+  }
+  const yiCount = 2 + Math.floor(rnd() * 2);
+  const jiCount = 2 + Math.floor(rnd() * 2);
+  return { yi: a.slice(0, yiCount), ji: a.slice(yiCount, yiCount + jiCount) };
+}
+
+/** 顶部「活动趋势」小标：chip 本身=近 7 天迷你趋势(图标)；悬停=今日宜忌 + 本月日历热力图 + 全量统计。读本地、不耗 token。 */
 export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () => void }) {
   const t = useT();
   const da = stats.dailyActivity ?? [];
@@ -180,14 +260,17 @@ export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () =
   for (let day = 1; day <= dim; day++) {
     monthMax = Math.max(monthMax, by.get(ymd(new Date(y, mo, day)))?.messageCount ?? 0);
   }
-  const cells: ({ day: number; v: number; lvl: number; today: boolean } | null)[] = [];
+  const cells: ({ day: number; v: number; lvl: number; today: boolean; yi: string[]; ji: string[] } | null)[] = [];
   for (let i = 0; i < lead; i++) cells.push(null);
   for (let day = 1; day <= dim; day++) {
-    const v = by.get(ymd(new Date(y, mo, day)))?.messageCount ?? 0;
+    const ds = ymd(new Date(y, mo, day));
+    const v = by.get(ds)?.messageCount ?? 0;
     const lvl = v <= 0 ? 0 : Math.min(4, Math.ceil((v / monthMax) * 4));
-    cells.push({ day, v, lvl, today: day === now.getDate() });
+    const f = dayFortune(ds); // 每天自己的宜忌(悬停格子可见)
+    cells.push({ day, v, lvl, today: day === now.getDate(), yi: f.yi, ji: f.ji });
   }
   const monthLabel = `${y}-${String(mo + 1).padStart(2, "0")}`;
+  const fortune = dayFortune(ymd(now)); // 今日宜忌(浮框顶部展示)
 
   return (
     <span
@@ -207,6 +290,17 @@ export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () =
       </span>
       <span className="glance-pop glance-pop-stats">
         <div className="glance-h">{t("活动用量（读本地缓存，不耗 token）")}</div>
+        <div className="alm">
+          <div className="alm-h">{t("今日宜忌")}</div>
+          <div className="alm-row">
+            <span className="alm-badge yi">宜</span>
+            <span className="alm-items">{fortune.yi.join(" · ")}</span>
+          </div>
+          <div className="alm-row">
+            <span className="alm-badge ji">忌</span>
+            <span className="alm-items">{fortune.ji.join(" · ")}</span>
+          </div>
+        </div>
         <div className="cal">
           <div className="cal-title">
             {t("本月")} · {monthLabel}
@@ -224,7 +318,7 @@ export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () =
                 <span
                   key={i}
                   className={`cal-cell cal-l${c.lvl}${c.today ? " today" : ""}`}
-                  title={`${monthLabel}-${String(c.day).padStart(2, "0")} · ${fmtN(c.v)}`}
+                  title={`${monthLabel}-${String(c.day).padStart(2, "0")} · ${fmtN(c.v)}\n宜 ${c.yi.join("·")}\n忌 ${c.ji.join("·")}`}
                 />
               ) : (
                 <span key={i} className="cal-cell empty" />
