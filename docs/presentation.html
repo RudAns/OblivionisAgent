@@ -3,171 +3,119 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OblivionisAgent — 本地 Claude 会话的连线式控制台</title>
+<title>OblivionisAgent — 把团队飞书群接进本地 Claude 会话</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --parchment: #f5f4ed;
-    --ivory: #faf9f5;
-    --white: #ffffff;
-    --sand: #e8e6dc;
-    --dark-surface: #30302e;
-    --deep-dark: #141413;
-    --near-black: #141413;
-    --terracotta: #c96442;
-    --coral: #d97757;
-    --charcoal: #4d4c48;
-    --olive: #5e5d59;
-    --stone: #87867f;
-    --silver: #b0aea5;
-    --border-cream: #f0eee6;
-    --border-warm: #e8e6dc;
-    --border-dark: #30302e;
+    --parchment: #f5f4ed; --ivory: #faf9f5; --white: #ffffff; --sand: #e8e6dc;
+    --dark-surface: #30302e; --deep-dark: #141413; --near-black: #141413;
+    --terracotta: #c96442; --coral: #d97757; --charcoal: #4d4c48; --olive: #5e5d59;
+    --stone: #87867f; --silver: #b0aea5; --border-cream: #f0eee6; --border-warm: #e8e6dc;
     --ring: #d1cfc5;
     --serif: "Newsreader", Georgia, "Times New Roman", serif;
     --sans: "Inter", system-ui, "Segoe UI", Arial, sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
-  body {
-    font-family: var(--sans);
-    color: var(--near-black);
-    background: var(--parchment);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-  }
-  h1, h2, h3, h4 { font-family: var(--serif); font-weight: 500; letter-spacing: 0; }
+  body { font-family: var(--sans); color: var(--near-black); background: var(--parchment); line-height: 1.6; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  h1, h2, h3, h4 { font-family: var(--serif); font-weight: 500; }
   a { color: inherit; text-decoration: none; }
   .wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
-  .serif { font-family: var(--serif); }
 
-  /* ── Nav ───────────────────────────── */
-  nav {
-    position: sticky; top: 0; z-index: 50;
-    background: rgba(245, 244, 237, 0.82);
-    backdrop-filter: saturate(180%) blur(12px);
-    border-bottom: 1px solid var(--border-cream);
-  }
+  nav { position: sticky; top: 0; z-index: 50; background: rgba(245,244,237,0.82); backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--border-cream); }
   .nav-in { display: flex; align-items: center; justify-content: space-between; height: 60px; }
-  .brand { font-family: var(--serif); font-size: 21px; font-weight: 500; color: var(--near-black); }
+  .brand { font-family: var(--serif); font-size: 21px; font-weight: 500; }
   .brand b { color: var(--terracotta); font-weight: 500; }
   .nav-links { display: flex; align-items: center; gap: 26px; }
   .nav-links a { font-size: 15px; color: var(--olive); transition: color .15s; }
   .nav-links a:hover { color: var(--near-black); }
-  .nav-cta {
-    background: var(--terracotta); color: var(--ivory);
-    padding: 8px 16px; border-radius: 10px; font-size: 14px; font-weight: 500;
-    box-shadow: 0 0 0 1px var(--terracotta);
-  }
-  @media (max-width: 720px) { .nav-links a:not(.nav-cta) { display: none; } }
+  @media (max-width: 720px) { .nav-links { display: none; } }
 
-  /* ── Hero ───────────────────────────── */
-  .hero { padding: 92px 0 72px; text-align: center; }
-  .overline {
-    display: inline-block; font-size: 12px; letter-spacing: 0.12px; font-weight: 500;
-    color: var(--terracotta); background: rgba(201,100,66,0.08);
-    border: 1px solid rgba(201,100,66,0.18); padding: 6px 14px; border-radius: 24px;
-    margin-bottom: 26px;
-  }
-  .hero h1 { font-size: 62px; line-height: 1.1; margin-bottom: 24px; }
+  .hero { padding: 92px 0 70px; text-align: center; }
+  .overline { display: inline-block; font-size: 12px; letter-spacing: 0.12px; font-weight: 500; color: var(--terracotta); background: rgba(201,100,66,0.08); border: 1px solid rgba(201,100,66,0.18); padding: 6px 14px; border-radius: 24px; margin-bottom: 26px; }
+  .hero h1 { font-size: 60px; line-height: 1.1; margin-bottom: 24px; }
   .hero h1 .accent { color: var(--terracotta); }
-  .hero .lead {
-    font-size: 20px; line-height: 1.6; color: var(--olive);
-    max-width: 720px; margin: 0 auto 34px;
-  }
+  .hero .lead { font-size: 20px; line-height: 1.6; color: var(--olive); max-width: 740px; margin: 0 auto 32px; }
   .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 22px; }
-  .btn-primary {
-    background: var(--terracotta); color: var(--ivory); font-weight: 500; font-size: 16px;
-    padding: 12px 24px; border-radius: 12px; box-shadow: 0 0 0 1px var(--terracotta);
-    transition: transform .12s, filter .15s;
-  }
+  .btn-primary { background: var(--terracotta); color: var(--ivory); font-weight: 500; font-size: 16px; padding: 12px 24px; border-radius: 12px; box-shadow: 0 0 0 1px var(--terracotta); transition: transform .12s, filter .15s; }
   .btn-primary:hover { filter: brightness(1.05); transform: translateY(-1px); }
-  .btn-ghost {
-    background: var(--sand); color: var(--charcoal); font-weight: 500; font-size: 16px;
-    padding: 12px 22px; border-radius: 12px; box-shadow: 0 0 0 1px var(--ring);
-  }
-  .compliance-chip {
-    display: inline-flex; align-items: center; gap: 9px; font-size: 14px; color: var(--olive);
-    background: var(--ivory); border: 1px solid var(--border-warm);
-    padding: 9px 18px; border-radius: 24px;
-  }
+  .compliance-chip { display: inline-flex; align-items: center; gap: 9px; font-size: 14px; color: var(--olive); background: var(--ivory); border: 1px solid var(--border-warm); padding: 9px 18px; border-radius: 24px; }
   .compliance-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: #4f9d69; }
-  .hero-media { margin-top: 56px; }
-  .hero-media img {
-    width: 100%; border-radius: 28px; display: block;
-    border: 1px solid var(--border-warm);
-    box-shadow: rgba(0,0,0,0.06) 0px 16px 50px;
-  }
+  .hero-media { margin-top: 54px; }
+  .hero-media img { width: 100%; border-radius: 28px; display: block; border: 1px solid var(--border-warm); box-shadow: rgba(0,0,0,0.06) 0px 16px 50px; }
+  .hero-media .cap { font-size: 13px; color: var(--stone); margin-top: 14px; }
 
-  /* ── Section shells ─────────────────── */
-  section { padding: 88px 0; }
-  .sec-head { text-align: center; max-width: 720px; margin: 0 auto 56px; }
+  section { padding: 86px 0; }
+  .sec-head { text-align: center; max-width: 730px; margin: 0 auto 52px; }
   .sec-head .kicker { font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--terracotta); font-weight: 600; margin-bottom: 14px; }
   .sec-head h2 { font-size: 44px; line-height: 1.2; margin-bottom: 16px; }
   .sec-head p { font-size: 18px; color: var(--olive); }
+  .alt { background: var(--ivory); border-top: 1px solid var(--border-cream); border-bottom: 1px solid var(--border-cream); }
 
-  /* ── Feature grid ───────────────────── */
   .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-  .feat {
-    background: var(--ivory); border: 1px solid var(--border-cream);
-    border-radius: 16px; padding: 28px 26px;
-    transition: box-shadow .18s, transform .18s, border-color .18s;
-  }
+  .feat { background: var(--ivory); border: 1px solid var(--border-cream); border-radius: 16px; padding: 26px; transition: box-shadow .18s, transform .18s, border-color .18s; }
+  .alt .feat { background: var(--white); }
   .feat:hover { box-shadow: rgba(0,0,0,0.05) 0px 4px 24px; transform: translateY(-2px); border-color: var(--border-warm); }
-  .feat .ic { font-size: 26px; margin-bottom: 16px; display: block; }
+  .feat .ic { font-size: 26px; margin-bottom: 14px; display: block; }
   .feat h3 { font-size: 22px; line-height: 1.2; margin-bottom: 10px; }
   .feat p { font-size: 15px; color: var(--olive); line-height: 1.6; }
   @media (max-width: 920px) { .feat-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 600px) { .feat-grid { grid-template-columns: 1fr; } .hero h1 { font-size: 40px; } .sec-head h2 { font-size: 32px; } }
+  @media (max-width: 600px) { .feat-grid { grid-template-columns: 1fr; } .hero h1 { font-size: 38px; } .sec-head h2 { font-size: 30px; } }
 
-  /* ── Screenshot spotlight ───────────── */
-  .alt { background: var(--ivory); border-top: 1px solid var(--border-cream); border-bottom: 1px solid var(--border-cream); }
-  .spot { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; margin-bottom: 84px; }
+  /* 部署一览表 */
+  .deploy { background: var(--white); border: 1px solid var(--border-warm); border-radius: 18px; overflow: hidden; box-shadow: rgba(0,0,0,0.05) 0px 4px 24px; margin-bottom: 56px; }
+  .deploy table { width: 100%; border-collapse: collapse; }
+  .deploy th { text-align: left; font-family: var(--sans); font-weight: 600; font-size: 13px; letter-spacing: 0.3px; color: var(--stone); text-transform: uppercase; padding: 16px 24px; background: var(--ivory); border-bottom: 1px solid var(--border-warm); }
+  .deploy td { padding: 16px 24px; font-size: 15px; color: var(--charcoal); border-top: 1px solid var(--border-cream); vertical-align: middle; }
+  .deploy tr td:first-child { font-weight: 500; color: var(--near-black); }
+  .deploy .pill { display: inline-block; background: rgba(201,100,66,0.09); color: var(--terracotta); border-radius: 20px; padding: 3px 11px; font-size: 13px; margin: 2px 3px 2px 0; }
+  .deploy .eng { color: var(--olive); font-size: 13.5px; }
+  @media (max-width: 700px) { .deploy th:last-child, .deploy td:last-child { display: none; } .deploy td, .deploy th { padding: 13px 16px; } }
+
+  /* 场景卡 */
+  .scn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .scn { background: var(--ivory); border: 1px solid var(--border-cream); border-radius: 16px; padding: 26px; }
+  .scn .num { font-family: var(--serif); font-size: 15px; color: var(--terracotta); font-weight: 500; margin-bottom: 8px; }
+  .scn h3 { font-size: 21px; line-height: 1.25; margin-bottom: 12px; }
+  .scn p { font-size: 15px; color: var(--olive); line-height: 1.65; margin-bottom: 10px; }
+  .scn .ask { display: block; font-family: var(--sans); font-size: 14px; color: var(--charcoal); background: var(--white); border: 1px solid var(--border-warm); border-left: 3px solid var(--terracotta); border-radius: 8px; padding: 10px 13px; margin-bottom: 10px; }
+  .scn .flow { font-size: 13.5px; color: var(--stone); }
+  .scn .flow b { color: var(--olive); font-weight: 500; }
+  @media (max-width: 760px) { .scn-grid { grid-template-columns: 1fr; } }
+
+  .spot { display: grid; grid-template-columns: 1fr 1fr; gap: 54px; align-items: center; margin-bottom: 80px; }
   .spot:last-child { margin-bottom: 0; }
   .spot.rev .spot-txt { order: 2; }
   .spot-txt .tag { font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--terracotta); font-weight: 600; margin-bottom: 12px; }
-  .spot-txt h3 { font-size: 32px; line-height: 1.2; margin-bottom: 14px; }
+  .spot-txt h3 { font-size: 31px; line-height: 1.2; margin-bottom: 14px; }
   .spot-txt p { font-size: 16px; color: var(--olive); line-height: 1.65; }
-  .spot-img img {
-    width: 100%; border-radius: 18px; display: block;
-    border: 1px solid var(--border-warm);
-    box-shadow: rgba(0,0,0,0.06) 0px 10px 36px;
-  }
-  @media (max-width: 820px) { .spot { grid-template-columns: 1fr; gap: 24px; } .spot.rev .spot-txt { order: 0; } }
+  .spot-img img { width: 100%; border-radius: 18px; display: block; border: 1px solid var(--border-warm); box-shadow: rgba(0,0,0,0.06) 0px 10px 36px; }
+  @media (max-width: 820px) { .spot { grid-template-columns: 1fr; gap: 22px; } .spot.rev .spot-txt { order: 0; } }
 
-  /* ── Gallery ────────────────────────── */
-  .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 26px; }
-  .shot { background: var(--ivory); border: 1px solid var(--border-cream); border-radius: 16px; overflow: hidden; transition: box-shadow .18s; }
-  .shot:hover { box-shadow: rgba(0,0,0,0.05) 0px 4px 24px; }
+  .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .shot { background: var(--white); border: 1px solid var(--border-cream); border-radius: 16px; overflow: hidden; }
   .shot img { width: 100%; display: block; border-bottom: 1px solid var(--border-cream); }
   .shot .cap { padding: 16px 20px; }
   .shot .cap b { font-family: var(--serif); font-weight: 500; font-size: 18px; display: block; margin-bottom: 5px; }
-  .shot .cap span { font-size: 14px; color: var(--stone); line-height: 1.55; }
+  .shot .cap span { font-size: 14px; color: var(--stone); line-height: 1.5; }
   @media (max-width: 700px) { .gallery { grid-template-columns: 1fr; } }
 
-  /* ── Node types ─────────────────────── */
   .nodes { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; max-width: 860px; margin: 0 auto; }
-  .node-chip {
-    background: var(--ivory); border: 1px solid var(--border-warm); border-radius: 24px;
-    padding: 10px 18px; font-size: 14.5px; color: var(--charcoal);
-  }
+  .node-chip { background: var(--ivory); border: 1px solid var(--border-warm); border-radius: 24px; padding: 10px 18px; font-size: 14.5px; color: var(--charcoal); }
   .node-chip span { color: var(--stone); font-size: 13px; }
 
-  /* ── Dark statement ─────────────────── */
   .dark { background: var(--deep-dark); color: var(--silver); }
   .dark h2 { color: var(--ivory); }
   .dark .sec-head p { color: var(--silver); }
-  .compliance-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 8px; }
+  .compliance-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
   .comp-card { background: var(--dark-surface); border: 1px solid #3a3a37; border-radius: 16px; padding: 24px 26px; }
   .comp-card h4 { color: var(--coral); font-size: 19px; margin-bottom: 8px; }
   .comp-card p { font-size: 15px; color: var(--silver); line-height: 1.6; }
   @media (max-width: 700px) { .compliance-grid { grid-template-columns: 1fr; } }
 
-  /* ── Footer ─────────────────────────── */
-  footer { background: var(--parchment); border-top: 1px solid var(--border-cream); padding: 40px 0; }
+  footer { background: var(--parchment); border-top: 1px solid var(--border-cream); padding: 36px 0; }
   .foot-in { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 14px; color: var(--stone); }
   .foot-in .badges { display: flex; gap: 10px; flex-wrap: wrap; }
   .foot-in .bdg { background: var(--ivory); border: 1px solid var(--border-warm); border-radius: 8px; padding: 4px 11px; font-size: 12.5px; color: var(--olive); }
@@ -180,25 +128,29 @@
     <div class="brand">Oblivionis<b>Agent</b></div>
     <div class="nav-links">
       <a href="#features">能力</a>
+      <a href="#scenarios">使用场景</a>
       <a href="#preview">界面</a>
-      <a href="#compliance">合规</a>
+      <a href="#why">优势</a>
     </div>
   </div>
 </nav>
 
 <header class="hero">
   <div class="wrap">
-    <div class="overline">本地 Claude Code · 连线式控制台</div>
-    <h1>可视化编排你的<br /><span class="accent">本地 Claude 会话</span></h1>
+    <div class="overline">团队内部 · 飞书 × 本地 Claude 协作台</div>
+    <h1>把团队的飞书群<br />接进<span class="accent">本地 Claude 会话</span></h1>
     <p class="lead">
-      拖节点、连根线，就能编排本地 <b>claude</b> 会话：多会话路由、意图分流、人格 / 技能 / 子代理赋能、内置终端、敏感操作审批。
-      其中一项能力——把<b>飞书群聊</b>接进来：群里 @机器人 → 路由到对应项目的会话 → 富文本回帖并 @提问人。
+      一套可视化画布，把不同的飞书群、不同的产线，路由到各自对应的本地 <b>claude</b> 开发会话——群里 @机器人提问，
+      自动落到对的工程目录、对的会话去处理，再富文本回帖并 @ 提问人。已经在团队多条管线上跑起来了。
     </p>
     <div class="cta-row">
-      <a class="btn-primary" href="#preview">看看长什么样</a>
+      <a class="btn-primary" href="#scenarios">看实际怎么用</a>
     </div>
-    <div class="compliance-chip"><span class="dot"></span> 遥控官方 Claude CLI · 复用订阅登录态 · 零额外 API 成本</div>
-    <div class="hero-media"><img src="screenshots/canvas.png" alt="连线配置画布" /></div>
+    <div class="compliance-chip"><span class="dot"></span> 复用现有 Claude 订阅 · 零额外 API 成本 · 数据全在本地</div>
+    <div class="hero-media">
+      <img src="screenshots/canvas.png" alt="连线配置画布" />
+      <div class="cap">团队当前的真实连线：6 个飞书群 → 意图分流 / 路由 → 7 条本地 Claude 会话</div>
+    </div>
   </div>
 </header>
 
@@ -206,60 +158,83 @@
   <div class="wrap">
     <div class="sec-head">
       <div class="kicker">它能做什么</div>
-      <h2>把「怎么驱动 Claude」做成可视化、可调优</h2>
-      <p>一套节点拼出你的工作流——从入口、路由，到落地的本地会话，每一步都看得见、调得动。</p>
+      <h2>把「怎么用 Claude」做成可视化、可调优</h2>
+      <p>一套节点拼出工作流——从飞书入口、智能分流，到落地的本地会话，每一步都看得见、调得动。</p>
     </div>
     <div class="feat-grid">
-      <div class="feat">
-        <span class="ic">🎛️</span>
-        <h3>连线式画布</h3>
-        <p>飞书群 → 路由 → Claude 会话，拖节点连线即完成接入；可折叠成会话卡片专注终端。</p>
+      <div class="feat"><span class="ic">🔀</span><h3>多群多会话 · 意图分流</h3><p>不同群路由到不同项目（各自工程目录 / 模型 / 权限）；同群消息再按语义意图走不同分支。</p></div>
+      <div class="feat"><span class="ic">🖥️</span><h3>本地会话直连</h3><p>群里的问题落到你电脑上对应工程的 claude 会话，直接看代码、改文件、跑命令、给结论。</p></div>
+      <div class="feat"><span class="ic">🛡️</span><h3>主人 / 访客隔离</h3><p>访客走脱敏分身、回复二次脱敏 + 安全护栏；你的开发上下文与访客会话互不污染。</p></div>
+      <div class="feat"><span class="ic">🔐</span><h3>敏感操作审批</h3><p>访客触发改文件 / 命令等敏感操作 → 群里弹交互卡，你点「允许」才执行，超时自动失效。</p></div>
+      <div class="feat"><span class="ic">📄</span><h3>飞书富交互</h3><p>读 docx / Wiki / 表格 / 多维表喂上下文；读消息附件；长回复转文件回传；Markdown 表格 → 飞书原生表格。</p></div>
+      <div class="feat"><span class="ic">🎭</span><h3>人格 / 技能赋能</h3><p>给会话挂「人格」定语气、挂「技能」定做法（如统一报告样式），连线即生效，一个可共享多会话。</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="scenarios" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">实际怎么用</div>
+      <h2>已经在这些管线上跑着</h2>
+      <p>每条产线一个飞书群，连到各自的本地会话与工程目录——下面是当前的真实部署。</p>
+    </div>
+
+    <div class="deploy">
+      <table>
+        <thead><tr><th>飞书群</th><th>智能分流后落到</th><th>工作目录</th></tr></thead>
+        <tbody>
+          <tr><td>角色技术管线</td><td><span class="pill">角色管线</span><span class="pill">CI 打包</span></td><td class="eng">游戏 Client / Builder 工程</td></tr>
+          <tr><td>地图管线</td><td><span class="pill">地图管线</span><span class="pill">CI 打包</span></td><td class="eng">游戏 Client / Builder 工程</td></tr>
+          <tr><td>音频项目沟通群</td><td><span class="pill">杂项对话</span><span class="pill">CI 打包</span></td><td class="eng">游戏 Client / Builder 工程</td></tr>
+          <tr><td>部门群</td><td><span class="pill">项目杂项</span><span class="pill">角色管线</span></td><td class="eng">游戏 Client 工程</td></tr>
+          <tr><td>卡牌战斗开发群</td><td><span class="pill">按意图分流</span></td><td class="eng">对应工程</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="scn-grid">
+      <div class="scn">
+        <div class="num">场景 1</div>
+        <h3>一句话触发打包</h3>
+        <span class="ask">@机器人 「帮我出一个角色的测试包」</span>
+        <p class="flow"><b>意图分流</b>识别为「打包」→ 自动落到 <b>CI 打包</b>会话（指向 Builder 工程）→ 触发构建，完成后群里回结果。同一个群里问代码问题，则分到「角色管线」会话直接看代码答。</p>
       </div>
-      <div class="feat">
-        <span class="ic">🔀</span>
-        <h3>多群多会话 · 意图分流</h3>
-        <p>不同群路由到不同项目（各自 cwd / 模型 / 权限）；同群消息再按语义意图走不同分支。</p>
+      <div class="scn">
+        <div class="num">场景 2</div>
+        <h3>多产线各管各的，不串台</h3>
+        <p>角色、地图、剧情、音频、卡牌战斗——每条产线一个群，连到各自的本地会话与工程目录。地图群的提问只会落到地图管线会话，不会跑到角色那边去。</p>
+        <p class="flow"><b>多群多会话路由 + 工程目录隔离</b></p>
       </div>
-      <div class="feat">
-        <span class="ic">🛡️</span>
-        <h3>主人 / 访客隔离</h3>
-        <p>访客走 <b>fork 脱敏分身</b>、回复二次脱敏 + 安全护栏——你的开发上下文与访客会话互不污染。</p>
+      <div class="scn">
+        <div class="num">场景 3</div>
+        <h3>部门群里的日常杂事</h3>
+        <span class="ask">@机器人 「这个资源为什么没被引用到？」</span>
+        <p class="flow">落到「项目杂项」会话，顺手查代码 / 翻文档 / 给结论——团队人人可问，不用各自装环境。</p>
       </div>
-      <div class="feat">
-        <span class="ic">🔐</span>
-        <h3>工具审批卡</h3>
-        <p>访客触发改文件 / 命令等敏感操作 → 群里弹交互卡，主人点「允许」才执行，超时自动失效。</p>
+      <div class="scn">
+        <div class="num">场景 4</div>
+        <h3>统一风格的报告</h3>
+        <span class="ask">@机器人 「把本周管线问题汇总成一页 HTML」</span>
+        <p class="flow">会话挂了「报告样式」技能 → 产出的周报 / 评审 / 分析 HTML 统一成一套视觉规范（就是这一页的风格），直接发群或转文件。</p>
       </div>
-      <div class="feat">
-        <span class="ic">🎭</span>
-        <h3>赋能节点</h3>
-        <p>人格（SOUL.md）/ 技能（SKILL.md）/ 子代理都做成可连线节点，连到会话即生效，一格可共享多会话。</p>
+      <div class="scn">
+        <div class="num">场景 5</div>
+        <h3>你的开发不受打扰</h3>
+        <p>你在内置终端里用本地会话做开发；飞书来的消息一律走脱敏分身另跑一条，两边互不污染——白天接需求、晚上自己改代码，互不打架。</p>
+        <p class="flow"><b>两会话模型（base 开发 / fork 飞书）</b></p>
       </div>
-      <div class="feat">
-        <span class="ic">🖥️</span>
-        <h3>内置交互终端</h3>
-        <p>双击节点打开开发会话（完整历史回放）；多终端保活、拖拽排序、贴图喂图、字号缩放。</p>
-      </div>
-      <div class="feat">
-        <span class="ic">📄</span>
-        <h3>飞书富交互</h3>
-        <p>读 docx / Wiki / Sheets / 多维表喂上下文；读消息附件；长回复转文件回传；Markdown 表格 → 飞书原生表格。</p>
-      </div>
-      <div class="feat">
-        <span class="ic">📖</span>
-        <h3>文档查看器</h3>
-        <p>独立窗口把各会话目录下的 .md / .html 排成目录树，右侧渲染——可边看文档边操作主窗。</p>
-      </div>
-      <div class="feat">
-        <span class="ic">📋</span>
-        <h3>审计 · 绿色部署</h3>
-        <p>谁在哪个群问了什么全部落盘；单实例防重开、关窗即净退；Tauri 打包，两个 exe 即可运行。</p>
+      <div class="scn">
+        <div class="num">场景 6</div>
+        <h3>更亲切的回复</h3>
+        <p>可给会话挂上「人格」，让机器人用设定好的口吻回帖——既是团队里的调剂，也让交互更像在跟一个同事说话。</p>
+        <p class="flow"><b>人格节点（可选）</b></p>
       </div>
     </div>
   </div>
 </section>
 
-<section id="preview" class="alt">
+<section id="preview">
   <div class="wrap">
     <div class="sec-head">
       <div class="kicker">界面预览</div>
@@ -268,110 +243,78 @@
     </div>
 
     <div class="spot">
-      <div class="spot-txt">
-        <div class="tag">内置交互终端</div>
-        <h3>实时观看本地 CLI 运行</h3>
-        <p>双击节点打开开发会话、完整历史回放；多终端保活、拖拽排序、剪贴板贴图喂图、字号缩放。</p>
-      </div>
-      <div class="spot-img"><img src="screenshots/terminal.png" alt="内置终端" /></div>
+      <div class="spot-txt"><div class="tag">意图分流</div><h3>同群消息，自动分到对的会话</h3><p>同一个群里，「打包」「问代码」「查文档」走不同分支——由 LLM 判定语义，落到各自对应的本地会话。</p></div>
+      <div class="spot-img"><img src="screenshots/intent.png" alt="意图分流" /></div>
     </div>
 
     <div class="spot rev">
-      <div class="spot-txt">
-        <div class="tag">飞书回帖效果</div>
-        <h3>富文本回复并 @ 提问人</h3>
-        <p>群里 @机器人提问，路由到对应项目的本地会话，处理完富文本回帖并 @ 回提问人；执行中还有逐工具进度卡。</p>
-      </div>
-      <div class="spot-img"><img src="screenshots/feishu.png" alt="飞书回帖" /></div>
+      <div class="spot-txt"><div class="tag">内置交互终端</div><h3>实时观看本地 CLI 运行</h3><p>双击节点打开开发会话、完整历史回放；多终端保活、拖拽排序、剪贴板贴图喂图、字号缩放。</p></div>
+      <div class="spot-img"><img src="screenshots/terminal.png" alt="内置终端" /></div>
     </div>
 
     <div class="spot">
-      <div class="spot-txt">
-        <div class="tag">用量看板 · 活动统计</div>
-        <h3>一眼看清在用什么、用了多少</h3>
-        <p>顶栏看订阅用量 / 上下文余量；活动小标悬停 = 本月日历热力图 + 全量统计。全部读本地缓存、不耗 token。</p>
-      </div>
+      <div class="spot-txt"><div class="tag">飞书回帖效果</div><h3>富文本回复并 @ 提问人</h3><p>群里 @机器人提问，路由到对应工程的本地会话，处理完富文本回帖并 @ 回提问人；执行中还有逐工具进度卡。</p></div>
+      <div class="spot-img"><img src="screenshots/feishu.png" alt="飞书回帖" /></div>
+    </div>
+
+    <div class="spot rev">
+      <div class="spot-txt"><div class="tag">用量看板 · 活动统计</div><h3>一眼看清在用什么、用了多少</h3><p>顶栏看订阅用量 / 上下文余量；活动小标悬停 = 本月日历热力图 + 全量统计。全部读本地缓存。</p></div>
       <div class="spot-img"><img src="screenshots/stats.png" alt="用量与统计" /></div>
     </div>
 
     <div class="gallery">
-      <div class="shot">
-        <img src="screenshots/intent.png" alt="意图分流" />
-        <div class="cap"><b>意图分流</b><span>同群消息按语义走不同分支（LLM 判定）</span></div>
-      </div>
-      <div class="shot">
-        <img src="screenshots/nodesetting.png" alt="会话节点设置" />
-        <div class="cap"><b>会话节点设置</b><span>cwd · 主客权限 · baseSessionId · 安全态势一览</span></div>
-      </div>
-      <div class="shot">
-        <img src="screenshots/shenji.png" alt="审计留痕" />
-        <div class="cap"><b>审计留痕</b><span>谁（主人 / 访客）问了什么、命中哪个会话——只读不可改</span></div>
-      </div>
-      <div class="shot">
-        <img src="screenshots/md_html_fileviewer.png" alt="文档查看器" />
-        <div class="cap"><b>文档查看器</b><span>按会话目录把 .md / .html 排成目录树，右侧渲染</span></div>
-      </div>
+      <div class="shot"><img src="screenshots/nodesetting.png" alt="会话节点设置" /><div class="cap"><b>会话节点设置</b><span>工程目录 · 主客权限 · 会话绑定 · 安全态势一览</span></div></div>
+      <div class="shot"><img src="screenshots/shenji.png" alt="审计留痕" /><div class="cap"><b>审计留痕</b><span>谁问了什么、命中哪个会话——只读不可改</span></div></div>
+      <div class="shot"><img src="screenshots/md_html_fileviewer.png" alt="文档查看器" /><div class="cap"><b>文档查看器</b><span>按会话目录把 .md / .html 排成目录树，右侧渲染</span></div></div>
+      <div class="shot"><img src="screenshots/feishu2.png" alt="对话样例" /><div class="cap"><b>对话样例</b><span>触发打包 → 按所连人格口吻回帖、标注作答会话</span></div></div>
     </div>
   </div>
 </section>
 
-<section>
+<section class="alt">
   <div class="wrap">
     <div class="sec-head">
       <div class="kicker">画布节点</div>
-      <h2>九种节点，拼出你的工作流</h2>
+      <h2>几种节点，拼出你的工作流</h2>
       <p>输入源 · 路由决策 · 执行落地 · 赋能加持——像搭积木一样组合。</p>
     </div>
     <div class="nodes">
-      <div class="node-chip">🟢 飞书群 <span>入口 · 按 chatId</span></div>
+      <div class="node-chip">🟢 飞书群 <span>入口</span></div>
       <div class="node-chip">🟣 路由 <span>加前缀 / 去 @</span></div>
-      <div class="node-chip">🟠 意图分流 <span>LLM 语义分支</span></div>
+      <div class="node-chip">🟠 意图分流 <span>语义分支</span></div>
       <div class="node-chip">🔵 Claude 会话 <span>落到本地会话</span></div>
-      <div class="node-chip">🩵 定时 <span>cron 触发</span></div>
-      <div class="node-chip">🟡 Webhook <span>外部 HTTP</span></div>
-      <div class="node-chip">🎭 人格 <span>SOUL.md</span></div>
-      <div class="node-chip">🧩 技能 <span>SKILL.md</span></div>
-      <div class="node-chip">🦾 子代理 <span>原生 subagent</span></div>
+      <div class="node-chip">🩵 定时 <span>到点触发</span></div>
+      <div class="node-chip">🟡 Webhook <span>外部触发</span></div>
+      <div class="node-chip">🎭 人格 <span>定语气</span></div>
+      <div class="node-chip">🧩 技能 <span>定做法</span></div>
+      <div class="node-chip">🦾 子代理 <span>独立上下文做重活</span></div>
     </div>
   </div>
 </section>
 
-<section id="compliance" class="dark">
+<section id="why" class="dark">
   <div class="wrap">
     <div class="sec-head">
-      <div class="kicker" style="color:var(--coral)">为什么这样设计</div>
-      <h2>遥控本地 CLI，而不是调 API</h2>
-      <p>很多人用的是 Claude 订阅（Pro / Max）而非 API Key。本项目一切 LLM 调用都通过驱动官方 <b>claude</b> CLI 完成。</p>
+      <div class="kicker" style="color:var(--coral)">为什么用它</div>
+      <h2>合规、低成本、数据可控</h2>
+      <p>一切 LLM 调用都通过驱动官方 <b>claude</b> 命令行完成——稳妥、省钱、数据不出本机。</p>
     </div>
     <div class="compliance-grid">
-      <div class="comp-card">
-        <h4>✓ 订阅合规</h4>
-        <p>Anthropic 禁止第三方工具直接使用订阅 OAuth 令牌；本项目绝不碰令牌、只遥控官方 CLI——合规、稳妥。</p>
-      </div>
-      <div class="comp-card">
-        <h4>✓ 零额外成本</h4>
-        <p>复用你已有的订阅登录态，不产生额外 API 账单；也完整复用已有的会话历史与项目上下文。</p>
-      </div>
-      <div class="comp-card">
-        <h4>✓ 数据留在本地</h4>
-        <p>会话、配置、审计全部落在你自己的电脑；飞书 App Secret 存进 Windows 凭据管理器，不明文落盘。</p>
-      </div>
-      <div class="comp-card">
-        <h4>✓ 访客始终受控</h4>
-        <p>访客走脱敏分身、回复二次脱敏；敏感操作要主人在飞书审批卡上点「允许」才执行。</p>
-      </div>
+      <div class="comp-card"><h4>✓ 零额外成本</h4><p>复用团队已有的 Claude 订阅登录态，不产生额外 API 账单；也完整复用已有的会话历史与项目上下文。</p></div>
+      <div class="comp-card"><h4>✓ 合规稳妥</h4><p>只遥控官方命令行工具，不碰任何令牌、不绕过官方通道——可放心在团队里长期用。</p></div>
+      <div class="comp-card"><h4>✓ 数据留在本地</h4><p>会话、配置、审计全部落在自己的电脑；飞书密钥存进系统凭据管理器，不明文落盘。</p></div>
+      <div class="comp-card"><h4>✓ 访客始终受控</h4><p>访客走脱敏分身、回复二次脱敏；敏感操作要在飞书审批卡上点「允许」才执行，全程留痕。</p></div>
     </div>
   </div>
 </section>
 
 <footer>
   <div class="wrap foot-in">
-    <div>© 2026 Derek·JW·Chen · OblivionisAgent</div>
+    <div>OblivionisAgent · 团队内部协作工具</div>
     <div class="badges">
       <span class="bdg">v0.3.0</span>
       <span class="bdg">Windows 10 / 11</span>
-      <span class="bdg">GPL-3.0</span>
-      <span class="bdg">官方 Claude CLI</span>
+      <span class="bdg">本地 Claude 驱动</span>
     </div>
   </div>
 </footer>
