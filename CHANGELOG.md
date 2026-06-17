@@ -6,6 +6,21 @@
 
 _（暂无）_
 
+## [0.4.0] - 2026-06-17
+
+### 🔒 重点修复
+- **主人不再被自己的审批卡拦住**：审批门控（`--permission-prompt-tool` + fork-settings 把 Bash/Edit 强制成 `ask`）原先在 `approvalMode=true` 时无条件挂上，会**盖过主人的 `bypassPermissions`**——于是主人自己提问也弹「工具审批」卡，还会**阻塞最多 100s 等审批**（连带「正在输入」一直不消、卡片点了像没反应）。改为仅当 `permissionMode!=="bypassPermissions"` 时才挂门控：主人免审、访客（default 模式）审批流不变。一处修复同时消除主人侧的三个现象。
+
+### 🧩 技能
+- **技能节点支持渐进式披露**（仿 Claude 原生 Skills）：技能文件带 `description:` frontmatter → 系统提示只注入「名字 + 用途 + 文件路径」指针（省上下文），模型命中场景时自己用 Read 读完整正文；不带 frontmatter 的技能维持「全文常驻」（向后兼容）。「报告型 HTML 样式」技能即用此机制，正文可写很全也不占日常上下文。
+
+### 🎛️ 画布交互
+- **左键框选**（可多选节点一起拖动）+ **中键（按下滚轮）平移** + **按住空格 + 左键平移**（照顾没鼠标中键的情况）；右键保留给上下文菜单。
+
+### 🖥️ 桌面 / 文档
+- 状态栏版本号改为**动态读真实版本**（不再写死，发版不会再漏改）。
+- 新增软件介绍页 `docs/presentation.html`，报告 / 演示型 HTML 设计规范落在 `docs/html-design.md`（含可贴进技能节点的精简稿）。
+
 ## [0.3.0] - 2026-06-17
 
 本期重点是**多会话流水线（L5）**——把多个本地会话串成流水线协作；外加一批可靠性加固，以及若干桌面信息一览（需重建生效）。
@@ -86,6 +101,7 @@ _（暂无）_
 
 > ℹ️ exe / 安装包未做代码签名，首次打开 Windows SmartScreen 会拦——点「更多信息 → 仍要运行」即可。
 
+[0.4.0]: https://github.com/RudAns/OblivionisAgent/releases/tag/v0.4.0
 [0.3.0]: https://github.com/RudAns/OblivionisAgent/releases/tag/v0.3.0
 [0.2.0]: https://github.com/RudAns/OblivionisAgent/releases/tag/v0.2.0
 [0.1.0]: https://github.com/RudAns/OblivionisAgent/releases/tag/v0.1.0
