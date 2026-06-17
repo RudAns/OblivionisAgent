@@ -520,6 +520,37 @@ fn b64_encode(data: &[u8]) -> String {
     s
 }
 
+/// 读成本台账 ~/.oblivionis/costs.jsonl 的最近若干条原始记录（聚合在前端用 summarizeCost 做，与引擎共用一份逻辑）。
+#[tauri::command]
+fn read_cost_entries() -> Result<serde_json::Value, String> {
+    let home = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".to_string());
+    let f = std::path::Path::new(&home).join(".oblivionis").join("costs.jsonl");
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    if let Ok(raw) = std::fs::read_to_string(&f) {
+        let lines: Vec<&str> = raw.lines().filter(|l| !l.trim().is_empty()).collect();
+        let start = lines.len().saturating_sub(8000);
+        for l in &lines[start..] {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(l) {
+                out.push(v);
+            }
+        }
+    }
+    Ok(serde_json::Value::Array(out))
+}
+
+/// 显示（或聚焦）独立的「成本看板」窗口（声明式常驻隐藏窗，同 mdviewer 模式；关=隐藏）。
+#[tauri::command]
+fn open_cost_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("cost") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        Ok(())
+    } else {
+        Err("成本看板窗口未就绪".into())
+    }
+}
+
 // ── 飞书 App Secret：存进 Windows 凭据管理器，绝不明文落 config.json ─────────────
 const KEYRING_SERVICE: &str = "OblivionisAgent";
 const KEYRING_ACCOUNT: &str = "feishu-app-secret";
@@ -597,7 +628,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
             set_feishu_secret, has_feishu_secret,
-            reports_dir, open_md_viewer, session_dirs, list_md_files, read_md, read_file_b64
+            reports_dir, open_md_viewer, session_dirs, list_md_files, read_md, read_file_b64,
+            read_cost_entries, open_cost_window
         ])
         .setup(|app| {
             if std::env::var("OBLIVIONIS_NO_SIDECAR").as_deref() != Ok("1") {
@@ -611,7 +643,7 @@ pub fn run() {
             // 文档查看器：点关闭=隐藏而非销毁，保持常驻、随时可再 show（同 mascot 思路）。
             // 不拦的话它会被销毁 → 下次 open_md_viewer get 不到 → "打不开"。
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "mdviewer" {
+                if window.label() == "mdviewer" || window.label() == "cost" {
                     api.prevent_close();
                     let _ = window.hide();
                     return;

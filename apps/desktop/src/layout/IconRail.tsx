@@ -73,7 +73,7 @@ export function IconRail({ canvasOpen, tab, settingsOpen, inboxBadge, onAction }
       <RailButton title={t("服务日志")} active={tab === "logs"} onClick={() => onAction("logs")}>
         <IconLogs />
       </RailButton>
-      <RailButton title={t("成本看板 · 各会话 token 花费")} active={tab === "cost"} onClick={() => onAction("cost")}>
+      <RailButton title={t("成本看板 · 各会话 token 花费（独立窗口）")} onClick={() => onAction("cost")}>
         <IconCost />
       </RailButton>
       <div className="railbar-spacer" />

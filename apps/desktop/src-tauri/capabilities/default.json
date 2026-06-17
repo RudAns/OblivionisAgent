@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "OblivionisAgent 默认能力集",
-  "windows": ["main", "mascot", "splashscreen", "mdviewer"],
+  "windows": ["main", "mascot", "splashscreen", "mdviewer", "cost"],
   "permissions": [
     "core:default",
     "core:window:allow-minimize",

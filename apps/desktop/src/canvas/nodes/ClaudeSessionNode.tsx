@@ -42,7 +42,8 @@ export function ClaudeSessionNode({ id, data, selected }: NodeProps) {
       label={d.label || t("Claude 会话")}
       selected={selected}
       status={d.status ?? "idle"}
-      hasSource={false}
+      // 右侧输出口：用于「多会话流水线」——把本会话产出连到下游会话继续加工（不接=纯终点，行为不变）
+      hasSource
     >
       {/* 人格连接口：Soul 节点拖到这里，作用于该会话的飞书回复(fork 脱敏分身)。
           终端(base)注入人格已评估为不需要，故只留单个口 */}

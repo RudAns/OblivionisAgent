@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App.js";
 import { Mascot } from "./Mascot.js";
 import { DocViewer } from "./panels/DocViewer.js";
+import { CostWindow } from "./panels/CostWindow.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { LangProvider } from "./i18n/index.js";
 import "./styles.css";
@@ -37,6 +38,10 @@ root.render(
     ) : label === "mdviewer" ? (
       <ErrorBoundary>
         <DocViewer />
+      </ErrorBoundary>
+    ) : label === "cost" ? (
+      <ErrorBoundary>
+        <CostWindow />
       </ErrorBoundary>
     ) : (
       <React.StrictMode>

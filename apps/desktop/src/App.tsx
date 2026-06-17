@@ -32,7 +32,6 @@ import {
   type SessionInfo,
   type Owner,
   type UsageSnapshot,
-  type CostSnapshot,
   type KnowledgeItem,
 } from "@oblivionis/shared";
 import { invoke } from "@tauri-apps/api/core";
@@ -47,7 +46,6 @@ import { TerminalsHost, type TermInfo } from "./panels/TerminalsHost.js";
 import { LogPanel, type LogLine } from "./panels/LogPanel.js";
 import { AuditPanel, type AuditItem } from "./panels/AuditPanel.js";
 import { InboxPanel } from "./panels/InboxPanel.js";
-import { CostPanel } from "./panels/CostPanel.js";
 import { FeishuPanel, FeishuStatusDot, type FeishuState } from "./panels/FeishuPanel.js";
 import { IconRail, type RailKey } from "./layout/IconRail.js";
 import { useI18n, useT, tStatic, type Lang } from "./i18n/index.js";
@@ -55,7 +53,7 @@ import { IconMoon, IconSun, IconMonitor } from "./layout/icons.js";
 import { SessionSidebar } from "./layout/SessionSidebar.js";
 import { StatusBar } from "./layout/StatusBar.js";
 
-type Tab = "transcript" | "terminal" | "audit" | "logs" | "inbox" | "cost";
+type Tab = "transcript" | "terminal" | "audit" | "logs" | "inbox";
 type ThemePref = "dark" | "light" | "system";
 
 const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">> = {
@@ -479,7 +477,6 @@ function Inner() {
   }, [settingsOpen]);
   const [bridgeUp, setBridgeUp] = useState(false); // 引擎 WS 连接状态（状态栏）
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
-  const [cost, setCost] = useState<CostSnapshot | null>(null); // 成本看板汇总
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
   const eventsRef = useRef<Record<string, ClaudeStreamEvent[]>>({});
   const [, forceRender] = useState(0);
@@ -621,9 +618,6 @@ function Inner() {
           break;
         case "usage-status":
           setUsage(msg);
-          break;
-        case "cost-summary":
-          setCost(msg);
           break;
         case "soul-path":
           // 人格文件已就绪（必要时刚播种了 starter）→ 用 VSCode 打开让用户编辑，保存即生效
@@ -1604,6 +1598,9 @@ function Inner() {
       case "mdviewer":
         void invoke("open_md_viewer"); // 文档查看器是独立窗口，可边看边继续用主窗
         break;
+      case "cost":
+        void invoke("open_cost_window"); // 成本看板独立窗口，避免和主窗「选会话/切终端」抢面板
+        break;
       default:
         setTab(key);
         setCanvasCollapsed(true); // 切到终端/转录/审计/日志/收件箱面板 → 退出节点视图
@@ -1672,14 +1669,12 @@ function Inner() {
     audit: t("审计 · 谁问了什么"),
     logs: t("服务日志"),
     inbox: t("知识收件箱") + (pendingKnowledge ? t(" · {0} 条待裁决", pendingKnowledge) : ""),
-    cost: t("成本看板"),
   };
   // 标题旁的一句功能说明（让"这个界面是干嘛的"一目了然）
   const TAB_DESC: Partial<Record<Tab, string>> = {
     audit: t("谁(主人/访客)问了什么、命中哪个会话——只读留痕，不可改"),
     inbox: t("群聊里沉淀出的规则 / 人格修订候选，等你采纳或忽略"),
     logs: t("引擎 / 服务运行日志，排障时看"),
-    cost: t("各会话的 token 花费：累计 / 今日 / 按会话 / 按天（数据来自每次运行的 cost_usd）"),
   };
   // 终端⇄转录是"同一个会话的两种视图"：粘滞切换，保持当前在看的会话
   const viewedSessionId = tab === "terminal" ? activeTerminalId : selectedIsClaude ? selected : null;
@@ -2318,7 +2313,6 @@ function Inner() {
               />
             )}
             {tab === "logs" && <LogPanel lines={logs} />}
-            {tab === "cost" && <CostPanel cost={cost} />}
             {tab === "inbox" && (
               <InboxPanel
                 items={knowledge}
