@@ -164,8 +164,11 @@ export class ClaudeSession {
       "--permission-mode",
       permissionMode,
       ...(append ? ["--append-system-prompt", append] : []),
-      // 飞书审批：挂上 MCP 审批工具，需要授权的工具调用会先发卡片问主人
-      ...(o.approval
+      // 飞书审批：挂上 MCP 审批工具，需要授权的工具调用会先发卡片问主人。
+      // ⚠ 仅当本回合不是 bypassPermissions 时才挂——主人(permissionMode=bypassPermissions)本就免审，
+      // 而 ask 规则 + permission-prompt-tool 会盖过 bypass，导致主人也被弹审批卡(且会卡 100s 等审批)。
+      // 审批卡是给「访客敏感操作」兜底的，主人不该审自己。
+      ...(o.approval && permissionMode !== "bypassPermissions"
         ? [
             "--mcp-config",
             join(homedir(), ".oblivionis", "perm-mcp.json"),
