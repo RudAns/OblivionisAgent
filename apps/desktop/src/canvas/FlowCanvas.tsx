@@ -7,6 +7,7 @@ import {
   MiniMap,
   ConnectionLineType,
   MarkerType,
+  SelectionMode,
   type Node,
   type Edge,
   type Connection,
@@ -163,6 +164,7 @@ export function FlowCanvas(props: Props) {
     <EdgeRuntimeContext.Provider value={runtimeValue}>
     <NodeActionContext.Provider value={actionValue}>
     <NodeMetaContext.Provider value={metaValue}>
+    {/* 左键拖=框选(多选节点可一起拖动)，中键(按下滚轮)拖=平移画布；右键留给上下文菜单，不给 pan */}
     <ReactFlow
       nodes={props.nodes}
       edges={props.edges}
@@ -184,6 +186,9 @@ export function FlowCanvas(props: Props) {
       connectionLineType={ConnectionLineType.Bezier}
       colorMode={props.theme}
       deleteKeyCode={["Delete"]}
+      panOnDrag={[1]}
+      selectionOnDrag
+      selectionMode={SelectionMode.Partial}
       fitView
       proOptions={{ hideAttribution: true }}
     >
