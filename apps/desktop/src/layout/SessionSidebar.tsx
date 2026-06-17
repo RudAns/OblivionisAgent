@@ -91,7 +91,7 @@ export function SessionSidebar({
               key={n.id}
               className={`rail-card ${activeTerminalId === n.id ? "active" : ""} ${
                 selected === n.id && activeTerminalId !== n.id ? "sel" : ""
-              } ${sweep} ${dragId === n.id ? "dragging" : ""} ${dropClass(n.id)}`}
+              } ${sweep} ${d.status === "error" ? "err" : ""} ${dragId === n.id ? "dragging" : ""} ${dropClass(n.id)}`}
               title={`${d.cwd || ""}\n${t("单击=查看此会话(保持当前 终端/转录 视图) · 拖动可排序")}`}
               {...itemProps(n.id, () => onOpenTerminal(n.id))}
             >

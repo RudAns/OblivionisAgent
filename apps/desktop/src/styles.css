@@ -1205,9 +1205,36 @@ button.primary {
 }
 .rail-dot.status-running {
   background: var(--st-run);
+  box-shadow:
+    0 0 0 2px rgba(255, 184, 77, 0.22),
+    0 0 8px var(--st-run);
+  animation: rail-dot-pulse 1.5s ease-in-out infinite;
 }
 .rail-dot.status-error {
   background: var(--st-err);
+  box-shadow:
+    0 0 0 2px rgba(255, 93, 93, 0.28),
+    0 0 9px var(--st-err);
+  animation: rail-dot-pulse 1.2s ease-in-out infinite;
+}
+@keyframes rail-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+/* 出错的会话卡：左侧红条，让「哪个会话挂了」一眼可见（错误状态没有扫光动画） */
+.rail-card.err {
+  box-shadow: inset 3px 0 0 var(--st-err);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-dot.status-running,
+  .rail-dot.status-error {
+    animation: none;
+  }
 }
 .rail-label {
   flex: 1;
@@ -1573,13 +1600,26 @@ button.primary {
 }
 .xnode.xn-error {
   border-color: #e5544b;
-  box-shadow:
-    0 0 0 1.5px rgba(229, 84, 75, 0.6),
-    0 0 14px rgba(229, 84, 75, 0.35),
-    0 7px 22px rgba(0, 0, 0, 0.5);
+  animation: xn-err-pulse 2s ease-in-out infinite;
+}
+@keyframes xn-err-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1.5px rgba(229, 84, 75, 0.6),
+      0 0 12px rgba(229, 84, 75, 0.3),
+      0 7px 22px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(229, 84, 75, 0.92),
+      0 0 20px rgba(229, 84, 75, 0.55),
+      0 7px 22px rgba(0, 0, 0, 0.5);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .xnode.xn-running {
+  .xnode.xn-running,
+  .xnode.xn-error {
     animation: none;
   }
 }

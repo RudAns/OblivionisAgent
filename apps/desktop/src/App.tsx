@@ -2734,6 +2734,10 @@ function Inspector({
           </div>
           {field(t("指令模板（{{body}}=请求体）"), d.prompt, "prompt")}
           {field(t("投递群 chatId"), d.chatId, "chatId")}
+          {field(t("HMAC 密钥（可选）"), d.secret, "secret")}
+          <div className="hint" style={{ marginBottom: 6 }}>
+            {t("HMAC 密钥设了就校验请求签名头（X-Hub-Signature-256 / X-Signature），防伪造回调；留空=不校验。每 token 限流 60 次/分钟。")}
+          </div>
           <div className="hint" style={{ marginBottom: 6 }}>
             {t("留空 = 发到 Home Chat。外网回调需自建隧道（cloudflared/ngrok 指向 8921）。")}
           </div>

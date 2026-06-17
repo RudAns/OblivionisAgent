@@ -501,4 +501,8 @@ export const EN: Record<string, string> = {
   "← 左侧选一个文档": "← Pick a document on the left",
   "用默认程序打开": "Open with default app",
   "已复制 ✓": "Copied ✓",
+  // Webhook HMAC
+  "HMAC 密钥（可选）": "HMAC secret (optional)",
+  "HMAC 密钥设了就校验请求签名头（X-Hub-Signature-256 / X-Signature），防伪造回调；留空=不校验。每 token 限流 60 次/分钟。":
+    "If set, requests must carry a valid signature header (X-Hub-Signature-256 / X-Signature, HMAC-SHA256) — blocks forged callbacks; empty = no check. Each token is rate-limited to 60/min.",
 };
