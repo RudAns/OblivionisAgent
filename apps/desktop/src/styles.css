@@ -3432,11 +3432,12 @@ button.primary {
 .sb-ctx-num b.hot {
   color: var(--st-err);
 }
-/* 堆叠条：固定开销 + 对话消息，剩下露出的轨道=空闲 */
+/* 堆叠条：固定开销 + 对话消息，剩下露出的轨道=空闲。
+   轨道用 --border(明暗主题都可见)，否则浅色主题里 --input=#fff 跟卡片白底糊一起看不清 */
 .sb-ctx-seg {
   display: flex;
   height: 8px;
-  background: var(--input);
+  background: var(--border);
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 8px;
@@ -3490,8 +3491,7 @@ button.primary {
   background: var(--st-ok);
 }
 .sb-ctx-leg .d-free {
-  background: var(--input);
-  border: 1px solid var(--border);
+  background: var(--border);
 }
 .sb-ctx-warn {
   font-size: 10.5px;
