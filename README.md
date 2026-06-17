@@ -14,7 +14,7 @@
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Claude](https://img.shields.io/badge/LLM-官方%20Claude%20CLI-D97757)
 ![License](https://img.shields.io/badge/License-GPL%20v3-3b82f6)
-![Version](https://img.shields.io/badge/version-0.1.0-2ea44f)
+![Version](https://img.shields.io/badge/version-0.2.0-2ea44f)
 [![CI](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml)
 
 [English](README.en.md) · **简体中文**
@@ -54,6 +54,11 @@
 | ![审计](docs/screenshots/shenji.png) | ![对话样例](docs/screenshots/feishu2.png) |
 | 谁(主人/访客)问了什么、命中哪个会话——只读不可改 | 触发 CI 打包 → 按所连人格口吻回帖、标注作答会话 |
 
+| 📖 文档查看器（独立窗口） |
+|:---:|
+| ![文档查看器](docs/screenshots/md_html_fileviewer.png) |
+| 按各会话项目目录把 `.md` / `.html` 排成目录树，右侧渲染（公共 `reports` 目录也在内）——可边看文档边继续操作主窗 |
+
 ---
 
 ## ✨ 亮点功能
@@ -67,6 +72,7 @@
 | 📊 **自助命令** | `/status` 状态卡（传输/模型/cwd/git 分支/会话数）· `/doctor` 自检 · `/retry` 重跑上一条 · `/continue` 续跑，仅主人可用 |
 | 📄 **飞书富交互** | 读 **docx / Wiki / Sheets / 多维表** 喂上下文；**读消息里的文件附件**（含被引用消息——文本类自动内联正文、其余落地让 Claude 用 Read 打开）；长回复自动转**飞书文件**回传（不撑爆气泡）；回复含 Markdown 表格 → 飞书**原生表格**；执行中**逐工具进度**流式卡（正在 运行命令 / 读取文件…） |
 | 🖥️ **内置交互终端** | 双击节点打开开发会话（完整历史回放）；多终端保活·拖拽排序、剪贴板贴图喂图、**字号缩放（设置滑杆 / Ctrl±）** |
+| 📖 **文档查看器** | 独立窗口浏览各会话项目目录下的 **`.md` / `.html`**：按**目录树**归置、Markdown 渲染（含原始 HTML / 本地图片）、HTML 沙箱原样显示；公共 `reports` 目录也并入——**可边看文档边继续操作主窗** |
 | 🎭 **赋能节点（人格 / 技能 / 子代理）** | SOUL.md（性格）· SKILL.md（操作规范）· Claude Code 原生 subagent（独立上下文做重活）都做成可连线节点，连到会话赋能口即生效，一格可共享多会话；改完点「**重锚**」一键刷新到所连会话（留记忆） |
 | 🌐 **中英双语界面** | 设置里一键切换 中文 / English；技术标识符（sessionId/cwd 等）保持原样，漏译自动回退中文 |
 | ⏰ **定时 / Webhook / 群记忆 / 知识收件箱** | 自然语言建定时任务、外部触发、按群积累记忆、问答沉淀规则待裁决 |

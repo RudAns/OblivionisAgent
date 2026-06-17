@@ -14,7 +14,7 @@ Wire nodes on a canvas to orchestrate local claude sessions: multi-session routi
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Claude](https://img.shields.io/badge/LLM-Official%20Claude%20CLI-D97757)
 ![License](https://img.shields.io/badge/License-GPL%20v3-3b82f6)
-![Version](https://img.shields.io/badge/version-0.1.0-2ea44f)
+![Version](https://img.shields.io/badge/version-0.2.0-2ea44f)
 [![CI](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml)
 
 **English** · [简体中文](README.md)
@@ -55,6 +55,11 @@ Wire nodes on a canvas to orchestrate local claude sessions: multi-session routi
 | ![audit](docs/screenshots/shenji.png) | ![conversation](docs/screenshots/feishu2.png) |
 | Who (owner/guest) asked what, which session handled it — read-only | @bot to package → reply in the connected persona's voice, with the answering session labeled |
 
+| 📖 Document viewer (separate window) |
+|:---:|
+| ![doc viewer](docs/screenshots/md_html_fileviewer.png) |
+| `.md` / `.html` across each session's project dir as a tree, rendered on the right (the shared `reports` dir is included too) — read docs while you keep driving the main window |
+
 ---
 
 ## ✨ Highlights
@@ -68,6 +73,7 @@ Wire nodes on a canvas to orchestrate local claude sessions: multi-session routi
 | 📊 **Self-serve commands** | `/status` (transport / model / cwd / git branch / session count) · `/doctor` self-check · `/retry` re-run the last one · `/continue` resume — owner only |
 | 📄 **Rich Feishu interactions** | Read **docx / Wiki / Sheets / Bitable** for context; **read file attachments in messages** (including quoted messages — text files are inlined automatically, others are saved locally for Claude to open with Read); long replies are auto-converted to a **Feishu file** (so bubbles don't blow up); replies with Markdown tables → **native Feishu tables**; **per-tool progress** streaming card during execution (running command / reading file…) |
 | 🖥️ **Built-in interactive terminal** | Double-click a node to open the dev session (full history replay); multi-terminal keep-alive · drag to reorder, paste images from the clipboard as input, **font scaling (settings slider / Ctrl±)** |
+| 📖 **Document viewer** | A separate window to browse **`.md` / `.html`** under each session's project dir: organized as a **tree**, Markdown rendered (incl. raw HTML / local images), HTML shown as-is in a sandbox; the shared `reports` dir is folded in — **read docs while you keep using the main window** |
 | 🎭 **Capability nodes (persona / skill / subagent)** | SOUL.md (personality) · SKILL.md (operating rules) · native Claude Code subagent (heavy work in an isolated context) are all wireable nodes; connect to a session's capability port to take effect, one node shareable across sessions; after editing, tap **"Re-anchor"** to refresh into the connected sessions (keeps memory) |
 | 🌐 **Bilingual UI (中 / EN)** | One-tap switch between 中文 / English in settings; technical identifiers (sessionId / cwd, etc.) stay as-is, missing translations fall back to Chinese |
 | ⏰ **Cron / Webhook / group memory / knowledge inbox** | Create cron jobs in natural language, external triggers, per-group accumulated memory, Q&A distilled into rules pending judgment |

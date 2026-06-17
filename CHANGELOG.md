@@ -2,6 +2,15 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。日期格式 YYYY-MM-DD。
 
+## [0.2.0] - 2026-06-17
+
+### 🖥️ 桌面体验
+- **文档查看器（独立窗口）**：浏览各「Claude 会话」工作目录下的 `.md` / `.html`，左侧栏 📖 一键唤起。
+  - 左侧把各会话工作目录**去重** + 公共 `~/.oblivionis/reports` 目录整理成切换列表（多个会话同目录合并成一条）。
+  - 选中目录后把其下文档排成**只含 md / html 的目录树**——已过滤 Unity / 构建 / VCS 等重目录，限深度与数量，**百万文件不卡死**。
+  - 右侧 **Markdown 渲染**（remark-gfm 表格 / 任务列表 + 原始 HTML + 本地图片）、**`.html` 沙箱内嵌原样显示**。
+  - **独立窗口（非模态）**——可边看文档边继续操作主窗；带刷新按钮（有新文档时重扫）。
+
 ## [0.1.0] - 2026-06-16
 
 首个公开版本。把飞书群聊接入本地 Claude Code 会话的 Windows 桌面工具。
@@ -49,4 +58,5 @@
 
 > ℹ️ exe / 安装包未做代码签名，首次打开 Windows SmartScreen 会拦——点「更多信息 → 仍要运行」即可。
 
+[0.2.0]: https://github.com/RudAns/OblivionisAgent/releases/tag/v0.2.0
 [0.1.0]: https://github.com/RudAns/OblivionisAgent/releases/tag/v0.1.0
