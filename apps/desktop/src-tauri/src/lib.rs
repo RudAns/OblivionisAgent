@@ -78,6 +78,24 @@ fn session_exists(cwd: &str, sid: &str) -> bool {
     false
 }
 
+/// 读文件的一段字节窗口(从 start 起、最多 max 字节)，按 UTF-8 lossy 转字符串。
+/// transcript 只追加：取末尾窗口就能拿到最后一回合，不必把几十 MB 整个读进内存。
+fn read_window(path: &std::path::Path, start: u64, max: u64) -> String {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return String::new(),
+    };
+    if start > 0 && f.seek(SeekFrom::Start(start)).is_err() {
+        return String::new();
+    }
+    let mut buf = Vec::new();
+    if f.take(max).read_to_end(&mut buf).is_err() {
+        return String::new();
+    }
+    String::from_utf8_lossy(&buf).into_owned()
+}
+
 /// 估算某会话当前上下文体量：读它的 transcript 最后一回合的 usage
 /// (input + cache_read + cache_creation = 这一轮加载进去的上下文)。纯读文件、不调模型、不耗 token。
 /// `since_mtime`：前端上次拿到的文件修改时间(ms)。一致就直接返回 {unchanged:true} 不读文件——
@@ -133,10 +151,6 @@ fn context_estimate(
             return Ok(serde_json::json!({ "unchanged": true, "mtime": mtime }));
         }
     }
-    let raw = match std::fs::read_to_string(&path) {
-        Ok(s) => s,
-        Err(_) => return Ok(none),
-    };
     // 小工具：从一行 JSON 里取 message.usage 的上下文体量(input+cache_read+cache_creation)
     let usage_tokens = |line: &str| -> Option<(u64, u64, String)> {
         let v = serde_json::from_str::<serde_json::Value>(line).ok()?;
@@ -152,32 +166,40 @@ fn context_estimate(
             .to_string();
         Some((ctx, out, model))
     };
-    // 从后往前找最后一条带 message.usage 的(assistant 回合)= 当前上下文体量
-    let mut ctx_tokens = 0u64;
-    let mut out_tokens = 0u64;
-    let mut model = String::new();
-    for line in raw.lines().rev() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
+    // 从一段文本里从后往前找最后一条带 usage 的(assistant 回合)
+    let find_last = |text: &str| -> Option<(u64, u64, String)> {
+        for line in text.lines().rev() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            if let Some(t) = usage_tokens(line) {
+                return Some(t);
+            }
         }
-        if let Some((c, o, m)) = usage_tokens(line) {
-            ctx_tokens = c;
-            out_tokens = o;
-            model = m;
-            break;
-        }
-    }
+        None
+    };
+    // 当前上下文=最后一回合：只读末尾窗口(512KB)，几十 MB 的 transcript 不整读、不进内存。
+    // 极端情况(最后一行比窗口还大)才退回整读兜底。
+    const WIN_TAIL: u64 = 512 * 1024;
+    const WIN_HEAD: u64 = 256 * 1024;
+    let flen = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let tail = read_window(&path, flen.saturating_sub(WIN_TAIL), WIN_TAIL);
+    let (ctx_tokens, out_tokens, model) = match find_last(&tail) {
+        Some(t) => t,
+        None => find_last(&std::fs::read_to_string(&path).unwrap_or_default()).unwrap_or((0, 0, String::new())),
+    };
     if ctx_tokens == 0 {
         // 文件存在但还没有带 usage 的回合：回传真实 mtime，避免下次轮询又白读一遍
         return Ok(
             serde_json::json!({ "ctxTokens": 0, "outTokens": 0, "model": serde_json::Value::Null, "baseTokens": 0, "mtime": mtime }),
         );
     }
-    // 从前往后找第一条带 usage 的 = 基线开销(系统提示+工具+记忆+技能+首条消息)，
-    // 用来把当前上下文粗分成「固定开销」vs「对话消息」。压缩(/compact)后首行不变，故基线稳定。
+    // 基线开销=首条带 usage 的回合(系统提示+工具+记忆+技能+首条消息)，只读开头窗口(256KB)即可，
+    // 首回合永远在文件最前面。用来把当前上下文粗分成「固定开销」vs「对话消息」，/compact 后首行不变故稳定。
+    let head = read_window(&path, 0, WIN_HEAD);
     let mut base_tokens = 0u64;
-    for line in raw.lines() {
+    for line in head.lines() {
         let line = line.trim();
         if line.is_empty() {
             continue;

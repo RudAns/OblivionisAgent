@@ -1616,9 +1616,9 @@ function Inner() {
   useEffect(() => {
     ctxMtimeRef.current = null; // 换终端 → 强制重读一次
     fetchCtx();
-    // 轮询：每 10s 只问一次"文件变了吗"(后端一次 stat、几微秒)。真的变了(完成一回合 / /compact)
-    // 才读 transcript；空闲时几乎零开销。捕捉压缩后体量骤降、对话继续增长等后台变化。
-    const id = setInterval(fetchCtx, 10000);
+    // 轮询很慢(3 分钟)：常驻小 % 只需"扫一眼大致对"，要精确就悬停即时重读。
+    // 每次也只问一次"文件变了吗"(后端一次 stat、几微秒)，变了才读 transcript；空闲几乎零开销。
+    const id = setInterval(fetchCtx, 180000);
     return () => clearInterval(id);
   }, [activeTerminalId, fetchCtx]);
   const selectedEdgeObj = edges.find((e) => e.id === selectedEdge) ?? null;
