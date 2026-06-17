@@ -418,12 +418,13 @@ fn open_path(path: String, base: String) -> Result<(), String> {
     Ok(())
 }
 
-/// 读 Claude 自己的活动统计缓存(~/.claude/stats-cache.json)给 GUI 顶部「周活跃」用。
-/// 纯读本地 ~19KB JSON、不耗 token。只回传最近 31 天日活 + 累计，周指标/连续天数在前端算。
+/// 读 Claude 自己的活动统计缓存(~/.claude/stats-cache.json)给 GUI 顶部活动小标用。
+/// 纯读本地 ~19KB JSON、不耗 token。回传全量日活 + 模型用量 + 最长会话 + 首次会话日，
+/// 常用模型/总 token/活跃天/连续天/最活跃日等都在前端算(有 Date)。
 /// 注：缓存只到「昨天」(lastComputedDate)，今天的活动 CLI 是实时算的、不在缓存里——前端标注一下即可。
 #[tauri::command]
 fn claude_stats() -> Result<serde_json::Value, String> {
-    let empty = serde_json::json!({ "dailyActivity": [], "totalSessions": 0, "totalMessages": 0, "lastComputedDate": serde_json::Value::Null });
+    let empty = serde_json::json!({ "dailyActivity": [], "modelUsage": {}, "totalSessions": 0, "totalMessages": 0, "longestSessionMs": 0, "firstSessionDate": serde_json::Value::Null, "lastComputedDate": serde_json::Value::Null });
     let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
     if home.is_empty() {
         return Ok(empty);
@@ -437,13 +438,20 @@ fn claude_stats() -> Result<serde_json::Value, String> {
         Ok(v) => v,
         Err(_) => return Ok(empty),
     };
+    // 全量日活(缓存本就按天 bounded，几十~一两百条、几 KB)：前端拿去画本月日历热力图 + 算活跃天/连续天/最活跃日。
     let da = v.get("dailyActivity").and_then(|x| x.as_array()).cloned().unwrap_or_default();
-    // 只取最近 31 天(够画周趋势+算连续天数)，别把全量历史塞过去
-    let tail: Vec<serde_json::Value> = if da.len() > 31 { da[da.len() - 31..].to_vec() } else { da };
+    let longest_ms = v
+        .get("longestSession")
+        .and_then(|s| s.get("duration"))
+        .and_then(|x| x.as_u64())
+        .unwrap_or(0);
     Ok(serde_json::json!({
-        "dailyActivity": tail,
+        "dailyActivity": da,
+        "modelUsage": v.get("modelUsage").cloned().unwrap_or_else(|| serde_json::json!({})),
         "totalSessions": v.get("totalSessions").and_then(|x| x.as_u64()).unwrap_or(0),
         "totalMessages": v.get("totalMessages").and_then(|x| x.as_u64()).unwrap_or(0),
+        "longestSessionMs": longest_ms,
+        "firstSessionDate": v.get("firstSessionDate").cloned().unwrap_or(serde_json::Value::Null),
         "lastComputedDate": v.get("lastComputedDate").cloned().unwrap_or(serde_json::Value::Null),
     }))
 }

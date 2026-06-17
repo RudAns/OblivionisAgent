@@ -639,15 +639,66 @@ button.primary {
   width: 42px;
   height: 16px;
 }
-.glance-pop-wide {
-  width: 332px;
+.glance-pop-stats {
+  width: 320px;
 }
-.glance-spark30 {
+/* 本月日历热力图（参考 GitHub contribution graph 配色） */
+.cal-head {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin: 2px 0 6px;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 15px);
+  grid-auto-rows: 15px;
+  gap: 4px;
+  justify-content: start;
+  margin-bottom: 6px;
+}
+.cal-cell {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  background: var(--border);
+}
+.cal-cell.empty {
+  background: transparent;
+}
+.cal-cell.today {
+  outline: 1.5px solid var(--text);
+  outline-offset: -1px;
+}
+.cal-l0 {
+  background: var(--border);
+}
+.cal-l1 {
+  background: #f3d2c4;
+}
+.cal-l2 {
+  background: #eaa888;
+}
+.cal-l3 {
+  background: #e27d56;
+}
+.cal-l4 {
+  background: #d4502b;
+}
+.cal-legend {
   display: flex;
-  align-items: flex-end;
-  gap: 1px;
-  height: 46px;
-  margin: 8px 0 3px;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 9px;
+}
+.cal-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+.stats-grid {
+  gap: 7px 14px;
 }
 /* 左上角品牌名悬停框 */
 .brand-wrap {

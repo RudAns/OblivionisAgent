@@ -7,10 +7,19 @@ interface DailyActivity {
   sessionCount: number;
   toolCallCount: number;
 }
+interface ModelUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+}
 export interface StatsData {
   dailyActivity: DailyActivity[];
+  modelUsage: Record<string, ModelUsage>;
   totalSessions: number;
   totalMessages: number;
+  longestSessionMs: number;
+  firstSessionDate: string | null;
   lastComputedDate: string | null;
 }
 export interface StatusData {
@@ -30,6 +39,25 @@ function fmtN(n: number): string {
   if (n >= 1000) return (n / 1000).toFixed(n >= 100_000 ? 0 : 1) + "k";
   return String(n);
 }
+/** token 量用小写 m/k（对齐 Claude /stats 的 "77.0m"） */
+function fmtTok(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "m";
+  if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+  return String(n);
+}
+/** 时长 ms → "56d 21h 28m" */
+function fmtDur(ms: number): string {
+  if (!ms) return "—";
+  const m = Math.floor(ms / 60000);
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  const mm = m % 60;
+  const p: string[] = [];
+  if (d) p.push(`${d}d`);
+  if (h) p.push(`${h}h`);
+  if (mm || !p.length) p.push(`${mm}m`);
+  return p.join(" ");
+}
 
 /** 本地日期 → YYYY-MM-DD（和 stats-cache 的 toDateString 一致，用本地时区） */
 function ymd(d: Date): string {
@@ -38,13 +66,20 @@ function ymd(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
 /** epoch ms → "YYYY-MM-DD HH:mm"（本地） */
 function fmtBuild(ms: number): string {
   if (!ms) return "—";
   const d = new Date(ms);
   const p = (x: number) => String(x).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** "claude-opus-4-8" → "Opus 4.8" */
+function prettyModel(id: string): string {
+  const m = /claude-(opus|sonnet|haiku|fable)-(\d+)-?(\d+)?/i.exec(id || "");
+  if (!m) return id || "—";
+  const fam = m[1] ?? "";
+  return `${fam.charAt(0).toUpperCase() + fam.slice(1)} ${m[2] ?? ""}${m[3] ? "." + m[3] : ""}`;
 }
 
 /** "claude_max" + "default_claude_max_20x" → "Max 20x" */
@@ -62,7 +97,7 @@ function prettyPlan(org: string, tier: string): string {
   return mult ? `${name} ${mult}x` : name;
 }
 
-/** 建 N 天序列 [today-(n-1) .. today]，每天的消息数(没数据=0) */
+/** 建 N 天序列 [today-(n-1) .. today]，每天的消息数(没数据=0)——给 chip 的迷你趋势用 */
 function buildSeries(now: Date, n: number, by: Map<string, DailyActivity>): { date: string; v: number }[] {
   const out: { date: string; v: number }[] = [];
   for (let i = n - 1; i >= 0; i--) {
@@ -74,81 +109,163 @@ function buildSeries(now: Date, n: number, by: Map<string, DailyActivity>): { da
   return out;
 }
 
-/** 一排迷你柱状图，最后一根(今天)由 CSS :last-child 高亮 */
-function Bars({ data, cls }: { data: { date: string; v: number }[]; cls: string }) {
-  const max = Math.max(1, ...data.map((d) => d.v));
-  return (
-    <span className={cls}>
-      {data.map((s) => (
-        <span
-          key={s.date}
-          className="glance-bar"
-          style={{ height: `${Math.max(6, Math.round((s.v / max) * 100))}%` }}
-          title={`${s.date.slice(5)} · ${fmtN(s.v)}`}
-        />
-      ))}
-    </span>
-  );
-}
-
-/** 顶部「活动趋势」小标：chip 本身就是近 7 天迷你趋势；悬停看 30 天用量看板 + 本周统计。读本地缓存、不耗 token。 */
+/** 顶部「活动趋势」小标：chip 本身=近 7 天迷你趋势(图标)；悬停=本月日历热力图 + 全量统计。读本地、不耗 token。 */
 export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () => void }) {
   const t = useT();
   const da = stats.dailyActivity ?? [];
   const by = new Map(da.map((d): [string, DailyActivity] => [d.date, d]));
-  const active = new Set(da.map((d) => d.date));
   const now = new Date();
   const spark7 = buildSeries(now, 7, by);
-  const days30 = buildSeries(now, 30, by);
 
-  // 本周：从本周一(含)到今天。缓存只到昨天，今天的活动不在里面——所以周三看到的多半是周一+周二。
-  const dow = (now.getDay() + 6) % 7; // 周一=0
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - dow);
-  const wStart = ymd(weekStart);
-  const inWeek = da.filter((d) => d.date >= wStart);
-  const weekDays = inWeek.length;
-  const weekMsgs = inWeek.reduce((s, d) => s + d.messageCount, 0);
-  const weekSessions = inWeek.reduce((s, d) => s + d.sessionCount, 0);
+  // ── 全量统计（对齐 Claude /stats Overview）──
+  let favModel = "";
+  let favIO = -1;
+  let totalTokens = 0;
+  for (const [m, u] of Object.entries(stats.modelUsage ?? {})) {
+    const io = (u.inputTokens ?? 0) + (u.outputTokens ?? 0);
+    totalTokens += io;
+    if (io > favIO) {
+      favIO = io;
+      favModel = m;
+    }
+  }
+  const activeDays = da.length;
+  const first = stats.firstSessionDate ? new Date(stats.firstSessionDate) : null;
+  const lastStr = stats.lastComputedDate || (da.length ? da[da.length - 1]!.date : null);
+  const last = lastStr ? new Date(`${lastStr}T00:00:00`) : null;
+  const totalDays =
+    first && last
+      ? Math.max(1, Math.floor((last.getTime() - new Date(`${ymd(first)}T00:00:00`).getTime()) / 86400000) + 1)
+      : 0;
 
-  // 连续活跃天数：从最近一个有活动的日子往回数
-  let streak = 0;
-  if (da.length) {
-    const last = da[da.length - 1]!.date;
-    const cur = new Date(`${last}T00:00:00`);
-    while (active.has(ymd(cur))) {
-      streak++;
+  // 连续天数（最长 + 当前）
+  const dateSet = new Set(da.map((d) => d.date));
+  const sorted = [...dateSet].sort();
+  let longestStreak = 0;
+  let run = 0;
+  let prev: string | null = null;
+  for (const ds of sorted) {
+    if (prev) {
+      const diff = Math.round((new Date(`${ds}T00:00:00`).getTime() - new Date(`${prev}T00:00:00`).getTime()) / 86400000);
+      run = diff === 1 ? run + 1 : 1;
+    } else run = 1;
+    if (run > longestStreak) longestStreak = run;
+    prev = ds;
+  }
+  let currentStreak = 0;
+  if (sorted.length) {
+    const cur = new Date(`${sorted[sorted.length - 1]!}T00:00:00`);
+    while (dateSet.has(ymd(cur))) {
+      currentStreak++;
       cur.setDate(cur.getDate() - 1);
     }
   }
+
+  // 最活跃日（消息最多）
+  let peakDate: string | null = null;
+  let peakV = -1;
+  for (const d of da) {
+    if (d.messageCount > peakV) {
+      peakV = d.messageCount;
+      peakDate = d.date;
+    }
+  }
+
+  // ── 本月日历热力图 ──
+  const y = now.getFullYear();
+  const mo = now.getMonth();
+  const dim = new Date(y, mo + 1, 0).getDate();
+  const lead = (new Date(y, mo, 1).getDay() + 6) % 7; // 周一=0
+  let monthMax = 1;
+  for (let day = 1; day <= dim; day++) {
+    monthMax = Math.max(monthMax, by.get(ymd(new Date(y, mo, day)))?.messageCount ?? 0);
+  }
+  const cells: ({ day: number; v: number; lvl: number; today: boolean } | null)[] = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let day = 1; day <= dim; day++) {
+    const v = by.get(ymd(new Date(y, mo, day)))?.messageCount ?? 0;
+    const lvl = v <= 0 ? 0 : Math.min(4, Math.ceil((v / monthMax) * 4));
+    cells.push({ day, v, lvl, today: day === now.getDate() });
+  }
+  const monthLabel = `${y}-${String(mo + 1).padStart(2, "0")}`;
 
   return (
     <span
       className="glance-chip stats-chip"
       onMouseEnter={() => onHover?.()}
-      title={t("近 7 天活动趋势 · 悬停看 30 天用量")}
+      title={t("近 7 天活动趋势 · 悬停看本月用量与统计")}
     >
-      <Bars data={spark7} cls="chip-spark" />
-      <span className="glance-pop glance-pop-wide">
+      <span className="chip-spark">
+        {spark7.map((s) => (
+          <span
+            key={s.date}
+            className="glance-bar"
+            style={{ height: `${Math.max(8, Math.round((s.v / Math.max(1, ...spark7.map((x) => x.v))) * 100))}%` }}
+            title={`${s.date.slice(5)} · ${fmtN(s.v)}`}
+          />
+        ))}
+      </span>
+      <span className="glance-pop glance-pop-stats">
         <div className="glance-h">{t("活动用量（读本地缓存，不耗 token）")}</div>
-        <Bars data={days30} cls="glance-spark30" />
-        <div className="glance-sub glance-spark-lbl">{t("近 30 天每日消息（今天高亮）")}</div>
-        <div className="glance-grid">
+        <div className="cal-head">
+          {t("本月")} · {monthLabel}
+        </div>
+        <div className="cal-grid">
+          {cells.map((c, i) =>
+            c ? (
+              <span
+                key={i}
+                className={`cal-cell cal-l${c.lvl}${c.today ? " today" : ""}`}
+                title={`${monthLabel}-${String(c.day).padStart(2, "0")} · ${fmtN(c.v)}`}
+              />
+            ) : (
+              <span key={i} className="cal-cell empty" />
+            ),
+          )}
+        </div>
+        <div className="cal-legend">
+          {t("少")}
+          <i className="cal-l0" />
+          <i className="cal-l1" />
+          <i className="cal-l2" />
+          <i className="cal-l3" />
+          <i className="cal-l4" />
+          {t("多")}
+        </div>
+        <div className="glance-grid stats-grid">
           <div>
-            <i>{t("本周消息")}</i>
-            <b>{fmtN(weekMsgs)}</b>
+            <i>{t("常用模型")}</i>
+            <b>{favModel ? prettyModel(favModel) : "—"}</b>
           </div>
           <div>
-            <i>{t("本周会话")}</i>
-            <b>{fmtN(weekSessions)}</b>
+            <i>{t("总 token")}</i>
+            <b>{fmtTok(totalTokens)}</b>
           </div>
           <div>
-            <i>{t("本周活跃")}</i>
-            <b>{t("{0} 天", weekDays)}</b>
+            <i>{t("会话数")}</i>
+            <b>{fmtN(stats.totalSessions)}</b>
           </div>
           <div>
-            <i>{t("连续活跃")}</i>
-            <b>🔥 {t("{0} 天", streak)}</b>
+            <i>{t("最长会话")}</i>
+            <b>{fmtDur(stats.longestSessionMs)}</b>
+          </div>
+          <div>
+            <i>{t("活跃天数")}</i>
+            <b>
+              {activeDays}/{totalDays}
+            </b>
+          </div>
+          <div>
+            <i>{t("最长连续")}</i>
+            <b>{t("{0} 天", longestStreak)}</b>
+          </div>
+          <div>
+            <i>{t("最活跃")}</i>
+            <b>{peakDate ? peakDate.slice(5) : "—"}</b>
+          </div>
+          <div>
+            <i>{t("当前连续")}</i>
+            <b>🔥 {t("{0} 天", currentStreak)}</b>
           </div>
         </div>
         <div className="glance-sub">
