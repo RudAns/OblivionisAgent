@@ -42,6 +42,8 @@ export interface ServerDeps {
   getTranscripts: () => Record<string, import("@oblivionis/shared").ClaudeStreamEvent[]>;
   /** 最近一次订阅用量快照（连接时下发） */
   getUsage: () => import("@oblivionis/shared").UsageSnapshot | null;
+  /** 成本看板汇总（连接时下发） */
+  getCost: () => import("@oblivionis/shared").CostSnapshot;
   /** 确保节点人格文件存在（无则播种），返回路径 */
   ensureSoul: (nodeId: string) => { path: string; created: boolean };
   /** 确保技能节点文件(SKILL.md)存在（无则播种），返回路径 */
@@ -84,6 +86,7 @@ export class ControlServer {
       this.send(ws, { type: "transcript-history", histories: this.deps.getTranscripts() });
       const u = this.deps.getUsage();
       if (u) this.send(ws, { type: "usage-status", ...u });
+      this.send(ws, { type: "cost-summary", ...this.deps.getCost() });
       this.send(ws, { type: "knowledge-inbox", items: this.deps.knowledge.all() });
       ws.on("message", (raw) => this.onClientMessage(raw.toString(), ws));
       ws.on("close", () => this.clients.delete(ws));

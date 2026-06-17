@@ -23,6 +23,12 @@ export class SessionManager {
     private store: ConfigStore,
     private hub: Hub,
     private log: Logger,
+    /** 一次运行完成时回报花费（成本看板记账用），可选 */
+    private onCost?: (
+      nodeId: string,
+      label: string,
+      rec: { cost: number; turns: number; durationMs: number; ctxTokens: number; outTokens: number; model?: string },
+    ) => void,
   ) {}
 
   /**
@@ -131,6 +137,7 @@ export class SessionManager {
         sid = id;
         persist(id);
       },
+      onCost: (rec) => this.onCost?.(node.id, node.label, rec),
       log: (level, msg) => this.log[level](msg),
     });
     this.sessions.set(key, session);

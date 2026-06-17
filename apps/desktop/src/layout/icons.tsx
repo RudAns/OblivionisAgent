@@ -90,6 +90,16 @@ export function IconInbox({ size }: IconProps) {
   );
 }
 
+/** 成本看板（柱状图 + $） */
+export function IconCost({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M4 20.5h16M6.5 20V12M11.5 20V7M16.5 20v-5" />
+      <path d="M19.5 6.5c0-.9-.9-1.5-2-1.5s-2 .6-2 1.4.8 1.1 2 1.3 2 .6 2 1.4-1 1.4-2 1.4-2-.6-2-1.5M17.5 3.6V5M17.5 11v1.4" opacity="0.9" />
+    </svg>
+  );
+}
+
 /** Markdown 文档查看器 */
 export function IconMarkdown({ size }: IconProps) {
   return (

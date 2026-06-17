@@ -18,6 +18,7 @@ import { feishuSecret } from "./secret-store.js";
 import { classifyIntent } from "./claude/classify-intent.js";
 import { TranscriptStore } from "./transcript-store.js";
 import { UsageMonitor } from "./usage-monitor.js";
+import { CostLedger } from "./cost-ledger.js";
 import { ensureSoul, resolveSessionSoul } from "./soul-store.js";
 import { ensureSkill, resolveSessionSkills } from "./skill-store.js";
 import { ensureSubagent, resolveSessionSubagents } from "./subagent-store.js";
@@ -103,7 +104,11 @@ async function main() {
   // 迁移兜底：env 里没有密钥(老外壳/手动起 bridge)但旧 config.json 还残留明文时，先用上它。
   // 正常路径是 Tauri 外壳已从凭据管理器读出经 env 注入；store.save 之后会把盘上的明文清掉。
   feishuSecret.seedIfEmpty(store.get().feishu.appSecret);
-  const sessions = new SessionManager(store, hub, log);
+  const costLedger = new CostLedger();
+  const sessions = new SessionManager(store, hub, log, (nodeId, label, rec) => {
+    costLedger.record({ ts: Date.now(), nodeId, label, ...rec });
+    hub.broadcast({ type: "cost-summary", ...costLedger.summary() });
+  });
   const ptys = new PtyManager(store, hub, log);
   // 转录持久化：旁路监听 Hub 上的 session-event，落盘 ~/.oblivionis/transcripts（保留约 3 天）
   const transcripts = new TranscriptStore();
@@ -787,6 +792,7 @@ async function main() {
     getAudit: () => readAudit(),
     getTranscripts: () => transcripts.histories(),
     getUsage: () => usage.getLast(),
+    getCost: () => costLedger.summary(),
     ensureSoul: (nodeId) => ensureSoul(nodeId),
     ensureSkill: (nodeId) => ensureSkill(nodeId),
     ensureSubagent: (nodeId) => ensureSubagent(nodeId),

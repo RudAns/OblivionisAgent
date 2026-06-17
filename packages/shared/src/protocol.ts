@@ -165,6 +165,8 @@ export type BridgeMessage =
   | { type: "transcript-history"; histories: Record<string, ClaudeStreamEvent[]> }
   /** 订阅用量（5h/周窗口，定时轮询 + 连接时下发） */
   | ({ type: "usage-status" } & UsageSnapshot)
+  /** 成本看板汇总（每次会话运行记账后 + 连接时下发） */
+  | ({ type: "cost-summary" } & CostSnapshot)
   /** 人格文件路径（响应 ensure-soul；created=本次播种了 starter） */
   | { type: "soul-path"; nodeId: string; path: string; created: boolean }
   /** 群记忆文件路径（响应 ensure-group-memory），GUI 用 VSCode 打开 */
@@ -173,6 +175,26 @@ export type BridgeMessage =
   | { type: "knowledge-inbox"; items: KnowledgeItem[] }
   /** 工具权限审批决定（定向发给发起请求的 MCP 连接） */
   | { type: "permission-response"; requestId: string; behavior: "allow" | "deny"; message?: string };
+
+/** 成本看板汇总：累计 / 今日花费、按会话节点与按天的聚合、最近若干条明细。 */
+export interface CostSnapshot {
+  total: number; // 累计花费 USD
+  today: number; // 今日花费 USD
+  runs: number; // 累计运行次数
+  perNode: { nodeId: string; label: string; cost: number; runs: number; lastTs: number }[];
+  daily: { day: string; cost: number; runs: number }[]; // 近 14 天
+  recent: {
+    ts: number;
+    nodeId: string;
+    label: string;
+    model?: string;
+    cost: number;
+    turns: number;
+    durationMs: number;
+    ctxTokens: number;
+    outTokens: number;
+  }[];
+}
 
 export type FeishuStatus = "disconnected" | "connecting" | "connected" | "error" | "mock";
 

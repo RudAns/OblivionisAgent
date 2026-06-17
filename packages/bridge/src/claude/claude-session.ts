@@ -63,6 +63,8 @@ export interface ClaudeSessionOptions {
   onStatus: (s: SessionStatus) => void;
   /** 发现/分配会话 id 时回调（fork 出新 id 或自动生成时），用于持久化到配置 */
   onSessionId: (id: string) => void;
+  /** 一次运行完成时回报花费/用量（成本看板记账用） */
+  onCost?: (rec: { cost: number; turns: number; durationMs: number; ctxTokens: number; outTokens: number; model?: string }) => void;
   log: (level: "info" | "warn" | "error", msg: string) => void;
 }
 
@@ -295,6 +297,14 @@ export class ClaudeSession {
               "info",
               `💰 [${o.label ?? o.nodeId}] $${cost.toFixed(4)} · 上下文 ${fmtTokens(ctx)}(缓存读 ${fmtTokens(cr)}/新建 ${fmtTokens(cc)}/直输 ${fmtTokens(cin)}) · 输出 ${fmtTokens(out)} · ${turns}轮`,
             );
+            o.onCost?.({
+              cost,
+              turns,
+              durationMs: (evt as { duration_ms?: number }).duration_ms ?? 0,
+              ctxTokens: ctx,
+              outTokens: out,
+              model: o.model,
+            });
           }
         }
       });

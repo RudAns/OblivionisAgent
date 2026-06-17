@@ -505,4 +505,20 @@ export const EN: Record<string, string> = {
   "HMAC 密钥（可选）": "HMAC secret (optional)",
   "HMAC 密钥设了就校验请求签名头（X-Hub-Signature-256 / X-Signature），防伪造回调；留空=不校验。每 token 限流 60 次/分钟。":
     "If set, requests must carry a valid signature header (X-Hub-Signature-256 / X-Signature, HMAC-SHA256) — blocks forged callbacks; empty = no check. Each token is rate-limited to 60/min.",
+  // 成本看板 Cost
+  "成本看板": "Cost",
+  "成本看板 · 各会话 token 花费": "Cost · token spend per session",
+  "各会话的 token 花费：累计 / 今日 / 按会话 / 按天（数据来自每次运行的 cost_usd）":
+    "Token spend per session: total / today / by session / by day (from each run's cost_usd)",
+  "还没有花费记录。": "No cost records yet.",
+  "每次「Claude 会话」运行完成后这里会记一笔（数据来自 stream-json 的 cost_usd）。":
+    "Each time a Claude session finishes a run, a record is added here (from the stream-json cost_usd).",
+  "累计花费": "Total spend",
+  "今日花费": "Today",
+  "会话数": "Sessions",
+  "{0} 次运行": "{0} runs",
+  "按会话": "By session",
+  "近 14 天": "Last 14 days",
+  "最近运行": "Recent runs",
+  "次": "runs",
 };

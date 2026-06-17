@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { IconGraph, IconAudit, IconLogs, IconInbox, IconMarkdown, IconSettings } from "./icons.js";
+import { IconGraph, IconAudit, IconLogs, IconInbox, IconCost, IconMarkdown, IconSettings } from "./icons.js";
 import { useT } from "../i18n/index.js";
 
-export type RailKey = "canvas" | "audit" | "logs" | "inbox" | "mdviewer" | "feishu" | "settings";
+export type RailKey = "canvas" | "audit" | "logs" | "inbox" | "cost" | "mdviewer" | "feishu" | "settings";
 
 interface Props {
   /** 画布是否展开（高亮"节点图"项） */
@@ -72,6 +72,9 @@ export function IconRail({ canvasOpen, tab, settingsOpen, inboxBadge, onAction }
       </RailButton>
       <RailButton title={t("服务日志")} active={tab === "logs"} onClick={() => onAction("logs")}>
         <IconLogs />
+      </RailButton>
+      <RailButton title={t("成本看板 · 各会话 token 花费")} active={tab === "cost"} onClick={() => onAction("cost")}>
+        <IconCost />
       </RailButton>
       <div className="railbar-spacer" />
       {/* 文档查看器：独立窗口，看各会话项目目录里的 .md / .html（渲染后），可边看边继续操作主窗 */}
