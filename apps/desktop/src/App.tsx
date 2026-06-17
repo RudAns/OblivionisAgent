@@ -2434,6 +2434,7 @@ function Inner() {
         ctx={ctx}
         onCtxHover={fetchCtx}
         saved={savedFlash}
+        version={appVer?.version}
       />
 
       {/* 右键菜单（节点/连线/空白）：portal 到 body，避开画布 transform 影响定位 */}

@@ -18,7 +18,11 @@ interface Props {
   onCtxHover?: () => void;
   /** 刚自动保存过 → 短暂显示"已保存 ✓" */
   saved?: boolean;
+  /** 本软件版本号（来自 app_version=CARGO_PKG_VERSION）；缺省回退编译期常量，避免再写死过时 */
+  version?: string;
 }
+
+const APP_VERSION = "0.3.0";
 
 function fmtK(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
@@ -36,7 +40,7 @@ function prettyModel(id: string): string {
 }
 
 /** 底部状态栏（参考专业 IDE）：后台服务状态、会话统计、当前终端（悬停看上下文用量）、自动保存提示 */
-export function StatusBar({ bridgeUp, sessionCount, openTerminals, activeLabel, ctx, onCtxHover, saved }: Props) {
+export function StatusBar({ bridgeUp, sessionCount, openTerminals, activeLabel, ctx, onCtxHover, saved, version }: Props) {
   const t = useT();
   // 上下文窗口按模型粗判：Opus 4.x 是 1M，其余按 200k（仅用于百分比展示）
   const win = ctx && /opus/i.test(ctx.model) ? 1_000_000 : 200_000;
@@ -111,7 +115,7 @@ export function StatusBar({ bridgeUp, sessionCount, openTerminals, activeLabel, 
       <span className={`sb-item dim ${saved ? "sb-saved" : ""}`}>
         {saved ? t("已保存 ✓") : t("改动自动保存")}
       </span>
-      <span className="sb-item dim">v0.2.0</span>
+      <span className="sb-item dim">v{version || APP_VERSION}</span>
     </footer>
   );
 }
