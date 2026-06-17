@@ -59,6 +59,11 @@ Wire nodes on a canvas to orchestrate local claude sessions: multi-session routi
 | ![doc viewer](docs/screenshots/md_html_fileviewer.png) |
 | `.md` / `.html` across each session's project dir as a tree, rendered on the right (the shared `reports` dir is included too) — read docs while you keep driving the main window |
 
+| 📊 Usage dashboard · activity stats · "today's almanac" |
+|:---:|
+| ![usage & stats](docs/screenshots/stats.png) |
+| Glance at subscription usage / context headroom in the top bar; hover the activity chip for a monthly heatmap + full stats (top model / total tokens / streaks…) + a tongue-in-cheek dev "almanac" (宜/忌). All read from local cache — no tokens spent |
+
 ---
 
 ## ✨ Highlights
