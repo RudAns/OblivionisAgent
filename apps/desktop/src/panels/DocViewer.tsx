@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -81,6 +82,29 @@ function buildTree(files: DocFile[]): TreeDir {
   return root;
 }
 
+/** 复制文本到剪贴板：webview 优先 navigator.clipboard，失败回退 execCommand。 */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 function openExternal(href: string, baseDir: string) {
   void invoke("open_path", { path: href, base: baseDir }).catch(() => {});
 }
@@ -120,6 +144,7 @@ function TreeView({
   toggle,
   selPath,
   onPick,
+  onContext,
 }: {
   node: TreeDir;
   depth: number;
@@ -127,6 +152,7 @@ function TreeView({
   toggle: (p: string) => void;
   selPath: string | null;
   onPick: (f: DocFile) => void;
+  onContext: (e: MouseEvent, f: DocFile) => void;
 }) {
   return (
     <>
@@ -137,7 +163,9 @@ function TreeView({
             <button className="md-tree-dir" style={{ paddingLeft: 8 + depth * 14 }} onClick={() => toggle(d.path)} title={d.path}>
               <span className="md-tw">{isCol ? "▸" : "▾"}</span> 📁 {d.name}
             </button>
-            {!isCol && <TreeView node={d} depth={depth + 1} collapsed={collapsed} toggle={toggle} selPath={selPath} onPick={onPick} />}
+            {!isCol && (
+              <TreeView node={d} depth={depth + 1} collapsed={collapsed} toggle={toggle} selPath={selPath} onPick={onPick} onContext={onContext} />
+            )}
           </div>
         );
       })}
@@ -147,6 +175,7 @@ function TreeView({
           className={`md-tree-file ${selPath === f.path ? "on" : ""}`}
           style={{ paddingLeft: 8 + depth * 14 + 18 }}
           onClick={() => onPick(f)}
+          onContextMenu={(e) => onContext(e, f)}
           title={f.path}
         >
           {f.ext === "html" ? "🌐 " : "📄 "}
@@ -169,6 +198,8 @@ export function DocViewer() {
   const [listing, setListing] = useState<DocListing | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [menu, setMenu] = useState<{ x: number; y: number; file: DocFile } | null>(null);
+  const [copiedTip, setCopiedTip] = useState(false);
   const [selFile, setSelFile] = useState<DocFile | null>(null);
   const [content, setContent] = useState("");
   const [loadingContent, setLoadingContent] = useState(false);
@@ -282,6 +313,19 @@ export function DocViewer() {
     ? selFile.path.slice(0, Math.max(selFile.path.lastIndexOf("\\"), selFile.path.lastIndexOf("/")))
     : "";
 
+  const copyPath = (p: string) => {
+    void copyText(p).then((ok) => {
+      if (ok) {
+        setCopiedTip(true);
+        window.setTimeout(() => setCopiedTip(false), 1200);
+      }
+    });
+  };
+  const onFileContext = (e: MouseEvent, f: DocFile) => {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, file: f });
+  };
+
   const mdComponents: Components = {
     a({ href, children }) {
       return (
@@ -344,7 +388,15 @@ export function DocViewer() {
               <div className="md-hint">{t("此目录下没有 .md / .html 文档。")}</div>
             )}
             {!loadingFiles && listing && listing.files.length > 0 && (
-              <TreeView node={tree} depth={0} collapsed={collapsed} toggle={toggleCol} selPath={selFile?.path ?? null} onPick={openFile} />
+              <TreeView
+                node={tree}
+                depth={0}
+                collapsed={collapsed}
+                toggle={toggleCol}
+                selPath={selFile?.path ?? null}
+                onPick={openFile}
+                onContext={onFileContext}
+              />
             )}
           </div>
         </aside>
@@ -358,9 +410,14 @@ export function DocViewer() {
                   {selFile.name}
                 </span>
                 <span className="md-main-meta">{fmtSize(selFile.size)}</span>
-                <button className="md-open" onClick={() => openExternal(selFile.path, "")}>
-                  {t("用默认程序打开")}
-                </button>
+                <span className="md-actions">
+                  <button className="md-open" onClick={() => copyPath(selFile.path)} title={selFile.path}>
+                    {copiedTip ? t("已复制 ✓") : t("复制路径")}
+                  </button>
+                  <button className="md-open" onClick={() => openExternal(selFile.path, "")}>
+                    {t("用默认程序打开")}
+                  </button>
+                </span>
               </div>
               <div className="md-render-wrap">
                 {loadingContent && <div className="md-hint">{t("加载中…")}</div>}
@@ -385,6 +442,40 @@ export function DocViewer() {
           )}
         </section>
       </div>
+
+      {menu &&
+        createPortal(
+          <div
+            className="ctx-backdrop"
+            onClick={() => setMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu(null);
+            }}
+          >
+            <div className="ctx-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
+              <button
+                className="ctx-item"
+                onClick={() => {
+                  copyPath(menu.file.path);
+                  setMenu(null);
+                }}
+              >
+                {t("复制路径")}
+              </button>
+              <button
+                className="ctx-item"
+                onClick={() => {
+                  openExternal(menu.file.path, "");
+                  setMenu(null);
+                }}
+              >
+                {t("用默认程序打开")}
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

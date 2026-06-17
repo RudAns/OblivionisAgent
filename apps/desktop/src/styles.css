@@ -3097,8 +3097,12 @@ button.primary {
   font-size: 11.5px;
   color: var(--muted);
 }
-.md-open {
+.md-actions {
   margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+.md-open {
   padding: 4px 12px;
   border: 1px solid var(--border);
   border-radius: 7px;

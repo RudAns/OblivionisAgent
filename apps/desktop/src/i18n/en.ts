@@ -500,4 +500,5 @@ export const EN: Record<string, string> = {
   "此目录下没有 .md / .html 文档。": "No .md / .html docs in this directory.",
   "← 左侧选一个文档": "← Pick a document on the left",
   "用默认程序打开": "Open with default app",
+  "已复制 ✓": "Copied ✓",
 };
