@@ -640,7 +640,9 @@ button.primary {
   height: 16px;
 }
 .glance-pop-stats {
-  width: 320px;
+  width: 340px;
+  max-height: calc(100vh - 88px);
+  overflow-y: auto;
 }
 /* 乐子：开发版「今日宜忌」黄历 */
 .alm {
@@ -688,77 +690,87 @@ button.primary {
   line-height: 1.55;
 }
 /* 本月日历热力图（参考 GitHub contribution graph 配色） */
+/* 本月日历：占满浮框宽度、格子放大、显示日期数字（像正常月历，和上下卡片左右对齐） */
 .cal {
-  width: max-content;
-  margin-bottom: 9px;
+  margin-bottom: 10px;
 }
 .cal-title {
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text);
-  margin: 2px 0 7px;
+  margin: 2px 0 8px;
 }
 .cal-week {
   display: grid;
-  grid-template-columns: repeat(7, 15px);
-  gap: 4px;
-  margin-bottom: 4px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin-bottom: 5px;
 }
 .cal-week span {
   text-align: center;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1;
   color: var(--muted);
 }
 .cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 15px);
-  grid-auto-rows: 15px;
-  gap: 4px;
-  justify-content: start;
-  margin-bottom: 6px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin-bottom: 8px;
 }
 .cal-cell {
-  width: 15px;
-  height: 15px;
-  border-radius: 3px;
+  height: 30px;
+  border-radius: 5px;
   background: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .cal-cell.empty {
   background: transparent;
 }
 .cal-cell.today {
-  outline: 1.5px solid var(--text);
-  outline-offset: -1px;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  font-weight: 700;
+  color: var(--text);
 }
 .cal-l0 {
   background: var(--border);
 }
 .cal-l1 {
   background: #f3d2c4;
+  color: #7a4a36;
 }
 .cal-l2 {
   background: #eaa888;
+  color: #5a2c1a;
 }
 .cal-l3 {
   background: #e27d56;
+  color: #fff;
 }
 .cal-l4 {
   background: #d4502b;
+  color: #fff;
 }
 .cal-legend {
   display: flex;
   align-items: center;
-  gap: 3px;
+  justify-content: flex-end;
+  gap: 4px;
   font-size: 10px;
   color: var(--muted);
-  margin-bottom: 9px;
+  margin-bottom: 10px;
 }
 .cal-legend i {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
 }
 .stats-grid {
   gap: 7px 14px;

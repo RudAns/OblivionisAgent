@@ -155,6 +155,47 @@ const ALMANAC: string[] = [
   "调手感",
   "削版本之子",
   "加新皮肤",
+  "重启试试",
+  "在生产环境调试",
+  "回滚大法",
+  "硬编码",
+  "留 TODO 给未来的自己",
+  "相信「这是最后一个 bug」",
+  "对着报错发呆",
+  "把锅写进 commit message",
+  "拉同事一起加班",
+  "需求评审装睡",
+  "PRD 只看图不看字",
+  "把 warning 当没看见",
+  "甩给 AI 写",
+  "让 Claude 背锅",
+  "把 deadline 当建议",
+  "先上线再说",
+  "画大饼",
+  "跟产品对线",
+  "祖传代码不敢动",
+  "注释写「勿删」",
+  "代码能跑就别动",
+  "上线前烧香",
+  "炼丹调参",
+  "数值策划拍脑袋",
+  "削最强英雄",
+  "加强没人玩的英雄",
+  "皮肤比平衡先出",
+  "热修复修出新 bug",
+  "首充 6 元",
+  "概率写「仅供参考」",
+  "拉通对齐",
+  "对齐颗粒度",
+  "赋能闭环",
+  "会议越开越多",
+  "老板说「很简单」",
+  "产品又要改",
+  "把 bug 说成 feature",
+  "甩 issue 给开源作者",
+  "复盘变甩锅大会",
+  "需求一句话开发一礼拜",
+  "用户说卡（其实是网速）",
 ];
 function hashStr(s: string): number {
   let h = 2166136261;
@@ -319,7 +360,9 @@ export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () =
                   key={i}
                   className={`cal-cell cal-l${c.lvl}${c.today ? " today" : ""}`}
                   title={`${monthLabel}-${String(c.day).padStart(2, "0")} · ${fmtN(c.v)}\n宜 ${c.yi.join("·")}\n忌 ${c.ji.join("·")}`}
-                />
+                >
+                  {c.day}
+                </span>
               ) : (
                 <span key={i} className="cal-cell empty" />
               ),
