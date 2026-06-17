@@ -29,7 +29,13 @@ export interface CronDeps {
 interface CronState {
   lastFired: number; // ms
   running: boolean;
+  startedAt: number; // ms，本次运行开始时刻（看门狗用）
 }
+
+/** 单次运行超过此时长仍未结束 → 判为卡死，强制复位 running，让该 cron 能再次触发。 */
+const MAX_RUN_MS = 10 * 60_000;
+/** 同一 tick 多个定时到点时，相邻两个错开的基础间隔（避免同秒齐发撞飞书限频）。 */
+const STAGGER_MS = 4_000;
 
 export class CronScheduler {
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -50,17 +56,30 @@ export class CronScheduler {
   private tick(): void {
     const cfg = this.deps.store.get();
     const now = new Date();
+    const due: { cron: CronNode; session: ClaudeSessionNode; st: CronState }[] = [];
+
     for (const node of cfg.graph.nodes) {
       if (node.kind !== "cron") continue;
       const cron = node as CronNode;
       if (!cron.data.enabled || !cron.data.prompt.trim()) continue;
       let st = this.state.get(node.id);
       if (!st) {
-        // 首次见到该 cron：种 lastFired=now，让 "every Nm" 满一个间隔再触发(避免启动即触发)；登记持久化
-        st = { lastFired: now.getTime(), running: false };
+        // 首次见到该 cron：种 lastFired=now，让 "every Nm" 满一个间隔再触发(避免启动即触发)。
+        st = { lastFired: now.getTime(), running: false, startedAt: 0 };
         this.state.set(node.id, st);
       }
-      if (st.running) continue;
+      // 看门狗：上次运行跑太久(claude 卡死/挂起、promise 永不 settle)→ 强制复位，
+      // 否则 running 永远停在 true，该 cron 再也不触发（报告里标记的"卡死"根因）。
+      if (st.running) {
+        if (st.startedAt && now.getTime() - st.startedAt > MAX_RUN_MS) {
+          this.deps.log.warn(
+            `定时任务「${node.label}」运行超过 ${Math.round(MAX_RUN_MS / 60_000)} 分钟未结束，强制复位（疑似卡死；旧进程可能成孤儿）`,
+          );
+          st.running = false;
+        } else {
+          continue;
+        }
+      }
       if (!shouldFire(cron.data.schedule, now, st.lastFired)) continue;
 
       // 沿连线找下游 Claude 会话节点
@@ -71,31 +90,42 @@ export class CronScheduler {
       if (!session) {
         this.deps.log.warn(`定时节点「${node.label}」没有连接到任何 Claude 会话，跳过`);
         st.lastFired = now.getTime();
-        this.state.set(node.id, st);
         continue;
       }
-
-      st.running = true;
-      st.lastFired = now.getTime();
-      this.state.set(node.id, st);
-      this.deps.log.info(`定时任务触发:「${node.label}」→ ${session.label}`);
-
-      void this.deps
-        .runPrompt(session.id, cron.data.prompt)
-        .then(async (reply) => {
-          const chatId = cron.data.chatId || cfg.homeChatId;
-          if (chatId && reply.trim()) {
-            await this.deps.deliver(chatId, `⏰ 「${node.label}」\n\n${reply}`);
-          } else if (reply.trim()) {
-            this.deps.log.info(`定时任务「${node.label}」完成(未配置投递群): ${reply.slice(0, 200)}`);
-          }
-        })
-        .catch((e) => this.deps.log.error(`定时任务「${node.label}」失败: ${(e as Error).message}`))
-        .finally(() => {
-          const cur = this.state.get(node.id);
-          if (cur) cur.running = false;
-        });
+      due.push({ cron, session, st });
     }
+
+    // 抖动/错峰：同一 tick 多个到点 → 按序错开启动（基础间隔 + 小随机），避免同秒齐发把飞书撞限频。
+    due.forEach((item, i) => {
+      const delay = i === 0 ? 0 : i * STAGGER_MS + Math.floor(Math.random() * 1500);
+      item.st.running = true;
+      item.st.startedAt = now.getTime() + delay;
+      item.st.lastFired = now.getTime();
+      setTimeout(() => this.fire(item.cron, item.session), delay);
+    });
+  }
+
+  /** 实际跑一次定时任务并投递结果；finally 里复位 running（防卡死的兜底仍是 tick 里的看门狗）。 */
+  private fire(cron: CronNode, session: ClaudeSessionNode): void {
+    const cur = this.state.get(cron.id);
+    if (cur) cur.startedAt = Date.now();
+    this.deps.log.info(`定时任务触发:「${cron.label}」→ ${session.label}`);
+    void this.deps
+      .runPrompt(session.id, cron.data.prompt)
+      .then(async (reply) => {
+        const cfg = this.deps.store.get();
+        const chatId = cron.data.chatId || cfg.homeChatId;
+        if (chatId && reply.trim()) {
+          await this.deps.deliver(chatId, `⏰ 「${cron.label}」\n\n${reply}`);
+        } else if (reply.trim()) {
+          this.deps.log.info(`定时任务「${cron.label}」完成(未配置投递群): ${reply.slice(0, 200)}`);
+        }
+      })
+      .catch((e) => this.deps.log.error(`定时任务「${cron.label}」失败: ${(e as Error).message}`))
+      .finally(() => {
+        const s = this.state.get(cron.id);
+        if (s) s.running = false;
+      });
   }
 }
 

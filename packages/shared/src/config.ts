@@ -129,6 +129,11 @@ export type CronData = z.infer<typeof CronData>;
 export const WebhookData = z.object({
   /** URL 路径口令（/hook/<token>）；建节点时自动生成随机值 */
   token: z.string().default(""),
+  /**
+   * 可选 HMAC 密钥：设了就校验请求签名头（`X-Hub-Signature-256: sha256=<hex>` 或 `X-Signature: <hex>`，
+   * 对请求体做 HMAC-SHA256），防伪造回调。留空 = 仅靠 token 口令、不校验签名（向后兼容）。
+   */
+  secret: z.string().default(""),
   /** 指令模板，{{body}} 会被替换为 POST 请求体（截断） */
   prompt: z.string().default("收到一个 webhook 事件，请简要分析以下内容并用中文总结：\n{{body}}"),
   /** 结果发到的群 chatId；留空=homeChatId */
