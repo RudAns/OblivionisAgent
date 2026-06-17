@@ -140,6 +140,7 @@ export function FlowCanvas(props: Props) {
       if (sk === "soul" || sk === "skill" || sk === "subagent")
         return tk === "claude-session" && c.targetHandle === "fork"; // 人格/技能/子代理连人格·技能口
       if (c.targetHandle === "fork") return false; // 人格·技能口只接 soul/skill/subagent（上面已放行）
+      if (sk === "claude-session") return tk === "claude-session"; // 多会话流水线：会话产出 → 下游会话（fork 口上面已挡）
       if (!ROUTING_SRC.has(sk) || !ROUTING_TGT.has(tk)) return false;
       if ((sk === "cron" || sk === "webhook") && tk !== "claude-session") return false; // 触发节点只直连会话
       return true;
