@@ -80,9 +80,16 @@ fn session_exists(cwd: &str, sid: &str) -> bool {
 
 /// 估算某会话当前上下文体量：读它的 transcript 最后一回合的 usage
 /// (input + cache_read + cache_creation = 这一轮加载进去的上下文)。纯读文件、不调模型、不耗 token。
+/// `since_mtime`：前端上次拿到的文件修改时间(ms)。一致就直接返回 {unchanged:true} 不读文件——
+/// 空闲轮询只花一次 stat(几微秒)，几十 MB 的 transcript 只在真的变了(完成一回合 / /compact)时才读。
 #[tauri::command]
-fn context_estimate(cwd: String, session_id: String) -> Result<serde_json::Value, String> {
-    let none = serde_json::json!({ "ctxTokens": 0, "outTokens": 0, "model": serde_json::Value::Null, "baseTokens": 0 });
+fn context_estimate(
+    cwd: String,
+    session_id: String,
+    since_mtime: Option<u64>,
+) -> Result<serde_json::Value, String> {
+    let none =
+        serde_json::json!({ "ctxTokens": 0, "outTokens": 0, "model": serde_json::Value::Null, "baseTokens": 0, "mtime": 0 });
     if session_id.is_empty() {
         return Ok(none);
     }
@@ -113,6 +120,18 @@ fn context_estimate(cwd: String, session_id: String) -> Result<serde_json::Value
     }
     if path.as_os_str().is_empty() || !path.exists() {
         return Ok(none);
+    }
+    // 取文件修改时间(ms)；和前端上次拿到的一致 → 没变 → 连读都不读，直接返回
+    let mtime = std::fs::metadata(&path)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    if let Some(since) = since_mtime {
+        if since != 0 && since == mtime {
+            return Ok(serde_json::json!({ "unchanged": true, "mtime": mtime }));
+        }
     }
     let raw = match std::fs::read_to_string(&path) {
         Ok(s) => s,
@@ -150,7 +169,10 @@ fn context_estimate(cwd: String, session_id: String) -> Result<serde_json::Value
         }
     }
     if ctx_tokens == 0 {
-        return Ok(none);
+        // 文件存在但还没有带 usage 的回合：回传真实 mtime，避免下次轮询又白读一遍
+        return Ok(
+            serde_json::json!({ "ctxTokens": 0, "outTokens": 0, "model": serde_json::Value::Null, "baseTokens": 0, "mtime": mtime }),
+        );
     }
     // 从前往后找第一条带 usage 的 = 基线开销(系统提示+工具+记忆+技能+首条消息)，
     // 用来把当前上下文粗分成「固定开销」vs「对话消息」。压缩(/compact)后首行不变，故基线稳定。
@@ -165,7 +187,7 @@ fn context_estimate(cwd: String, session_id: String) -> Result<serde_json::Value
             break;
         }
     }
-    Ok(serde_json::json!({ "ctxTokens": ctx_tokens, "outTokens": out_tokens, "model": model, "baseTokens": base_tokens }))
+    Ok(serde_json::json!({ "ctxTokens": ctx_tokens, "outTokens": out_tokens, "model": model, "baseTokens": base_tokens, "mtime": mtime }))
 }
 
 #[tauri::command]

@@ -1578,6 +1578,7 @@ function Inner() {
   // 用 ref 取当前 activeTerminalId/nodes，避免 nodes 频繁变动导致 fetchCtx 重建/狂刷。
   const ctxDepsRef = useRef({ activeTerminalId, nodes });
   ctxDepsRef.current = { activeTerminalId, nodes };
+  const ctxMtimeRef = useRef<number | null>(null); // 上次拿到的 transcript 修改时间(ms)，传给后端做"没变就别读"判断
   const fetchCtx = useCallback(() => {
     const { activeTerminalId: aid, nodes: ns } = ctxDepsRef.current;
     const n = aid ? ns.find((x) => x.id === aid) : null;
@@ -1585,18 +1586,38 @@ function Inner() {
     const sid = d?.baseSessionId || d?.sessionId || "";
     if (!sid) {
       setCtx(null);
+      ctxMtimeRef.current = null;
       return;
     }
-    void invoke<{ ctxTokens: number; outTokens: number; model: string; baseTokens: number }>("context_estimate", {
-      cwd: d?.cwd ?? "",
-      sessionId: sid,
-    })
-      .then((r) => setCtx(r && r.ctxTokens > 0 ? r : null))
+    void invoke<{
+      unchanged?: boolean;
+      ctxTokens?: number;
+      outTokens?: number;
+      model?: string;
+      baseTokens?: number;
+      mtime?: number;
+    }>("context_estimate", { cwd: d?.cwd ?? "", sessionId: sid, sinceMtime: ctxMtimeRef.current })
+      .then((r) => {
+        if (!r || r.unchanged) return; // 文件没变 → 后端连读都没读，保持现状
+        ctxMtimeRef.current = r.mtime ?? null;
+        setCtx(
+          r.ctxTokens && r.ctxTokens > 0
+            ? {
+                ctxTokens: r.ctxTokens,
+                outTokens: r.outTokens ?? 0,
+                model: r.model ?? "",
+                baseTokens: r.baseTokens ?? 0,
+              }
+            : null,
+        );
+      })
       .catch(() => setCtx(null));
   }, []);
   useEffect(() => {
+    ctxMtimeRef.current = null; // 换终端 → 强制重读一次
     fetchCtx();
-    // 轮询刷新：捕捉后台变化(如 /compact 压缩后体量骤降、对话继续增长)。读本地文件、不耗 token。
+    // 轮询：每 10s 只问一次"文件变了吗"(后端一次 stat、几微秒)。真的变了(完成一回合 / /compact)
+    // 才读 transcript；空闲时几乎零开销。捕捉压缩后体量骤降、对话继续增长等后台变化。
     const id = setInterval(fetchCtx, 10000);
     return () => clearInterval(id);
   }, [activeTerminalId, fetchCtx]);
