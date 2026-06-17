@@ -501,6 +501,16 @@ export const EN: Record<string, string> = {
   "← 左侧选一个文档": "← Pick a document on the left",
   "用默认程序打开": "Open with default app",
   "已复制 ✓": "Copied ✓",
+  // 文档查看器：搜索 / 近期 / UX
+  "搜索本工作区文件…": "Search files in this workspace…",
+  "搜索结果 · {0}": "Results · {0}",
+  "没有匹配「{0}」的文件": 'No files match "{0}"',
+  近期修改: "Recently modified",
+  全部文档: "All documents",
+  刚刚: "just now",
+  "{0} 分钟前": "{0}m ago",
+  "{0} 小时前": "{0}h ago",
+  "{0} 天前": "{0}d ago",
   // Webhook HMAC
   "HMAC 密钥（可选）": "HMAC secret (optional)",
   "HMAC 密钥设了就校验请求签名头（X-Hub-Signature-256 / X-Signature），防伪造回调；留空=不校验。每 token 限流 60 次/分钟。":

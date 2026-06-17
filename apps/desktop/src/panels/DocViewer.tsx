@@ -201,6 +201,7 @@ export function DocViewer() {
   const [menu, setMenu] = useState<{ x: number; y: number; file: DocFile } | null>(null);
   const [copiedTip, setCopiedTip] = useState(false);
   const [selFile, setSelFile] = useState<DocFile | null>(null);
+  const [query, setQuery] = useState(""); // 工作区内文件快速搜索
   const [content, setContent] = useState("");
   const [loadingContent, setLoadingContent] = useState(false);
   const [contentErr, setContentErr] = useState<string | null>(null);
@@ -246,6 +247,7 @@ export function DocViewer() {
       if (autoOpen) {
         setSelFile(null);
         setContent("");
+        setQuery(""); // 换目录清空搜索
       }
       invoke<DocListing>("list_md_files", { dir })
         .then((r) => {
@@ -309,6 +311,37 @@ export function DocViewer() {
     });
 
   const tree = useMemo(() => buildTree(listing?.files ?? []), [listing]);
+  // 近期修改：按 mtime 取前 8
+  const recent = useMemo(
+    () => [...(listing?.files ?? [])].sort((a, b) => b.modifiedMs - a.modifiedMs).slice(0, 8),
+    [listing],
+  );
+  // 工作区内搜索：按文件名/相对路径过滤；名字命中优先，再按 mtime
+  const q = query.trim().toLowerCase();
+  const results = useMemo(() => {
+    if (!q) return [] as DocFile[];
+    return (listing?.files ?? [])
+      .filter((f) => f.name.toLowerCase().includes(q) || f.rel.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const an = a.name.toLowerCase().includes(q) ? 0 : 1;
+        const bn = b.name.toLowerCase().includes(q) ? 0 : 1;
+        return an - bn || b.modifiedMs - a.modifiedMs;
+      })
+      .slice(0, 200);
+  }, [listing, q]);
+  // 相对时间（近期修改用）
+  const fmtAgo = (ms: number): string => {
+    const diff = Date.now() - ms;
+    if (diff < 60_000) return t("刚刚");
+    const m = Math.floor(diff / 60_000);
+    if (m < 60) return t("{0} 分钟前", m);
+    const h = Math.floor(m / 60);
+    if (h < 24) return t("{0} 小时前", h);
+    const d = Math.floor(h / 24);
+    if (d < 7) return t("{0} 天前", d);
+    const dt = new Date(ms);
+    return `${dt.getMonth() + 1}-${String(dt.getDate()).padStart(2, "0")}`;
+  };
   const fileDir = selFile
     ? selFile.path.slice(0, Math.max(selFile.path.lastIndexOf("\\"), selFile.path.lastIndexOf("/")))
     : "";
@@ -382,21 +415,93 @@ export function DocViewer() {
             {t("文档")}
             {listing?.truncated ? t("（文件过多，已截断）") : ""}
           </div>
+          {!loadingFiles && listing && listing.files.length > 0 && (
+            <div className="md-search">
+              <span className="md-search-ic">🔍</span>
+              <input
+                className="md-search-in"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("搜索本工作区文件…")}
+                spellCheck={false}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setQuery("");
+                  if (e.key === "Enter" && results[0]) openFile(results[0]);
+                }}
+              />
+              {query && (
+                <button className="md-search-x" onClick={() => setQuery("")} title={t("清除")}>
+                  ×
+                </button>
+              )}
+            </div>
+          )}
           <div className="md-files">
             {loadingFiles && <div className="md-hint">{t("扫描中…")}</div>}
             {!loadingFiles && listing && listing.files.length === 0 && (
               <div className="md-hint">{t("此目录下没有 .md / .html 文档。")}</div>
             )}
-            {!loadingFiles && listing && listing.files.length > 0 && (
-              <TreeView
-                node={tree}
-                depth={0}
-                collapsed={collapsed}
-                toggle={toggleCol}
-                selPath={selFile?.path ?? null}
-                onPick={openFile}
-                onContext={onFileContext}
-              />
+            {/* 搜索态：扁平结果（带所在文件夹） */}
+            {!loadingFiles &&
+              listing &&
+              listing.files.length > 0 &&
+              q &&
+              (results.length === 0 ? (
+                <div className="md-hint">{t("没有匹配「{0}」的文件", query)}</div>
+              ) : (
+                <>
+                  <div className="md-grp-h">{t("搜索结果 · {0}", results.length)}</div>
+                  {results.map((f) => (
+                    <button
+                      key={f.path}
+                      className={`md-frow ${selFile?.path === f.path ? "on" : ""}`}
+                      onClick={() => openFile(f)}
+                      onContextMenu={(e) => onFileContext(e, f)}
+                      title={f.path}
+                    >
+                      <span className="nm">
+                        {f.ext === "html" ? "🌐 " : "📄 "}
+                        {f.name}
+                      </span>
+                      {f.rel.includes("/") && <span className="meta">{f.rel.slice(0, f.rel.lastIndexOf("/"))}</span>}
+                    </button>
+                  ))}
+                </>
+              ))}
+            {/* 非搜索态：近期修改 + 全部文档树 */}
+            {!loadingFiles && listing && listing.files.length > 0 && !q && (
+              <>
+                {recent.length > 0 && (
+                  <>
+                    <div className="md-grp-h">🕒 {t("近期修改")}</div>
+                    {recent.map((f) => (
+                      <button
+                        key={`r-${f.path}`}
+                        className={`md-frow ${selFile?.path === f.path ? "on" : ""}`}
+                        onClick={() => openFile(f)}
+                        onContextMenu={(e) => onFileContext(e, f)}
+                        title={f.path}
+                      >
+                        <span className="nm">
+                          {f.ext === "html" ? "🌐 " : "📄 "}
+                          {f.name}
+                        </span>
+                        <span className="meta">{fmtAgo(f.modifiedMs)}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
+                <div className="md-grp-h">📁 {t("全部文档")}</div>
+                <TreeView
+                  node={tree}
+                  depth={0}
+                  collapsed={collapsed}
+                  toggle={toggleCol}
+                  selPath={selFile?.path ?? null}
+                  onPick={openFile}
+                  onContext={onFileContext}
+                />
+              </>
             )}
           </div>
         </aside>

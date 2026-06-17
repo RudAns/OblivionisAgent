@@ -3648,6 +3648,88 @@ button.primary {
   color: #fff;
 }
 
+/* ── 文档查看器：搜索框 + 近期/搜索结果扁平行 ───────────────── */
+.md-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 8px 6px;
+  padding: 5px 9px;
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.md-search:focus-within {
+  border-color: var(--accent);
+}
+.md-search-ic {
+  font-size: 12px;
+  opacity: 0.65;
+}
+.md-search-in {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.md-search-x {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.md-search-x:hover {
+  color: var(--text);
+}
+/* 扁平文件行（近期修改 / 搜索结果）：左名右元信息 */
+.md-frow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.md-frow:hover {
+  background: var(--hover);
+}
+.md-frow.on {
+  background: var(--accent);
+  color: #fff;
+}
+.md-frow .nm {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-frow .meta {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-frow.on .meta {
+  color: rgba(255, 255, 255, 0.82);
+}
+
 /* ── 状态栏：当前终端名 hover → 上下文用量悬浮框 ───────────────── */
 .sb-term {
   position: relative;
