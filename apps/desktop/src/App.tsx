@@ -1631,8 +1631,9 @@ function Inner() {
     // 本软件版本+构建时间：运行期不变，开机取一次即可
     void invoke<AppVer>("app_version").then(setAppVer).catch(() => {});
   }, []);
-  const fetchGlance = useCallback(() => {
-    void invoke<StatsData>("claude_stats")
+  // deep=true(仅悬停时)：额外扫近期 transcript 补「缓存截至日之后」的活动(昨天/今天的格子)；轮询用 false 省开销。
+  const fetchGlance = useCallback((deep = false) => {
+    void invoke<StatsData>("claude_stats", { deep })
       .then((s) => setGlanceStats(s && s.dailyActivity?.length ? s : null))
       .catch(() => {});
     void invoke<StatusData>("claude_status")
@@ -1640,9 +1641,9 @@ function Inner() {
       .catch(() => {});
   }, []);
   useEffect(() => {
-    fetchGlance();
-    // 很慢(5 分钟)：两个小本地文件(19KB+52KB)、版本号已缓存。悬停时还会即时重读。
-    const id = setInterval(fetchGlance, 300000);
+    fetchGlance(false);
+    // 很慢(5 分钟)：两个小本地文件(19KB+52KB)、版本号已缓存。悬停时(deep)才扫近期 transcript。
+    const id = setInterval(() => fetchGlance(false), 300000);
     return () => clearInterval(id);
   }, [fetchGlance]);
 
@@ -1791,7 +1792,7 @@ function Inner() {
           </button>
         )}
         <div className="spacer" data-tauri-drag-region />
-        {glanceStats && <StatsChip stats={glanceStats} onHover={fetchGlance} />}
+        {glanceStats && <StatsChip stats={glanceStats} onHover={() => fetchGlance(true)} />}
         {usage?.sessionPct != null && (
           <span
             className={`usage-chip ${usage.sessionPct >= 85 ? "hot" : usage.sessionPct >= 60 ? "warm" : ""}`}

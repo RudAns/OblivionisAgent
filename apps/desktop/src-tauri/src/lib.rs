@@ -418,13 +418,111 @@ fn open_path(path: String, base: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 从一行 transcript JSON 里抠出 "timestamp":"..." 的值（不整行 parse，省时）。
+fn extract_ts(line: &str) -> Option<String> {
+    let i = line.find("\"timestamp\":\"")?;
+    let rest = &line[i + 13..];
+    let j = rest.find('"')?;
+    Some(rest[..j].to_string())
+}
+
+/// 扫各 project 目录下「最近 ~10 天改过」的会话 transcript，给前端补「缓存截至日(last_computed)
+/// 之后」那几天的活动——`~/.claude/stats-cache.json` 只在 CLI 重算时才前移，常滞后好几天，
+/// 不补的话昨天/今天在日历热力图上是灰的。优化：先读文件头拿首条时间戳，首条早于 last_computed
+/// 的老会话(被 resume 但起始很早)直接跳过、不整读那几十 MB；只整读真正的新会话。子串计数、不逐行 parse。
+/// 带 60s TTL 内存缓存，避免连续 hover 反复扫盘。返回 [{ts, messages, tools}]，按本地日期分桶在前端做。
+fn scan_recent_sessions(home: &std::path::Path, last_computed: &str) -> serde_json::Value {
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{Duration, SystemTime};
+    static CACHE: OnceLock<Mutex<Option<(SystemTime, serde_json::Value)>>> = OnceLock::new();
+    let cell = CACHE.get_or_init(|| Mutex::new(None));
+    if let Ok(g) = cell.lock() {
+        if let Some((t, v)) = g.as_ref() {
+            if t.elapsed().map(|d| d < Duration::from_secs(60)).unwrap_or(false) {
+                return v.clone();
+            }
+        }
+    }
+    let projects = home.join(".claude").join("projects");
+    let cutoff = SystemTime::now().checked_sub(Duration::from_secs(10 * 24 * 3600));
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&projects) {
+        for proj in rd.flatten() {
+            let ppath = proj.path();
+            if !ppath.is_dir() {
+                continue;
+            }
+            let files = match std::fs::read_dir(&ppath) {
+                Ok(f) => f,
+                Err(_) => continue,
+            };
+            for fe in files.flatten() {
+                let fp = fe.path();
+                if fp.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                    continue;
+                }
+                // mtime 太老 → 不读（cheap stat 过滤）
+                if let (Some(cut), Ok(mt)) = (cutoff, fp.metadata().and_then(|m| m.modified())) {
+                    if mt < cut {
+                        continue;
+                    }
+                }
+                // 先读头(16KB)拿首条消息时间戳；首条早于缓存截至日的老会话直接跳过、不整读
+                let head = read_window(&fp, 0, 16 * 1024);
+                let head_ts = head.lines().find_map(|l| {
+                    if l.contains("\"type\":\"assistant\"") || l.contains("\"type\":\"user\"") {
+                        extract_ts(l)
+                    } else {
+                        None
+                    }
+                });
+                if let Some(ts) = &head_ts {
+                    if ts.len() >= 10 && &ts[..10] < last_computed {
+                        continue;
+                    }
+                }
+                let raw = match std::fs::read_to_string(&fp) {
+                    Ok(s) => s,
+                    Err(_) => continue,
+                };
+                let mut messages = 0u64;
+                let mut tools = 0u64;
+                let mut first_ts = head_ts;
+                for line in raw.lines() {
+                    if line.contains("\"type\":\"assistant\"") || line.contains("\"type\":\"user\"") {
+                        messages += 1;
+                        if first_ts.is_none() {
+                            first_ts = extract_ts(line);
+                        }
+                    }
+                    if line.contains("\"type\":\"tool_use\"") {
+                        tools += 1;
+                    }
+                }
+                if messages == 0 {
+                    continue;
+                }
+                if let Some(ts) = first_ts {
+                    out.push(serde_json::json!({ "ts": ts, "messages": messages, "tools": tools }));
+                }
+            }
+        }
+    }
+    let val = serde_json::Value::Array(out);
+    if let Ok(mut g) = cell.lock() {
+        *g = Some((SystemTime::now(), val.clone()));
+    }
+    val
+}
+
 /// 读 Claude 自己的活动统计缓存(~/.claude/stats-cache.json)给 GUI 顶部活动小标用。
 /// 纯读本地 ~19KB JSON、不耗 token。回传全量日活 + 模型用量 + 最长会话 + 首次会话日，
 /// 常用模型/总 token/活跃天/连续天/最活跃日等都在前端算(有 Date)。
-/// 注：缓存只到「昨天」(lastComputedDate)，今天的活动 CLI 是实时算的、不在缓存里——前端标注一下即可。
+/// 注：缓存只到 lastComputedDate，常滞后；`deep=true`(悬停时)才额外扫近期 transcript 补「截至日之后」
+/// 那几天的活动(recentSessions)，前端按本地日期合并进 dailyActivity，让昨天/今天的格子也有色。
 #[tauri::command]
-fn claude_stats() -> Result<serde_json::Value, String> {
-    let empty = serde_json::json!({ "dailyActivity": [], "modelUsage": {}, "totalSessions": 0, "totalMessages": 0, "longestSessionMs": 0, "firstSessionDate": serde_json::Value::Null, "lastComputedDate": serde_json::Value::Null });
+fn claude_stats(deep: Option<bool>) -> Result<serde_json::Value, String> {
+    let empty = serde_json::json!({ "dailyActivity": [], "modelUsage": {}, "totalSessions": 0, "totalMessages": 0, "longestSessionMs": 0, "firstSessionDate": serde_json::Value::Null, "lastComputedDate": serde_json::Value::Null, "recentSessions": [] });
     let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
     if home.is_empty() {
         return Ok(empty);
@@ -445,6 +543,12 @@ fn claude_stats() -> Result<serde_json::Value, String> {
         .and_then(|s| s.get("duration"))
         .and_then(|x| x.as_u64())
         .unwrap_or(0);
+    let last_computed = v.get("lastComputedDate").and_then(|x| x.as_str()).unwrap_or("");
+    let recent = if deep.unwrap_or(false) {
+        scan_recent_sessions(std::path::Path::new(&home), last_computed)
+    } else {
+        serde_json::Value::Array(vec![])
+    };
     Ok(serde_json::json!({
         "dailyActivity": da,
         "modelUsage": v.get("modelUsage").cloned().unwrap_or_else(|| serde_json::json!({})),
@@ -453,6 +557,7 @@ fn claude_stats() -> Result<serde_json::Value, String> {
         "longestSessionMs": longest_ms,
         "firstSessionDate": v.get("firstSessionDate").cloned().unwrap_or(serde_json::Value::Null),
         "lastComputedDate": v.get("lastComputedDate").cloned().unwrap_or(serde_json::Value::Null),
+        "recentSessions": recent,
     }))
 }
 

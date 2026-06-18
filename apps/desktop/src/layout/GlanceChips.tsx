@@ -21,6 +21,8 @@ export interface StatsData {
   longestSessionMs: number;
   firstSessionDate: string | null;
   lastComputedDate: string | null;
+  /** 缓存截至日之后的近期会话(deep 扫描得来)，前端按本地日期补进 dailyActivity */
+  recentSessions?: { ts: string; messages: number; tools: number }[];
 }
 export interface StatusData {
   version: string;
@@ -106,6 +108,29 @@ function buildSeries(now: Date, n: number, by: Map<string, DailyActivity>): { da
     const key = ymd(d);
     out.push({ date: key, v: by.get(key)?.messageCount ?? 0 });
   }
+  return out;
+}
+
+/** 把 deep 扫到的近期会话(缓存截至日之后的)按本地日期补进 dailyActivity，让昨天/今天的格子有色。 */
+function mergeRecent(stats: StatsData): DailyActivity[] {
+  const base = stats.dailyActivity ?? [];
+  const last = stats.lastComputedDate ?? "";
+  const rs = stats.recentSessions ?? [];
+  if (!rs.length) return base;
+  const add = new Map<string, DailyActivity>();
+  for (const s of rs) {
+    const d = ymd(new Date(s.ts)); // 本地日期
+    if (last && d <= last) continue; // 已在缓存里，跳过
+    const cur = add.get(d) ?? { date: d, messageCount: 0, sessionCount: 0, toolCallCount: 0 };
+    cur.messageCount += s.messages;
+    cur.sessionCount += 1;
+    cur.toolCallCount += s.tools;
+    add.set(d, cur);
+  }
+  if (!add.size) return base;
+  // 同一天若缓存已有(理论上不会，因为 d>last)以扫描为准
+  const out = base.filter((x) => !add.has(x.date)).concat([...add.values()]);
+  out.sort((a, b) => a.date.localeCompare(b.date));
   return out;
 }
 
@@ -233,7 +258,7 @@ function dayFortune(dateStr: string): { yi: string[]; ji: string[] } {
 /** 顶部「活动趋势」小标：chip 本身=近 7 天迷你趋势(图标)；悬停=今日宜忌 + 本月日历热力图 + 全量统计。读本地、不耗 token。 */
 export function StatsChip({ stats, onHover }: { stats: StatsData; onHover?: () => void }) {
   const t = useT();
-  const da = stats.dailyActivity ?? [];
+  const da = mergeRecent(stats);
   const by = new Map(da.map((d): [string, DailyActivity] => [d.date, d]));
   const now = new Date();
   const spark7 = buildSeries(now, 7, by);
