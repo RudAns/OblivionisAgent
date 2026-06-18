@@ -212,6 +212,105 @@ fn context_estimate(
     Ok(serde_json::json!({ "ctxTokens": ctx_tokens, "outTokens": out_tokens, "model": model, "baseTokens": base_tokens, "mtime": mtime }))
 }
 
+/// 拆 SKILL.md 的 frontmatter：带 `description:` → (Some(desc), body)；否则 (None, 全文)。
+/// 和 bridge 的 parseSkillFile 一致——决定走渐进式(只给指针)还是全文。
+fn parse_skill_file(text: &str) -> (Option<String>, String) {
+    let t = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let after = t.strip_prefix("---\n").or_else(|| t.strip_prefix("---\r\n"));
+    if let Some(rest) = after {
+        if let Some(end) = rest.find("\n---") {
+            let fm = &rest[..end];
+            let body = rest[end + 4..].trim_start_matches(['\r', '\n']).to_string();
+            let desc = fm
+                .lines()
+                .find_map(|l| {
+                    l.trim()
+                        .strip_prefix("description:")
+                        .map(|v| v.trim().trim_matches(|c| c == '"' || c == '\'').trim().to_string())
+                })
+                .filter(|s| !s.is_empty());
+            return (desc, body);
+        }
+    }
+    (None, t.to_string())
+}
+
+/// 解析连在某会话「技能口(fork handle)」上的技能，拼成**单行** --append-system-prompt 文本给终端用。
+/// 终端(base)默认不注入人格/护栏，但用户要求技能在终端也生效——只技能、不碰人格。单行是因为
+/// Windows 下终端经 `cmd /c claude` 起，换行会截断命令行；把渐进式指针/正文里的换行压成空格。
+fn resolve_terminal_skills(sid: &str) -> Option<String> {
+    if sid.is_empty() {
+        return None;
+    }
+    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
+    if home.is_empty() {
+        return None;
+    }
+    let base = std::path::Path::new(&home).join(".oblivionis");
+    let raw = std::fs::read_to_string(base.join("config.json")).ok()?;
+    let cfg: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let graph = cfg.get("graph")?;
+    let nodes = graph.get("nodes")?.as_array()?;
+    let node = nodes.iter().find(|n| {
+        n.get("kind").and_then(|x| x.as_str()) == Some("claude-session") && {
+            let d = n.get("data");
+            d.and_then(|d| d.get("baseSessionId")).and_then(|x| x.as_str()) == Some(sid)
+                || d.and_then(|d| d.get("sessionId")).and_then(|x| x.as_str()) == Some(sid)
+        }
+    })?;
+    let node_id = node.get("id").and_then(|x| x.as_str())?;
+    let skills_dir = base.join("skills");
+    let empty: Vec<serde_json::Value> = Vec::new();
+    let edges = graph.get("edges").and_then(|e| e.as_array()).unwrap_or(&empty);
+    let clean = |s: &str| s.replace(['\n', '\r'], " ").replace('"', "'");
+    let mut frags: Vec<String> = Vec::new();
+    for e in edges {
+        if e.get("target").and_then(|x| x.as_str()) != Some(node_id) {
+            continue;
+        }
+        if e.get("targetHandle").and_then(|x| x.as_str()).unwrap_or("fork") != "fork" {
+            continue;
+        }
+        let src_id = match e.get("source").and_then(|x| x.as_str()) {
+            Some(s) => s,
+            None => continue,
+        };
+        let src = match nodes.iter().find(|n| n.get("id").and_then(|x| x.as_str()) == Some(src_id)) {
+            Some(s) => s,
+            None => continue,
+        };
+        if src.get("kind").and_then(|x| x.as_str()) != Some("skill") {
+            continue;
+        }
+        let label = src.get("label").and_then(|x| x.as_str()).map(|s| s.trim()).filter(|s| !s.is_empty()).unwrap_or("技能");
+        let safe: String = src_id.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' }).collect();
+        let p = skills_dir.join(format!("{safe}.md"));
+        let text = match std::fs::read_to_string(&p) {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        let (desc, body) = parse_skill_file(&text);
+        if let Some(d) = desc {
+            frags.push(format!(
+                "技能「{}」：{}（命中时先用 Read 读取 {} 取完整规范再做）",
+                clean(label),
+                clean(&d),
+                p.to_string_lossy()
+            ));
+        } else {
+            let b = clean(body.trim());
+            if !b.is_empty() {
+                frags.push(format!("技能「{}」：{}", clean(label), b));
+            }
+        }
+    }
+    if frags.is_empty() {
+        None
+    } else {
+        Some(format!("【本会话连了以下技能，命中相应场景时遵循】 {}", frags.join("  ｜  ")))
+    }
+}
+
 #[tauri::command]
 fn pty_open(
     app: tauri::AppHandle,
@@ -239,6 +338,12 @@ fn pty_open(
     if !sid.is_empty() {
         claude_args.push(if resumed { "--resume".to_string() } else { "--session-id".to_string() });
         claude_args.push(sid.clone());
+    }
+    // 终端(base)也吃连在本会话「技能口」上的技能(渐进式指针，单行)——让你在终端里也按技能做事。
+    // 只技能、不碰人格/护栏(终端保持干净的原则只对人格/护栏)。
+    if let Some(append) = resolve_terminal_skills(&sid) {
+        claude_args.push("--append-system-prompt".to_string());
+        claude_args.push(append);
     }
 
     // Windows 上 claude 多为 .cmd，用 cmd.exe(完整路径) /c 包一层最稳；posix 直接起。
