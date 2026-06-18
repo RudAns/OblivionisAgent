@@ -6,6 +6,19 @@
 
 _（暂无）_
 
+## [0.4.1] - 2026-06-18
+
+### 🖥️ 文档查看器（更像专业工具）
+- **工作区内文件快速搜索**：按文件名 / 相对路径过滤（名字命中优先），结果显示所在文件夹；`Esc` 清空、`Enter` 打开首条、`×` 清除。
+- **近期修改单独分栏**：🕒 按修改时间取前 8 + 相对时间。
+- 侧栏 UX 重构：分组为「搜索结果 / 近期修改 / 全部文档树」，换目录自动清空搜索。
+
+### 🧩 技能
+- **终端会话也吃技能**：连在会话「技能口」上的技能，现在打开该会话内置终端时也会注入（单行渐进式指针，命中场景再 Read 完整规范）——纯终端用的会话也能用上技能了。只技能、不碰人格 / 护栏（「终端保持干净」只针对人格 / 护栏）。
+
+### 🐛 修复
+- **活动日历跨天不刷新**：`~/.claude/stats-cache.json` 滞后时（只在 CLI 重算才前移），昨天 / 今天在本月热力图上是灰格。现在悬停时扫近期 transcript 补「缓存截至日之后」每天的活动并按本地日期合并；被 resume 的老会话先读头跳过、不整读，60s TTL 缓存，轮询不扫——保持轻量。
+
 ## [0.4.0] - 2026-06-17
 
 ### 🔒 重点修复
@@ -101,6 +114,7 @@ _（暂无）_
 
 > ℹ️ exe / 安装包未做代码签名，首次打开 Windows SmartScreen 会拦——点「更多信息 → 仍要运行」即可。
 
+[0.4.1]: https://github.com/RudAns/OblivionisAgent/releases/tag/v0.4.1
 [0.4.0]: https://github.com/RudAns/OblivionisAgent/releases/tag/v0.4.0
 [0.3.0]: https://github.com/RudAns/OblivionisAgent/releases/tag/v0.3.0
 [0.2.0]: https://github.com/RudAns/OblivionisAgent/releases/tag/v0.2.0
