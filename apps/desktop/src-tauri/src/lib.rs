@@ -531,12 +531,46 @@ fn extract_ts(line: &str) -> Option<String> {
     Some(rest[..j].to_string())
 }
 
-/// 扫各 project 目录下「最近 ~10 天改过」的会话 transcript，给前端补「缓存截至日(last_computed)
-/// 之后」那几天的活动——`~/.claude/stats-cache.json` 只在 CLI 重算时才前移，常滞后好几天，
-/// 不补的话昨天/今天在日历热力图上是灰的。优化：先读文件头拿首条时间戳，首条早于 last_computed
-/// 的老会话(被 resume 但起始很早)直接跳过、不整读那几十 MB；只整读真正的新会话。子串计数、不逐行 parse。
-/// 带 60s TTL 内存缓存，避免连续 hover 反复扫盘。返回 [{ts, messages, tools}]，按本地日期分桶在前端做。
-fn scan_recent_sessions(home: &std::path::Path, last_computed: &str) -> serde_json::Value {
+/// civil(年,月,日) → 1970-01-01 起的天数（Howard Hinnant）
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = (if y >= 0 { y } else { y - 399 }) / 400;
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe - 719468
+}
+/// 天数 → (年,月,日)
+fn civil_from_days(z: i64) -> (i64, i64, i64) {
+    let z = z + 719468;
+    let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (if m <= 2 { y + 1 } else { y }, m, d)
+}
+/// UTC 时间戳 "YYYY-MM-DDTHH:MM…" + 时区偏移(分，东为正) → 本地日期 "YYYY-MM-DD"
+fn local_date_of(ts: &str, tz_off_min: i64) -> Option<String> {
+    let b = ts.as_bytes();
+    if b.len() < 16 || b[4] != b'-' || b[7] != b'-' || b[10] != b'T' {
+        return None;
+    }
+    let num = |a: usize, z: usize| ts.get(a..z).and_then(|s| s.parse::<i64>().ok());
+    let total = days_from_civil(num(0, 4)?, num(5, 7)?, num(8, 10)?) * 1440 + num(11, 13)? * 60 + num(14, 16)? + tz_off_min;
+    let (ly, lm, ld) = civil_from_days(total.div_euclid(1440));
+    Some(format!("{ly:04}-{lm:02}-{ld:02}"))
+}
+
+/// 扫各 project 目录下「最近 ~10 天改过」的 transcript，把「缓存截至日(last_computed)之后」每条消息
+/// 按它**自己的本地日期**计入对应天——这样被 resume 的老会话在某天的活动也算到那天(而非会话起始日)，
+/// 解决「昨天/今天是灰格」。只读每个文件末尾 ~8MB(append-only，近期消息都在尾部)、子串计数不逐行 parse、
+/// 60s TTL 缓存。返回 [{date, messageCount, sessionCount, toolCallCount}]，date 均 > last_computed。
+fn scan_recent_sessions(home: &std::path::Path, last_computed: &str, tz_off_min: i64) -> serde_json::Value {
+    use std::collections::{HashMap, HashSet};
     use std::sync::{Mutex, OnceLock};
     use std::time::{Duration, SystemTime};
     static CACHE: OnceLock<Mutex<Option<(SystemTime, serde_json::Value)>>> = OnceLock::new();
@@ -550,7 +584,9 @@ fn scan_recent_sessions(home: &std::path::Path, last_computed: &str) -> serde_js
     }
     let projects = home.join(".claude").join("projects");
     let cutoff = SystemTime::now().checked_sub(Duration::from_secs(10 * 24 * 3600));
-    let mut out: Vec<serde_json::Value> = Vec::new();
+    const TAIL: u64 = 8 * 1024 * 1024;
+    let mut days: HashMap<String, (u64, u64)> = HashMap::new(); // date → (messages, tools)
+    let mut day_files: HashSet<(String, String)> = HashSet::new(); // (date,file) 去重算会话数
     if let Ok(rd) = std::fs::read_dir(&projects) {
         for proj in rd.flatten() {
             let ppath = proj.path();
@@ -566,53 +602,62 @@ fn scan_recent_sessions(home: &std::path::Path, last_computed: &str) -> serde_js
                 if fp.extension().and_then(|e| e.to_str()) != Some("jsonl") {
                     continue;
                 }
-                // mtime 太老 → 不读（cheap stat 过滤）
-                if let (Some(cut), Ok(mt)) = (cutoff, fp.metadata().and_then(|m| m.modified())) {
-                    if mt < cut {
-                        continue;
+                let flen = match fp.metadata() {
+                    Ok(m) => {
+                        if let (Some(cut), Ok(mt)) = (cutoff, m.modified()) {
+                            if mt < cut {
+                                continue; // mtime 太老 → 不读
+                            }
+                        }
+                        m.len()
                     }
-                }
-                // 先读头(16KB)拿首条消息时间戳；首条早于缓存截至日的老会话直接跳过、不整读
-                let head = read_window(&fp, 0, 16 * 1024);
-                let head_ts = head.lines().find_map(|l| {
-                    if l.contains("\"type\":\"assistant\"") || l.contains("\"type\":\"user\"") {
-                        extract_ts(l)
-                    } else {
-                        None
-                    }
-                });
-                if let Some(ts) = &head_ts {
-                    if ts.len() >= 10 && &ts[..10] < last_computed {
-                        continue;
-                    }
-                }
-                let raw = match std::fs::read_to_string(&fp) {
-                    Ok(s) => s,
                     Err(_) => continue,
                 };
-                let mut messages = 0u64;
-                let mut tools = 0u64;
-                let mut first_ts = head_ts;
-                for line in raw.lines() {
-                    if line.contains("\"type\":\"assistant\"") || line.contains("\"type\":\"user\"") {
-                        messages += 1;
-                        if first_ts.is_none() {
-                            first_ts = extract_ts(line);
-                        }
+                let fid = fp.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                let start = flen.saturating_sub(TAIL); // 只读末尾 ~8MB
+                let raw = read_window(&fp, start, TAIL);
+                for (idx, line) in raw.lines().enumerate() {
+                    if start > 0 && idx == 0 {
+                        continue; // 尾窗首行可能被截断，丢
                     }
-                    if line.contains("\"type\":\"tool_use\"") {
-                        tools += 1;
+                    let is_msg = line.contains("\"type\":\"assistant\"") || line.contains("\"type\":\"user\"");
+                    let is_tool = line.contains("\"type\":\"tool_use\"");
+                    if !is_msg && !is_tool {
+                        continue;
                     }
-                }
-                if messages == 0 {
-                    continue;
-                }
-                if let Some(ts) = first_ts {
-                    out.push(serde_json::json!({ "ts": ts, "messages": messages, "tools": tools }));
+                    let date = match extract_ts(line).and_then(|ts| local_date_of(&ts, tz_off_min)) {
+                        Some(d) => d,
+                        None => continue,
+                    };
+                    if date.as_str() <= last_computed {
+                        continue; // 已在缓存里
+                    }
+                    let e = days.entry(date.clone()).or_insert((0, 0));
+                    if is_msg {
+                        e.0 += 1;
+                    }
+                    if is_tool {
+                        e.1 += 1;
+                    }
+                    if is_msg {
+                        day_files.insert((date, fid.clone()));
+                    }
                 }
             }
         }
     }
+    let mut sess: HashMap<String, u64> = HashMap::new();
+    for (date, _) in &day_files {
+        *sess.entry(date.clone()).or_insert(0) += 1;
+    }
+    let mut out: Vec<serde_json::Value> = days
+        .into_iter()
+        .map(|(date, (messages, tools))| {
+            let s = sess.get(&date).copied().unwrap_or(0);
+            serde_json::json!({ "date": date, "messageCount": messages, "sessionCount": s, "toolCallCount": tools })
+        })
+        .collect();
+    out.sort_by(|a, b| a["date"].as_str().unwrap_or("").cmp(b["date"].as_str().unwrap_or("")));
     let val = serde_json::Value::Array(out);
     if let Ok(mut g) = cell.lock() {
         *g = Some((SystemTime::now(), val.clone()));
@@ -626,8 +671,8 @@ fn scan_recent_sessions(home: &std::path::Path, last_computed: &str) -> serde_js
 /// 注：缓存只到 lastComputedDate，常滞后；`deep=true`(悬停时)才额外扫近期 transcript 补「截至日之后」
 /// 那几天的活动(recentSessions)，前端按本地日期合并进 dailyActivity，让昨天/今天的格子也有色。
 #[tauri::command]
-fn claude_stats(deep: Option<bool>) -> Result<serde_json::Value, String> {
-    let empty = serde_json::json!({ "dailyActivity": [], "modelUsage": {}, "totalSessions": 0, "totalMessages": 0, "longestSessionMs": 0, "firstSessionDate": serde_json::Value::Null, "lastComputedDate": serde_json::Value::Null, "recentSessions": [] });
+fn claude_stats(deep: Option<bool>, tz_off_min: Option<i64>) -> Result<serde_json::Value, String> {
+    let empty = serde_json::json!({ "dailyActivity": [], "modelUsage": {}, "totalSessions": 0, "totalMessages": 0, "longestSessionMs": 0, "firstSessionDate": serde_json::Value::Null, "lastComputedDate": serde_json::Value::Null, "recentDays": [] });
     let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
     if home.is_empty() {
         return Ok(empty);
@@ -650,7 +695,7 @@ fn claude_stats(deep: Option<bool>) -> Result<serde_json::Value, String> {
         .unwrap_or(0);
     let last_computed = v.get("lastComputedDate").and_then(|x| x.as_str()).unwrap_or("");
     let recent = if deep.unwrap_or(false) {
-        scan_recent_sessions(std::path::Path::new(&home), last_computed)
+        scan_recent_sessions(std::path::Path::new(&home), last_computed, tz_off_min.unwrap_or(0))
     } else {
         serde_json::Value::Array(vec![])
     };
@@ -662,7 +707,7 @@ fn claude_stats(deep: Option<bool>) -> Result<serde_json::Value, String> {
         "longestSessionMs": longest_ms,
         "firstSessionDate": v.get("firstSessionDate").cloned().unwrap_or(serde_json::Value::Null),
         "lastComputedDate": v.get("lastComputedDate").cloned().unwrap_or(serde_json::Value::Null),
-        "recentSessions": recent,
+        "recentDays": recent,
     }))
 }
 

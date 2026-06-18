@@ -1633,7 +1633,8 @@ function Inner() {
   }, []);
   // deep=true(仅悬停时)：额外扫近期 transcript 补「缓存截至日之后」的活动(昨天/今天的格子)；轮询用 false 省开销。
   const fetchGlance = useCallback((deep = false) => {
-    void invoke<StatsData>("claude_stats", { deep })
+    const tzOffMin = -new Date().getTimezoneOffset(); // 东为正(UTC+8→480)，给后端把消息时间戳转本地日期
+    void invoke<StatsData>("claude_stats", { deep, tzOffMin })
       .then((s) => setGlanceStats(s && s.dailyActivity?.length ? s : null))
       .catch(() => {});
     void invoke<StatusData>("claude_status")

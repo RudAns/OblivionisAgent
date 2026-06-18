@@ -21,8 +21,8 @@ export interface StatsData {
   longestSessionMs: number;
   firstSessionDate: string | null;
   lastComputedDate: string | null;
-  /** 缓存截至日之后的近期会话(deep 扫描得来)，前端按本地日期补进 dailyActivity */
-  recentSessions?: { ts: string; messages: number; tools: number }[];
+  /** 缓存截至日之后的近期每日活动(deep 扫描、按消息本地日期分桶)，补进 dailyActivity */
+  recentDays?: { date: string; messageCount: number; sessionCount: number; toolCallCount: number }[];
 }
 export interface StatusData {
   version: string;
@@ -111,25 +111,22 @@ function buildSeries(now: Date, n: number, by: Map<string, DailyActivity>): { da
   return out;
 }
 
-/** 把 deep 扫到的近期会话(缓存截至日之后的)按本地日期补进 dailyActivity，让昨天/今天的格子有色。 */
+/** 把 deep 扫到的近期每日活动(缓存截至日之后、已按消息本地日期分桶)补进 dailyActivity，让昨天/今天有色。 */
 function mergeRecent(stats: StatsData): DailyActivity[] {
   const base = stats.dailyActivity ?? [];
-  const last = stats.lastComputedDate ?? "";
-  const rs = stats.recentSessions ?? [];
-  if (!rs.length) return base;
-  const add = new Map<string, DailyActivity>();
-  for (const s of rs) {
-    const d = ymd(new Date(s.ts)); // 本地日期
-    if (last && d <= last) continue; // 已在缓存里，跳过
-    const cur = add.get(d) ?? { date: d, messageCount: 0, sessionCount: 0, toolCallCount: 0 };
-    cur.messageCount += s.messages;
-    cur.sessionCount += 1;
-    cur.toolCallCount += s.tools;
-    add.set(d, cur);
-  }
-  if (!add.size) return base;
-  // 同一天若缓存已有(理论上不会，因为 d>last)以扫描为准
-  const out = base.filter((x) => !add.has(x.date)).concat([...add.values()]);
+  const rd = stats.recentDays ?? [];
+  if (!rd.length) return base;
+  const dates = new Set(rd.map((r) => r.date));
+  const out = base
+    .filter((x) => !dates.has(x.date))
+    .concat(
+      rd.map((r) => ({
+        date: r.date,
+        messageCount: r.messageCount,
+        sessionCount: r.sessionCount,
+        toolCallCount: r.toolCallCount,
+      })),
+    );
   out.sort((a, b) => a.date.localeCompare(b.date));
   return out;
 }
