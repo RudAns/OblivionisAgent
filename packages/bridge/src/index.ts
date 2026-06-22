@@ -35,6 +35,28 @@ import { PermissionBroker } from "./perm/permission-broker.js";
 import { runMcpPermServer } from "./perm/mcp-perm-server.js";
 import { writeFileSync } from "node:fs";
 
+/**
+ * 从回复里拆出「操作按钮」：技能约定模型在文末输出一段 ```buttons [...] ``` (JSON 数组 {label,send})。
+ * 解析成功 → 返回去掉该块的正文 body + 按钮数组；解析失败/没有 → 原文 + 空数组。点按钮会把 send 回灌进会话。
+ */
+function splitButtons(text: string): { body: string; buttons: { label: string; send: string }[] } {
+  const m = /```buttons[ \t]*\r?\n([\s\S]*?)\r?\n```/.exec(text);
+  if (!m) return { body: text, buttons: [] };
+  let buttons: { label: string; send: string }[] = [];
+  try {
+    const arr = JSON.parse(m[1]!);
+    if (Array.isArray(arr)) {
+      buttons = arr
+        .filter((b) => b && typeof b.label === "string" && typeof b.send === "string")
+        .slice(0, 5)
+        .map((b) => ({ label: String(b.label).slice(0, 30), send: String(b.send).slice(0, 1000) }));
+    }
+  } catch {
+    /* 解析失败就当没有按钮，原文照常发 */
+  }
+  return { body: text.replace(m[0], "").trim(), buttons };
+}
+
 /** 审计：把每条入站消息追加到 ~/.oblivionis/audit.jsonl（durable 记录，按群+时间可排序） */
 function appendAudit(entry: Record<string, unknown>): void {
   try {
@@ -607,7 +629,10 @@ async function main() {
         // 流式增量：每段新文本即时脱敏后刷进卡片（句柄内部已节流）
         stream ? (acc) => stream!.update(redact(acc)) : undefined,
       );
-      const safeReply = redact(reply);
+      // 技能「操作按钮」：拆出文末 ```buttons``` 块 → 正文 cleanReply（不含按钮指令）+ 按钮数组。
+      const { body: cleanReply, buttons: rawBtns } = splitButtons(reply);
+      const safeReply = redact(cleanReply);
+      const safeButtons = rawBtns.map((b) => ({ label: redact(b.label), send: redact(b.send) }));
       // 回复过长(>2800字)→ 作为飞书 .md 文件回传,避免塞进巨大气泡(链路已验证)。文件发失败则回退全文。
       const LONG = 2800;
       const sendAsFile = async (replyTo?: string): Promise<boolean> => {
@@ -628,15 +653,19 @@ async function main() {
         if (!filed) await gateway.transport.reply(inbound.chatId, safeReply, replyOpts);
         hub.broadcast({ type: "outbound", chatId: inbound.chatId, text: safeReply, ts: Date.now() });
       }
+      // 技能「操作按钮」：正文发完后再挂一张按钮卡，点了把该按钮 send 回灌进会话（走正常入站流程）
+      if (safeButtons.length && inbound.chatId && gateway.transport?.sendActionCard) {
+        await gateway.transport.sendActionCard(inbound.chatId, "", safeButtons, inbound.messageId).catch(() => {});
+      }
       // 多会话流水线（L5，异步、不阻塞主链路）：本会话产出 → 下游会话继续加工（仅当画了「会话→会话」连线）
-      if (inbound.chatId && reply.trim()) {
-        void runPipeline(node.id, reply, inbound.chatId, 0, new Set([node.id])).catch((e) =>
+      if (inbound.chatId && cleanReply.trim()) {
+        void runPipeline(node.id, cleanReply, inbound.chatId, 0, new Set([node.id])).catch((e) =>
           log.error(`流水线启动失败: ${(e as Error).message}`),
         );
       }
       // 群记忆提炼（异步、绝不影响主链路）：把这轮里值得长期记住的群信息写进 GROUP.md
       if (inbound.chatId) {
-        void distillGroupMemory(readGroupMemory(inbound.chatId) ?? "", resolved.userText, reply, inbound.senderName, {
+        void distillGroupMemory(readGroupMemory(inbound.chatId) ?? "", resolved.userText, cleanReply, inbound.senderName, {
           binPath: cfg.claude.binPath,
           cwd: cfg.claude.defaultCwd || process.cwd(),
           log: (m) => log.info(m),
@@ -649,7 +678,7 @@ async function main() {
 
       // 知识提取（异步、绝不影响主链路）：从这轮问答提取规则候选 → 收件箱 → 推送 GUI
       // ★ 只喂 userText(用户原话)，不喂 resolved.text——后者含路由前缀，会把"我自己设的前缀/系统提示词"误当成规则
-      void extractKnowledge(resolved.userText, reply, {
+      void extractKnowledge(resolved.userText, cleanReply, {
         binPath: cfg.claude.binPath,
         cwd: cfg.claude.defaultCwd || process.cwd(),
         log: (m) => log.info(m),

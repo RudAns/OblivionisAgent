@@ -236,6 +236,16 @@ export class LarkTransport implements FeishuTransport {
             const toast = this.knowledgeActionCb(String(value.id ?? ""), action, operator);
             return { toast: { type: "info", content: toast } };
           }
+          // 技能「操作按钮」：点了把 send 当作该会话的新一条消息回灌，走正常入站流程(路由/技能/脱敏都复用)
+          if (value.kind === "session-input" && this.cb) {
+            const send = String(value.send ?? "");
+            const cid = String(value.chatId ?? "");
+            if (send && cid) {
+              const senderName = (await this.getUserName(operator, cid)) ?? operator ?? "unknown";
+              this.cb({ chatId: cid, senderId: operator || "unknown", senderName, text: send, isMention: true, raw: data });
+              return { toast: { type: "info", content: "已发送 ✓" } };
+            }
+          }
           const requestId = String(value.requestId ?? "");
           const decision = value.decision === "allow" ? "allow" : "deny";
           if (requestId && this.cardActionCb) {
@@ -909,6 +919,38 @@ export class LarkTransport implements FeishuTransport {
 
   onKnowledgeAction(cb: (id: string, action: "accept" | "dismiss", operatorOpenId: string) => string): void {
     this.knowledgeActionCb = cb;
+  }
+
+  /** 发送「操作按钮」卡片：文末挂若干按钮，点了把该按钮的 send 文本回灌进会话（value.kind=session-input）。 */
+  async sendActionCard(
+    chatId: string,
+    text: string,
+    buttons: { label: string; send: string }[],
+    replyToMessageId?: string,
+  ): Promise<boolean> {
+    if (!this.client || !buttons.length) return false;
+    const card = {
+      config: { wide_screen_mode: true },
+      elements: [
+        ...(text.trim() ? [{ tag: "div", text: { tag: "lark_md", content: text } }] : []),
+        {
+          tag: "action",
+          actions: buttons.slice(0, 5).map((b, i) => ({
+            tag: "button",
+            text: { tag: "plain_text", content: b.label.slice(0, 30) },
+            type: i === 0 ? "primary" : "default",
+            value: { kind: "session-input", chatId, send: b.send },
+          })),
+        },
+      ],
+    };
+    try {
+      await this.sendContent(chatId, replyToMessageId, "interactive", JSON.stringify(card));
+      return true;
+    } catch (e) {
+      this.opts.log("warn", `操作按钮卡片发送失败: ${(e as Error).message}`);
+      return false;
+    }
   }
 
   /** 发送知识收件箱裁决卡片：采纳(写 CLAUDE.md)/忽略 两个按钮，value 携带 kind+id+action */

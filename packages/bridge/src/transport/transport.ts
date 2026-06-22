@@ -79,6 +79,16 @@ export interface FeishuTransport {
   fetchDocContent?(url: string): Promise<{ title?: string; text: string } | undefined>;
   /** 发送一张交互卡片（可选；供 /status 等富卡复用） */
   sendCard?(chatId: string, card: unknown, replyToMessageId?: string): Promise<boolean>;
+  /**
+   * 发送「操作按钮」卡片（可选；技能让回复文末挂按钮用）。每个按钮点了 → 把 send 当作该会话的新一条消息回灌。
+   * button.value 内部携带 { kind:"session-input", chatId, send }，点击在传输层合成一条入站消息走正常流程。
+   */
+  sendActionCard?(
+    chatId: string,
+    text: string,
+    buttons: { label: string; send: string }[],
+    replyToMessageId?: string,
+  ): Promise<boolean>;
   /** 把文本作为飞书文件发出（可选；长报告/补丁/CSV 回传，避免巨大气泡） */
   sendTextFile?(chatId: string, fileName: string, content: string, replyToMessageId?: string): Promise<boolean>;
   /** 发送工具审批交互卡片（可选；按钮 value 携带 requestId+decision） */
