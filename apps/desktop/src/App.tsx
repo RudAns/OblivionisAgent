@@ -57,6 +57,7 @@ import { useI18n, useT, tStatic, type Lang } from "./i18n/index.js";
 import { IconMoon, IconSun, IconMonitor } from "./layout/icons.js";
 import { SessionSidebar } from "./layout/SessionSidebar.js";
 import { HomeView } from "./layout/HomeView.js";
+import { UpdateBanner } from "./layout/UpdateBanner.js";
 import { StatusBar } from "./layout/StatusBar.js";
 import { StatsChip, BrandInfo, type StatsData, type StatusData, type AppVer } from "./layout/GlanceChips.js";
 
@@ -1940,6 +1941,8 @@ function Inner() {
         )}
         <WindowControls />
       </header>
+
+      {WIN_MODE === "main" && <UpdateBanner />}
 
       {unroutedActive && (
         <div className="banner">

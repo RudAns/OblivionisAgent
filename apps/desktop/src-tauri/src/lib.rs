@@ -1102,6 +1102,9 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_shell::init())
+        // 自动更新（updater 查端点/下载安装签名包，process 用于装完重启）
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         // 全局唤起热键：默认不注册，由前端按设置(默认关)动态 register/unregister(避免与别的软件撞键)
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(BridgeProc::default())
