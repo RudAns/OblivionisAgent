@@ -1,3 +1,6 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ConfigStore } from "./config-store.js";
 import type { Logger } from "./logger.js";
 import type { LoopNode, ClaudeSessionNode } from "@oblivionis/shared";
@@ -21,6 +24,8 @@ export interface LoopDeps {
   runPrompt: (sessionNodeId: string, prompt: string) => Promise<string>;
   /** 把结果发到飞书群（出站脱敏由实现保证） */
   deliver: (chatId: string, text: string) => Promise<void>;
+  /** 重置会话上下文（重新 fork 出新鲜脱敏分身）；用于「每 N 轮新鲜上下文」。复用「刷新快照」。 */
+  resetSession: (sessionNodeId: string) => Promise<void>;
   /** 广播运行进度给 GUI（节点卡/检视显示第几轮、是否在跑、停因） */
   progress: (nodeId: string, round: number, max: number, running: boolean, note?: string) => void;
   /** 当前累计花费 USD（用于预算刹车；取自成本账本 summary().total） */
@@ -131,15 +136,29 @@ export class LoopRunner {
   private async fire(loop: LoopNode, session: ClaudeSessionNode): Promise<void> {
     const d = loop.data;
     const maxRounds = Math.max(1, Math.min(50, d.maxRounds || 5));
+    const reset = d.resetEvery && d.resetEvery > 0 ? Math.min(d.resetEvery, maxRounds) : 0;
     const startCost = this.deps.costTotal();
     const transcript: string[] = [];
     let stopReason = `跑满 ${maxRounds} 轮`;
     let round = 0;
-    this.deps.log.info(`循环触发:「${loop.label}」→ ${session.label}（上限 ${maxRounds} 轮）`);
+    let justReset = false;
+    this.deps.log.info(
+      `循环触发:「${loop.label}」→ ${session.label}（上限 ${maxRounds} 轮${reset ? `，每 ${reset} 轮重置上下文` : ""}）`,
+    );
     try {
       for (round = 1; round <= maxRounds; round++) {
         this.deps.progress(loop.id, round, maxRounds, true);
-        const prompt = round === 1 ? d.prompt || "开始。" : d.continuePrompt;
+        let prompt: string;
+        if (round === 1) {
+          prompt = d.prompt || "开始。";
+          if (reset)
+            prompt += `\n\n（这是多轮任务，每 ${reset} 轮会重置上下文。请把进度持续写入工作目录的 STATE.md；每轮先读 STATE.md 了解已完成到哪，再做下一步。全部完成时单独回复一行：${d.doneMarker}）`;
+        } else if (justReset) {
+          prompt = "（上下文已重置）请读取工作目录的 STATE.md，按已记录的进度继续下一步，并把新进度写回 STATE.md。";
+        } else {
+          prompt = d.continuePrompt;
+        }
+        justReset = false;
         const reply = (await this.deps.runPrompt(session.id, prompt)) ?? "";
         transcript.push(`【第 ${round} 轮】\n${reply.trim()}`);
 
@@ -151,7 +170,19 @@ export class LoopRunner {
           stopReason = `达预算上限 $${d.maxCostUsd}（第 ${round} 轮）`;
           break;
         }
-        if (round < maxRounds) await new Promise((r) => setTimeout(r, ROUND_GAP_MS));
+        if (round >= maxRounds) break;
+        // 每 N 轮重置上下文：重新 fork 出新鲜分身（靠 STATE.md 续接进度），防长循环上下文膨胀
+        if (reset && round % reset === 0) {
+          this.deps.progress(loop.id, round, maxRounds, true, "重置上下文…");
+          try {
+            await this.deps.resetSession(session.id);
+            justReset = true;
+            this.deps.log.info(`循环「${loop.label}」第 ${round} 轮后重置上下文（新鲜分身）`);
+          } catch (e) {
+            this.deps.log.warn(`循环「${loop.label}」重置上下文失败，继续同上下文: ${(e as Error).message}`);
+          }
+        }
+        await new Promise((r) => setTimeout(r, ROUND_GAP_MS));
       }
       if (round > maxRounds) round = maxRounds;
 
@@ -162,6 +193,7 @@ export class LoopRunner {
         `🔁「${loop.label}」循环完成 · ${round} 轮 · 停因：${stopReason}` +
         (spent > 0 ? ` · 花费 $${spent.toFixed(3)}` : "");
       const body = transcript.join("\n\n");
+      this.writeRunLog(loop.label, head, body);
       if (chatId && body.trim()) {
         await this.deps.deliver(chatId, `${head}\n\n${body}`);
       } else {
@@ -175,5 +207,24 @@ export class LoopRunner {
       const s = this.state.get(loop.id);
       if (s) s.running = false;
     }
+  }
+
+  /** 把本次循环完整 run-log 落盘到 ~/.oblivionis/loop-logs/，便于事后复看（失败不影响循环）。 */
+  private writeRunLog(label: string, head: string, body: string): void {
+    try {
+      const dir = join(homedir(), ".oblivionis", "loop-logs");
+      mkdirSync(dir, { recursive: true });
+      const safe = label.replace(/[\\/:*?"<>|]/g, "_").slice(0, 40) || "loop";
+      writeFileSync(join(dir, `${safe}-${this.stamp()}.md`), `# ${head}\n\n${body}\n`, "utf8");
+    } catch (e) {
+      this.deps.log.warn(`循环 run-log 落盘失败: ${(e as Error).message}`);
+    }
+  }
+
+  /** YYYYMMDD-HHmmss（本地） */
+  private stamp(): string {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
   }
 }

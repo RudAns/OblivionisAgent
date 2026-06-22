@@ -108,6 +108,7 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
       doneMarker: "[[DONE]]",
       maxRounds: 5,
       maxCostUsd: 0,
+      resetEvery: 0,
       enabled: true,
     },
   }),
@@ -3128,6 +3129,21 @@ function Inspector({
               onChange={(e) => onPatch({ maxCostUsd: Math.max(0, Number(e.target.value) || 0) })}
             />
           </label>
+          <label className="field">
+            <span>{t("每 N 轮重置上下文（0=不重置）")}</span>
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={d.resetEvery ?? 0}
+              onChange={(e) => onPatch({ resetEvery: Math.max(0, Math.min(50, Number(e.target.value) || 0)) })}
+            />
+          </label>
+          {(d.resetEvery ?? 0) > 0 && (
+            <div className="hint" style={{ marginBottom: 6 }}>
+              {t("长循环防上下文膨胀：每 N 轮重新 fork 新鲜分身，靠工作目录 STATE.md 续接进度（引擎自动要求会话读写它）。")}
+            </div>
+          )}
           {field(t("触发时刻（空=仅手动）"), d.schedule, "schedule")}
           <div className="hint" style={{ marginBottom: 6 }}>
             {t("留空=只手动「跑一次」；或填 09:00 / every 30m 自动触发")}

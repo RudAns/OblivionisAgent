@@ -656,4 +656,7 @@ export const EN: Record<string, string> = {
   "上次：{0}": "Last: {0}",
   "循环会对下游会话反复发指令，直到完成标记/满轮数/超预算；只报告，破坏性操作仍走审批卡。":
     "The loop repeatedly prompts the downstream session until the done marker / max rounds / budget cap; report-only — destructive actions still go through the approval card.",
+  "每 N 轮重置上下文（0=不重置）": "Reset context every N rounds (0=off)",
+  "长循环防上下文膨胀：每 N 轮重新 fork 新鲜分身，靠工作目录 STATE.md 续接进度（引擎自动要求会话读写它）。":
+    "Long-loop anti-bloat: re-fork a fresh session every N rounds, carrying progress via STATE.md in the work dir (the engine auto-instructs the session to read/write it).",
 };

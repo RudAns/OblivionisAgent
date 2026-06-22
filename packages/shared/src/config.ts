@@ -153,6 +153,12 @@ export const LoopData = z.object({
   maxRounds: z.number().int().min(1).max(50).default(5),
   /** 预算上限(USD)，本次循环累计花费超过即停；0=不限（仍受 maxRounds 兜底） */
   maxCostUsd: z.number().min(0).default(0),
+  /**
+   * 每 N 轮重置上下文（重新 fork 出新鲜分身）；0=不重置（同上下文连续，旧行为）。
+   * Ralph Wiggum 式长循环：上下文越滚越大会变慢变贵，定期重置保持清爽。
+   * 开启后靠工作目录的 STATE.md 续接进度——引擎会自动在指令里要求会话读写 STATE.md。
+   */
+  resetEvery: z.number().int().min(0).max(50).default(0),
   /** 每轮/汇总发到的飞书群 chatId；留空=全局 homeChatId；都没有则只记日志 */
   chatId: z.string().optional(),
   enabled: z.boolean().default(true),

@@ -833,6 +833,7 @@ async function main() {
     log,
     runPrompt: runWebhookPrompt,
     deliver: deliverToChat,
+    resetSession: (nodeId) => sessions.prepareGuestFork(nodeId),
     progress: (nodeId, round, max, running, note) =>
       hub.broadcast({ type: "loop-progress", nodeId, round, max, running, note }),
     costTotal: () => costLedger.summary().total,
