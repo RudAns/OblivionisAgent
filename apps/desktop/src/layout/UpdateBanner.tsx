@@ -34,9 +34,13 @@ export function UpdateBanner() {
 
   useEffect(() => {
     void runCheck(false); // 启动自动查一次
-    const onManual = () => void runCheck(true);
+    const id = window.setInterval(() => void runCheck(false), 5 * 60 * 60 * 1000); // 之后每 5 小时自动查一次
+    const onManual = () => void runCheck(true); // 设置里「检查更新」手动触发
     window.addEventListener("oblivionis:check-update", onManual);
-    return () => window.removeEventListener("oblivionis:check-update", onManual);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("oblivionis:check-update", onManual);
+    };
   }, [runCheck]);
 
   const doUpdate = useCallback(async () => {

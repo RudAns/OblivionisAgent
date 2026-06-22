@@ -2382,6 +2382,22 @@ function Inner() {
                   GitHub
                 </button>
               </div>
+
+              <div className="settings-label" style={{ marginTop: 16 }}>{t("更新")}</div>
+              <div className="fs-actions">
+                <button
+                  title={t("立即向 GitHub 检查是否有新版本")}
+                  onClick={() => {
+                    setSettingsOpen(false); // 收起设置，好让顶部更新条/结果露出来
+                    window.dispatchEvent(new Event("oblivionis:check-update"));
+                  }}
+                >
+                  {t("🔄 检查更新")}
+                </button>
+              </div>
+              <div className="hint" style={{ marginTop: 6 }}>
+                {t("当前 v{0} · 启动时与每 5 小时自动检查一次", appVer?.version ?? "—")}
+              </div>
             </div>
           </div>
         )}
