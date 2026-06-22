@@ -1128,8 +1128,10 @@ function Inner() {
   }, []);
 
   // 启动闪屏：固定 4 秒(进度条走满)后显示主窗、关掉闪屏小窗。引擎慢/没起来也照常弹主窗(不会卡住)。
+  // 只在主窗跑：画布窗也加载同一份 App，若不拦它会 getCurrentWindow().show() 把自己也弹出来——
+  // 画布窗应保持隐藏，只由「节点图」按钮(open_canvas_window)按需显示。
   useEffect(() => {
-    if (!("__TAURI_INTERNALS__" in window)) return;
+    if (!("__TAURI_INTERNALS__" in window) || WIN_MODE !== "main") return;
     let done = false;
     const reveal = async () => {
       if (done) return;
@@ -1357,9 +1359,9 @@ function Inner() {
     }
   }, [mascotSec]);
 
-  // 点小人 → 主窗口聚焦并跳到那个完成的会话
+  // 点小人 → 主窗口聚焦并跳到那个完成的会话。只在主窗跑：否则画布窗也会响应、把自己 show 出来。
   useEffect(() => {
-    if (!("__TAURI_INTERNALS__" in window)) return;
+    if (!("__TAURI_INTERNALS__" in window) || WIN_MODE !== "main") return;
     let un: (() => void) | undefined;
     tauriListen<{ nodeId?: string }>("mascot-clicked", async (e) => {
       try {
