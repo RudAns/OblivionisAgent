@@ -52,7 +52,9 @@ export type ClientMessage =
       toolName: string;
       input: unknown;
       ctx: { nodeId?: string; nodeLabel?: string; chatId?: string; senderId?: string; senderName?: string };
-    };
+    }
+  /** 手动触发某个循环节点立即跑一次 */
+  | { type: "run-loop"; nodeId: string };
 
 export interface AuditEntry {
   chatId: string;
@@ -143,6 +145,8 @@ export type BridgeMessage =
     }
   /** 各会话节点的原始(base)/脱敏分身(fork) transcript 最终修改时间(ms)，给节点卡显示"最终修改日期" */
   | { type: "session-meta"; metas: Record<string, { base?: number; fork?: number }> }
+  /** 循环节点运行进度：第 round/max 轮、是否仍在跑、一行备注（结束/停因）。供节点卡与检视显示。 */
+  | { type: "loop-progress"; nodeId: string; round: number; max: number; running: boolean; note?: string }
   /** 回灌到飞书的出站消息（镜像给 GUI 展示） */
   | { type: "outbound"; chatId: string; text: string; ts: number }
   | { type: "pty-opened"; ptyId: string; nodeId: string }

@@ -25,6 +25,7 @@ import { ensureSubagent, resolveSessionSubagents } from "./subagent-store.js";
 import { KnowledgeStore } from "./knowledge-store.js";
 import { extractKnowledge } from "./claude/extract-knowledge.js";
 import { CronScheduler } from "./cron-scheduler.js";
+import { LoopRunner } from "./loop-runner.js";
 import { reflectSoul } from "./claude/reflect-soul.js";
 import { readGroupMemory, writeGroupMemory, ensureGroupMemory } from "./group-memory-store.js";
 import { distillGroupMemory } from "./claude/distill-memory.js";
@@ -825,6 +826,19 @@ async function main() {
   const webhookServer = new WebhookServer({ store, log, runPrompt: runWebhookPrompt, deliver: deliverToChat });
   webhookServer.sync();
 
+  // 循环节点（Loop Engineering 驱动器）：复用 cron/webhook 的 runPrompt/deliver（脱敏分身 + 出站脱敏）。
+  // 反复跑直到完成标记/满轮数/超预算才停；预算用成本账本累计花费判定。
+  const loopRunner = new LoopRunner({
+    store,
+    log,
+    runPrompt: runWebhookPrompt,
+    deliver: deliverToChat,
+    progress: (nodeId, round, max, running, note) =>
+      hub.broadcast({ type: "loop-progress", nodeId, round, max, running, note }),
+    costTotal: () => costLedger.summary().total,
+  });
+  loopRunner.start();
+
   // 人格自主迭代闭环（Hermes 的"soul evolution"，但提案须经主人裁决）：
   // 每 24h 一次（启动 15 分钟后首跑）：对"有人格文件 + 近24h有群聊"的节点跑反思，
   // 修订提案进知识收件箱(kind=soul)，主人采纳后覆写 SOUL.md。
@@ -888,6 +902,7 @@ async function main() {
     ensureGroupMemory: (chatId) => ensureGroupMemory(chatId),
     knowledge,
     permBroker,
+    runLoop: (nodeId) => loopRunner.runNow(nodeId),
     onConfigChanged: () => {
       // 图(graph)变更不必重连飞书；仅会话需要失效（已在 server 内处理）。
       // webhook 节点增删/端口改 → 重同步监听

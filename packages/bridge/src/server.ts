@@ -56,6 +56,8 @@ export interface ServerDeps {
   knowledge: import("./knowledge-store.js").KnowledgeStore;
   /** 工具权限审批中枢 */
   permBroker: import("./perm/permission-broker.js").PermissionBroker;
+  /** 手动「跑一次」某个循环节点 */
+  runLoop: (nodeId: string) => void;
   /** 配置(graph)被 GUI 改写后回调 */
   onConfigChanged: () => void;
   /** 干跑路由(含意图分类)，返回 route-test-result，不真发飞书/不真跑会话 */
@@ -206,6 +208,9 @@ export class ControlServer {
         void sessions
           .prepareGuestFork(msg.nodeId)
           .catch((e) => log.error(`刷新快照失败: ${e.message}`));
+        break;
+      case "run-loop":
+        this.deps.runLoop(msg.nodeId);
         break;
       case "reinject-soul":
         void this.deps

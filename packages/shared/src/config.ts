@@ -131,6 +131,35 @@ export const CronData = z.object({
 export type CronData = z.infer<typeof CronData>;
 
 /**
+ * 循环节点（cron 升级版 / Loop Engineering 驱动器）：到点或手动触发后，对下游「Claude 会话」节点
+ * 反复跑 prompt——每轮把「继续」推动语回灌进同一脱敏分身（上下文自然累积），直到命中完成标记 /
+ * 跑满轮数 / 超预算才停，最后把汇总发到群。
+ *
+ * 安全栅栏（同 cron）：每轮 = 普通脱敏分身上的一条消息，无任何特权；破坏性操作仍走审批卡。
+ * v1 只做 L1（报告/发飞书）；隔离(worktree)、每 N 轮新鲜上下文留给后续阶段。
+ */
+export const LoopData = z.object({
+  /** 触发：留空=仅手动「跑一次」；或 "HH:MM" / "every 30m" 自动触发（语法同 cron） */
+  schedule: z.string().default(""),
+  /** 第 1 轮发给下游会话的任务指令 */
+  prompt: z.string().default(""),
+  /** 第 2 轮起每轮发的「继续」推动语（会话据此推进下一步；完成时按约定输出 doneMarker） */
+  continuePrompt: z.string().default("继续下一步。全部做完后，单独回复一行：[[DONE]]"),
+  /** 停止判定：sentinel=回复出现 doneMarker 即停（兜底仍有 maxRounds）；count=固定跑满 maxRounds */
+  stopMode: z.enum(["sentinel", "count"]).default("sentinel"),
+  /** sentinel 模式的完成标记 */
+  doneMarker: z.string().default("[[DONE]]"),
+  /** 轮数硬上限（永远生效的刹车，防失控空转） */
+  maxRounds: z.number().int().min(1).max(50).default(5),
+  /** 预算上限(USD)，本次循环累计花费超过即停；0=不限（仍受 maxRounds 兜底） */
+  maxCostUsd: z.number().min(0).default(0),
+  /** 每轮/汇总发到的飞书群 chatId；留空=全局 homeChatId；都没有则只记日志 */
+  chatId: z.string().optional(),
+  enabled: z.boolean().default(true),
+});
+export type LoopData = z.infer<typeof LoopData>;
+
+/**
  * Webhook 入口节点：外部系统(GitHub/Jenkins/CI)POST 到 /hook/<token>，
  * 触发下游「Claude 会话」分析请求体，结果发指定群。token 即口令(放在 URL 里)。
  */
@@ -179,6 +208,7 @@ export const GraphNode = z.discriminatedUnion("kind", [
   BaseNode.extend({ kind: z.literal("intent-switch"), data: IntentSwitchData }),
   BaseNode.extend({ kind: z.literal("claude-session"), data: ClaudeSessionData }),
   BaseNode.extend({ kind: z.literal("cron"), data: CronData }),
+  BaseNode.extend({ kind: z.literal("loop"), data: LoopData }),
   BaseNode.extend({ kind: z.literal("webhook"), data: WebhookData }),
   BaseNode.extend({ kind: z.literal("soul"), data: SoulData }),
   BaseNode.extend({ kind: z.literal("skill"), data: SkillData }),
@@ -191,6 +221,7 @@ export type RouteNode = Extract<GraphNode, { kind: "route" }>;
 export type IntentSwitchNode = Extract<GraphNode, { kind: "intent-switch" }>;
 export type ClaudeSessionNode = Extract<GraphNode, { kind: "claude-session" }>;
 export type CronNode = Extract<GraphNode, { kind: "cron" }>;
+export type LoopNode = Extract<GraphNode, { kind: "loop" }>;
 export type WebhookNode = Extract<GraphNode, { kind: "webhook" }>;
 export type SoulNode = Extract<GraphNode, { kind: "soul" }>;
 export type SkillNode = Extract<GraphNode, { kind: "skill" }>;
