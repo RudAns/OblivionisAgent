@@ -1003,6 +1003,32 @@ button.primary {
   flex-shrink: 0;
 }
 
+/* 画布工具条上的次级按钮（导出图片等）：低调的描边白底，区别于主色「＋ 添加节点」 */
+.canvas-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: background 0.12s, border-color 0.12s;
+}
+.canvas-tool-btn:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--accent);
+}
+.canvas-tool-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* 画板浮动工具条：加节点按钮（top-center，避开左上角的收起键/节点编辑浮窗） */
 .canvas-palette {
   position: absolute;
@@ -3880,4 +3906,578 @@ button.primary {
   font-size: 10.5px;
   color: var(--muted);
   line-height: 1.45;
+}
+
+/* ═════════ 节点编辑器弹窗（modal）═════════ */
+/* 从角落浮窗升级为带遮罩的居中弹窗——后续 Loop/循环配置会变重，需要更大更聚焦的编辑空间。
+   仍保留 .popup / .popup-inspector 类，复用既有头部/正文样式与「点外部关闭」逻辑。 */
+.node-modal-backdrop {
+  position: fixed;
+  top: 52px; /* 让出自定义标题栏（52px）：弹窗开着也能拖窗 / 用最小化·关闭按钮 */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.42);
+}
+.popup-inspector.node-modal {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: min(660px, 94vw);
+  max-height: min(86vh, 880px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+  animation: nodeModalIn 0.14s ease-out;
+}
+@keyframes nodeModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ═════════ 欢迎主页：一图流仪表盘（Home dashboard）═════════ */
+/* 布局：节点图占左上(大)，其正下方=成本(宽)，右整列=活动日历(高)+订阅用量(矮)。
+   卡片 bg/border 都用 color-mix 兑透明、去投影，融进面板 → 整页读作「一块信息」。 */
+.home-view {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background:
+    radial-gradient(1200px 520px at 30% -10%, rgba(var(--accent-rgb), 0.07), transparent 72%),
+    var(--panel);
+}
+.home-dash {
+  height: 100%;
+  min-height: 540px;
+  box-sizing: border-box;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(312px, 1fr);
+  grid-template-rows: auto minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-areas:
+    "hero  hero"
+    "graph side"
+    "cost  side";
+  gap: 12px;
+}
+
+/* —— 卡片基底：半透 + 极淡描边，融进面板 —— */
+.dash-card {
+  background: color-mix(in srgb, var(--card) 42%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 38%, transparent);
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+button.dash-card {
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  transition: background 0.14s, border-color 0.14s;
+}
+button.dash-card:hover {
+  background: color-mix(in srgb, var(--card) 62%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.dash-card-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  flex-shrink: 0;
+}
+.dch-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.dch-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.dash-card-body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 14px;
+}
+
+/* —— 顶部 hero（不做卡片，直接落面板上）—— */
+.dash-hero {
+  grid-area: hero;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 2px 2px 0;
+}
+.dash-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.dash-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  object-fit: contain;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.dash-brand-txt h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.dash-accent {
+  color: var(--accent);
+}
+.dash-ver {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.dash-brand-txt p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.dash-hero-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.dash-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dst {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--card) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 36%, transparent);
+  border-radius: 9px;
+  padding: 6px 11px;
+}
+.dst b {
+  font-size: 14px;
+  color: var(--text);
+}
+.dst-badge b {
+  color: var(--accent);
+}
+.dash-acts {
+  display: flex;
+  gap: 8px;
+}
+.dash-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.3);
+}
+.dash-act:hover {
+  filter: brightness(1.06);
+}
+.dash-act.ghost {
+  background: color-mix(in srgb, var(--card) 45%, transparent);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  box-shadow: none;
+}
+.dash-act.ghost:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+}
+
+/* —— 节点编排总览（左上·大）：只用圆角色块 + 连线表现 —— */
+.dash-graph {
+  grid-area: graph;
+  min-height: 0;
+}
+.dgraph-body {
+  padding: 0;
+  position: relative;
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 0) 0 0 / 24px 24px,
+    transparent;
+}
+.gm-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.gm-edge {
+  fill: none;
+  stroke: var(--edge-rest, #8893a3);
+  stroke-width: 2.6;
+  opacity: 0.45;
+}
+.gm-node {
+  fill: var(--card); /* 兜底：内联实色失败也不至于变 SVG 默认黑块 */
+  stroke-width: 1.6;
+}
+.dgraph-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* —— 成本看板（左下·宽）：今日/累计/运行 + 按会话花费横条排行 —— */
+.dash-cost {
+  grid-area: cost;
+  min-height: 0;
+}
+.dash-cost .dash-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.cost-nums {
+  display: flex;
+  gap: 9px;
+}
+.cn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: color-mix(in srgb, var(--frame) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  border-radius: 9px;
+  padding: 7px 10px;
+}
+.cn i {
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.cn b {
+  font-size: 15px;
+  color: var(--text);
+  font-weight: 700;
+}
+.cost-rank {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  justify-content: center;
+}
+.crk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.crk-lb {
+  width: 110px;
+  flex-shrink: 0;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crk-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--frame) 55%, transparent);
+  overflow: hidden;
+}
+.crk-bar span {
+  display: block;
+  height: 100%;
+  background: color-mix(in srgb, var(--accent) 62%, transparent);
+  border-radius: 999px;
+}
+.crk-v {
+  width: 58px;
+  flex-shrink: 0;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cost-empty {
+  font-size: 12px;
+  color: var(--muted);
+  margin: auto;
+  text-align: center;
+}
+
+/* —— 右整列：活动日历(高) + 订阅用量(矮) —— */
+.dash-side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.dash-cal {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.dash-usage {
+  flex: 0 0 auto;
+}
+
+/* 订阅用量：两条紧凑横条 */
+.dash-usage .dash-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+}
+.um-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.um-lb {
+  width: 26px;
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.um-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--frame) 55%, transparent);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+}
+.um-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s;
+}
+.um-bar span.warm {
+  background: #c68a32;
+}
+.um-bar span.hot {
+  background: #d0473a;
+}
+.um-row b {
+  width: 40px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.um-row b.warm {
+  color: #c68a32;
+}
+.um-row b.hot {
+  color: #d0473a;
+}
+
+/* —— 活动日历：方格 + 关键统计 + 今日宜忌；三组均匀撑满，不留中间空白 —— */
+.dcal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: space-between;
+}
+.dcal-top {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dcal-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+}
+.dcal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.dcal-cell {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid transparent;
+}
+.dcal-cell.empty {
+  background: transparent;
+}
+.dcal-cell.l0 {
+  background: color-mix(in srgb, var(--frame) 60%, transparent);
+}
+.dcal-cell.l1 {
+  background: color-mix(in srgb, var(--accent) 22%, var(--frame));
+  color: var(--text);
+}
+.dcal-cell.l2 {
+  background: color-mix(in srgb, var(--accent) 42%, var(--frame));
+  color: var(--text);
+}
+.dcal-cell.l3 {
+  background: color-mix(in srgb, var(--accent) 64%, transparent);
+  color: #fff;
+}
+.dcal-cell.l4 {
+  background: var(--accent);
+  color: #fff;
+}
+.dcal-cell.today {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  font-weight: 700;
+}
+.dcal-fortune {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--frame) 50%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 26%, transparent);
+  border-radius: 10px;
+}
+.dcf-h {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.dcf-row {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.dcf-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.dcf-badge.yi {
+  background: #3b9b70;
+}
+.dcf-badge.ji {
+  background: #c0517a;
+}
+.dcf-items {
+  color: var(--text);
+}
+.dcal-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.dcs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: color-mix(in srgb, var(--frame) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  border-radius: 8px;
+  padding: 6px 9px;
+  min-width: 0;
+}
+.dcs i {
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.dcs b {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.dcal-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.dcal-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.dcal-legend i.l0 {
+  background: color-mix(in srgb, var(--frame) 60%, transparent);
+}
+.dcal-legend i.l1 {
+  background: color-mix(in srgb, var(--accent) 22%, var(--frame));
+}
+.dcal-legend i.l2 {
+  background: color-mix(in srgb, var(--accent) 42%, var(--frame));
+}
+.dcal-legend i.l3 {
+  background: color-mix(in srgb, var(--accent) 64%, transparent);
+}
+.dcal-legend i.l4 {
+  background: var(--accent);
+}
+
+/* ═════════ 节点编排独立窗口：只显示画布 ═════════ */
+/* 画布从主视图右侧面板独立成单独窗口(label=canvas)，主视图让给终端+欢迎页。
+   该窗口有原生标题栏，故隐藏主窗那套自定义标题栏/图标栏/会话侧栏/状态栏，只留画布。 */
+.app.canvas-win > .toolbar,
+.app.canvas-win > .statusbar,
+.app.canvas-win .railbar,
+.app.canvas-win .rail {
+  display: none;
 }

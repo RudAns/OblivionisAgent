@@ -803,6 +803,20 @@ fn open_md_viewer(app: tauri::AppHandle) -> Result<(), String> {
     }
 }
 
+/// 打开/聚焦「节点编排」独立窗口（同 mdviewer：常驻、点关闭=隐藏，所以这里 get 一定拿得到）。
+/// 节点画布从主视图右侧面板挪出来单开一窗，主视图让给终端 + 欢迎页，不再来回切。
+#[tauri::command]
+fn open_canvas_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("canvas") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        Ok(())
+    } else {
+        Err("节点编排窗口未就绪".into())
+    }
+}
+
 /// 路径归一化（去重用）：分隔符统一成 \、去尾斜杠、小写（Windows 大小写不敏感）。
 fn norm_path(p: &str) -> String {
     p.replace('/', "\\").trim_end_matches('\\').to_lowercase()
@@ -1095,7 +1109,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
             context_estimate, claude_stats, claude_status, app_version, set_feishu_secret, has_feishu_secret,
-            reports_dir, open_md_viewer, session_dirs, list_md_files, read_md, read_file_b64
+            reports_dir, open_md_viewer, open_canvas_window, session_dirs, list_md_files, read_md, read_file_b64
         ])
         .setup(|app| {
             if std::env::var("OBLIVIONIS_NO_SIDECAR").as_deref() != Ok("1") {
@@ -1109,7 +1123,7 @@ pub fn run() {
             // 文档查看器：点关闭=隐藏而非销毁，保持常驻、随时可再 show（同 mascot 思路）。
             // 不拦的话它会被销毁 → 下次 open_md_viewer get 不到 → "打不开"。
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "mdviewer" {
+                if window.label() == "mdviewer" || window.label() == "canvas" {
                     api.prevent_close();
                     let _ = window.hide();
                     return;

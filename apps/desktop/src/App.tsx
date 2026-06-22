@@ -15,6 +15,8 @@ import {
   useReactFlow,
   addEdge,
   applyNodeChanges,
+  getNodesBounds,
+  getViewportForBounds,
   type Node,
   type Edge,
   type Connection,
@@ -35,6 +37,7 @@ import {
   type CostSnapshot,
   type KnowledgeItem,
 } from "@oblivionis/shared";
+import { toPng } from "html-to-image";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, currentMonitor, ProgressBarStatus } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -53,6 +56,7 @@ import { IconRail, type RailKey } from "./layout/IconRail.js";
 import { useI18n, useT, tStatic, type Lang } from "./i18n/index.js";
 import { IconMoon, IconSun, IconMonitor } from "./layout/icons.js";
 import { SessionSidebar } from "./layout/SessionSidebar.js";
+import { HomeView } from "./layout/HomeView.js";
 import { StatusBar } from "./layout/StatusBar.js";
 import { StatsChip, BrandInfo, type StatsData, type StatusData, type AppVer } from "./layout/GlanceChips.js";
 
@@ -294,6 +298,21 @@ function rfToGraph(nodes: Node[], edges: Edge[]): OblivionisConfig["graph"] {
   };
 }
 
+/**
+ * 本 webview 的角色：节点画布已拆成独立窗口(label="canvas")，与主窗各跑一份 App、各连同一后台引擎。
+ * - "main"：欢迎页 + 终端 + 各面板；不内嵌画布，「节点图」按钮改为开/聚焦画布窗口。只读地全量套用引擎下发的图(供概览/侧栏同步)。
+ * - "canvas"：只显示画布(+ 节点编辑弹窗/右键菜单/导出)，是图的唯一编辑端，编辑→set-config→引擎广播→主窗自动跟。
+ * 两窗经引擎的 config 广播保持同步(server.ts 对每个客户端广播)，用户无感。
+ */
+const WIN_MODE: "main" | "canvas" = (() => {
+  try {
+    if ("__TAURI_INTERNALS__" in window) return getCurrentWindow().label === "canvas" ? "canvas" : "main";
+  } catch {
+    /* 浏览器开发版无 Tauri，按主窗 */
+  }
+  return "main";
+})();
+
 function Inner() {
   const client = useMemo(() => new BridgeClient(`ws://127.0.0.1:${DEFAULT_WS_PORT}`), []);
   const rf = useReactFlow();
@@ -351,9 +370,14 @@ function Inner() {
     }
   });
   const [feishuOpen, setFeishuOpen] = useState(false);
+  // 欢迎主页：主窗打开软件默认落这里（每次启动都展示，像 IDE 的 Start Page）；点任意导航/卡片即离开，
+  // 左侧栏「Home」按钮随时可回来。画布窗(canvas)只显示画布，不要欢迎页。
+  const [homeOpen, setHomeOpen] = useState(WIN_MODE === "main");
+  const [exporting, setExporting] = useState(false);
   const [panelWidth, setPanelWidth] = useState(480);
   // 连线画布折叠态（记住到 localStorage）：折叠后左侧变成 Claude 会话卡片窄菜单，给终端腾空间
   const [canvasCollapsed, setCanvasCollapsedState] = useState<boolean>(() => {
+    if (WIN_MODE === "canvas") return false; // 画布窗：永远展开画布
     try {
       return localStorage.getItem("oblivionis.canvasCollapsed") === "1";
     } catch {
@@ -522,6 +546,20 @@ function Inner() {
         case "config": {
           setConfig(msg.config);
           configRef.current = msg.config;
+          if (WIN_MODE === "main") {
+            // 主窗不编辑图：每次都按引擎配置全量重建 → 概览/会话侧栏随画布窗的编辑实时更新。
+            // 同步 lastSavedSig 并跳过自动保存(见下)，避免重建触发回存形成回环。
+            const { nodes: n, edges: e } = graphToRf(msg.config, statusRef.current);
+            setNodes(n);
+            setEdges(e);
+            graphInit.current = true;
+            try {
+              lastSavedSig.current = JSON.stringify(rfToGraph(n, e));
+            } catch {
+              /* ignore */
+            }
+            break;
+          }
           if (!graphInit.current) {
             const { nodes: n, edges: e } = graphToRf(msg.config, statusRef.current);
             setNodes(n);
@@ -657,7 +695,9 @@ function Inner() {
   }, [client, setNodes, setEdges]);
 
   // 自动保存：图有实质变化(含布局)就静默存盘。不再依赖手动保存，也不会被任何操作清空。
+  // 仅画布窗(图的唯一编辑端)存盘；主窗只读地全量套用引擎图，不能回存(否则与画布窗互相覆盖)。
   useEffect(() => {
+    if (WIN_MODE !== "canvas") return;
     if (!graphInit.current || !configRef.current) return;
     let graph: OblivionisConfig["graph"];
     let sig: string;
@@ -677,8 +717,9 @@ function Inner() {
     return () => window.clearTimeout(t);
   }, [nodes, edges, client]);
 
-  // 撤销/重做历史：图实质变化 settle 后入栈（防抖，避免每帧/纯选中入栈）
+  // 撤销/重做历史：图实质变化 settle 后入栈（防抖，避免每帧/纯选中入栈）。只在画布窗(编辑端)记历史。
   useEffect(() => {
+    if (WIN_MODE !== "canvas") return;
     if (!graphInit.current) return;
     const h = historyRef.current;
     if (h.applying) {
@@ -924,6 +965,20 @@ function Inner() {
       const mod = e.ctrlKey || e.metaKey;
       // 有文本选区时，把复制/剪切交还给浏览器（日志/转录/审计里选中文字复制），不抢去复制节点
       if (mod && (k === "c" || k === "x") && window.getSelection()?.toString()) return;
+      // 主窗没有内嵌画布：只保留命令面板(Ctrl+K)与保存(Ctrl+S)，撤销/复制/缩放/适应等画布快捷键交给画布窗口
+      if (WIN_MODE !== "canvas") {
+        if (mod && k === "k") {
+          e.preventDefault();
+          setCmdkQuery("");
+          setCmdkIndex(0);
+          setCmdkOpen(true);
+        } else if (mod && k === "s") {
+          e.preventDefault();
+          saveRef.current();
+          flashSaved();
+        }
+        return;
+      }
       if (!mod) {
         if (k === "f") {
           e.preventDefault();
@@ -1161,6 +1216,16 @@ function Inner() {
     return () => document.removeEventListener("mousedown", onDown, true);
   }, [feishuOpen, settingsOpen, inspectorOpen, addMenuOpen, costOpen]);
 
+  // 节点编辑器弹窗（modal）：Esc 关闭
+  useEffect(() => {
+    if (!inspectorOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setInspectorOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [inspectorOpen]);
+
   // 切到某会话(显示其终端)时：记录"在看谁"，并清掉它的完成红点
   useEffect(() => {
     activeTermRef.current = activeTerminal;
@@ -1169,6 +1234,7 @@ function Inner() {
 
   // 打开(保活)某会话节点的终端并切到终端标签（画布双击 / 折叠菜单双击共用）
   const openTerminalForNode = useCallback((nodeId: string) => {
+    setHomeOpen(false);
     if (!termIds.current.has(nodeId)) termIds.current.set(nodeId, crypto.randomUUID());
     setSelected(nodeId);
     setActiveTerminal(nodeId);
@@ -1179,8 +1245,14 @@ function Inner() {
   }, []);
 
   // 在节点视图里定位某节点：确保画布展开 → 选中 → 平滑居中。供会话侧栏点击 / Ctrl+K 搜索复用。
+  // 画布已独立成单独窗口：主窗没有内嵌画布 → 改为开/聚焦画布窗口（跨窗口定位暂不做）。
   const locateNode = useCallback(
     (nodeId: string) => {
+      if (WIN_MODE !== "canvas") {
+        void invoke("open_canvas_window").catch(() => {});
+        return;
+      }
+      setHomeOpen(false);
       setCanvasCollapsed(false);
       setSelected(nodeId);
       setNodes((ns) => ns.map((nd) => ({ ...nd, selected: nd.id === nodeId })));
@@ -1205,6 +1277,47 @@ function Inner() {
       setCanvasCollapsed(true);
     }, 80);
   };
+
+  // 导出整张连线画布为高清 PNG（用于分享）：按所有节点的包围盒算出"适应视图"，
+  // 用 html-to-image 抓 .react-flow__viewport（只含节点+连线，不含缩略图/控制条/背景点），
+  // 2x 像素密度输出。读 rf.getNodes() 拿真实坐标——故只在画布视图下可用。
+  const exportCanvasImage = useCallback(async () => {
+    const ns = rf.getNodes();
+    if (!ns.length || exporting) return;
+    const vpEl = document.querySelector(".react-flow__viewport") as HTMLElement | null;
+    if (!vpEl) return;
+    setExporting(true);
+    try {
+      const bounds = getNodesBounds(ns);
+      const imageWidth = Math.min(4800, Math.max(1280, Math.round(bounds.width + 240)));
+      const imageHeight = Math.min(4800, Math.max(800, Math.round(bounds.height + 240)));
+      const vp = getViewportForBounds(bounds, imageWidth, imageHeight, 0.3, 2.5, 0.14);
+      const bg = resolvedTheme === "light" ? "#f4f1ea" : "#14171c";
+      const dataUrl = await toPng(vpEl, {
+        backgroundColor: bg,
+        width: imageWidth,
+        height: imageHeight,
+        pixelRatio: 2,
+        cacheBust: true,
+        style: {
+          width: `${imageWidth}px`,
+          height: `${imageHeight}px`,
+          transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`,
+        },
+      });
+      const d = new Date();
+      const p2 = (x: number) => String(x).padStart(2, "0");
+      const name = `OblivionisAgent-画布-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}.png`;
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = name;
+      a.click();
+    } catch (err) {
+      console.error("[export-image] failed:", err);
+    } finally {
+      setExporting(false);
+    }
+  }, [rf, exporting, resolvedTheme]);
 
   // 双击「Claude 会话」节点：打开它的开发终端
   const onNodeDoubleClick: NodeMouseHandler = useCallback(
@@ -1356,6 +1469,11 @@ function Inner() {
   };
 
   const addNode = (kind: keyof typeof NEW_NODE_DEFAULTS, pos?: { x: number; y: number }) => {
+    if (WIN_MODE !== "canvas") {
+      // 主窗不编辑图(改动不会落盘)：加节点请到画布窗口 → 这里只负责把它打开/聚焦。
+      void invoke("open_canvas_window").catch(() => {});
+      return;
+    }
     const base = NEW_NODE_DEFAULTS[kind]!();
     const id = crypto.randomUUID();
     const node: Node = {
@@ -1642,8 +1760,9 @@ function Inner() {
       .catch(() => {});
   }, []);
   useEffect(() => {
-    fetchGlance(false);
-    // 很慢(5 分钟)：两个小本地文件(19KB+52KB)、版本号已缓存。悬停时(deep)才扫近期 transcript。
+    // 首取 deep：欢迎页仪表盘开机即展示活动日历，要带上「缓存截至日之后」的昨天/今天活动。
+    fetchGlance(WIN_MODE === "main");
+    // 很慢(5 分钟)：两个小本地文件(19KB+52KB)、版本号已缓存。悬停/回主页(deep)才扫近期 transcript。
     const id = setInterval(() => fetchGlance(false), 300000);
     return () => clearInterval(id);
   }, [fetchGlance]);
@@ -1663,17 +1782,20 @@ function Inner() {
 
   /** 左侧图标竖栏动作分发：节点图与面板视图互斥切换 */
   const onRailAction = (key: RailKey) => {
+    if (key === "home") {
+      setHomeOpen(true);
+      setInspectorOpen(false); // 回主页时收掉编辑弹窗/下拉，保持欢迎页干净
+      setAddMenuOpen(false);
+      setFeishuOpen(false);
+      return;
+    }
+    if (key === "canvas") {
+      // 节点画布已独立成单独窗口：主窗点「节点图」=开/聚焦那个窗口，不再在右侧内嵌切换。
+      void invoke("open_canvas_window").catch(() => {});
+      return;
+    }
+    // 浮层/独立窗口类(成本看板/飞书/设置/文档查看器)：盖在「当前界面」之上即可，不要离开欢迎主页或切走视图。
     switch (key) {
-      case "canvas": {
-        const opening = canvasCollapsed; // 当前折叠 → 这次是「进节点视图」
-        setCanvasCollapsed(!canvasCollapsed); // 切换:节点视图 ⇄ 终端/面板视图
-        if (opening) {
-          // 进节点视图时别带着终端那个选中——否则会触发链路聚焦把其它连线压成半透明
-          setSelected(null);
-          setNodes((ns) => (ns.some((n) => n.selected) ? ns.map((n) => (n.selected ? { ...n, selected: false } : n)) : ns));
-        }
-        break;
-      }
       case "feishu":
         setFeishuOpen((o) => !o);
         break;
@@ -1684,11 +1806,13 @@ function Inner() {
         void invoke("open_md_viewer"); // 文档查看器是独立窗口，可边看边继续用主窗
         break;
       case "cost":
-        setCostOpen((o) => !o); // 成本看板浮层：盖在主界面上，点外部自动关（不占面板/不和选会话冲突）
+        setCostOpen((o) => !o); // 成本看板浮层：盖在当前界面上，点外部自动关（不切走视图、不离开主页）
         break;
       default:
+        // 真正切视图的面板(收件箱/审计/日志/转录/终端) → 离开欢迎主页、展开面板
+        setHomeOpen(false);
         setTab(key);
-        setCanvasCollapsed(true); // 切到终端/转录/审计/日志/收件箱面板 → 退出节点视图
+        setCanvasCollapsed(true);
     }
   };
 
@@ -1764,18 +1888,20 @@ function Inner() {
   // 终端⇄转录是"同一个会话的两种视图"：粘滞切换，保持当前在看的会话
   const viewedSessionId = tab === "terminal" ? activeTerminalId : selectedIsClaude ? selected : null;
   const showTerminalView = () => {
+    setHomeOpen(false);
     setLastSessionView("terminal");
     if (viewedSessionId) openTerminalForNode(viewedSessionId);
     else setTab("terminal");
   };
   const showTranscriptView = () => {
+    setHomeOpen(false);
     setLastSessionView("transcript");
     if (viewedSessionId) setSelected(viewedSessionId);
     setTab("transcript");
   };
 
   return (
-    <div className="app">
+    <div className={`app ${WIN_MODE === "canvas" ? "canvas-win" : ""}`}>
       <header className="toolbar" data-tauri-drag-region>
         <BrandInfo status={glanceStatus} app={appVer} />
         <button
@@ -1787,8 +1913,8 @@ function Inner() {
           <FeishuStatusDot status={feishu.status} />
           {t("飞书")}{feishu.bot?.name ? `：${feishu.bot.name}` : ""}
         </button>
-        {selectedNode && !inspectorOpen && (
-          <button onClick={() => setInspectorOpen(true)} title={t("编辑选中节点（画布收起时也可用）")}>
+        {WIN_MODE === "canvas" && selectedNode && !inspectorOpen && (
+          <button onClick={() => setInspectorOpen(true)} title={t("编辑选中节点")}>
             {t("✎ 编辑节点")}
           </button>
         )}
@@ -1827,6 +1953,7 @@ function Inner() {
 
       <div className="shell">
         <IconRail
+          homeOpen={homeOpen}
           canvasOpen={!canvasCollapsed}
           tab={tab}
           settingsOpen={settingsOpen}
@@ -1855,24 +1982,18 @@ function Inner() {
             })
           }
           onOpenTerminal={(id) => {
-            if (!canvasCollapsed) {
-              // 节点视图下点会话 → 定位到该节点(选中+居中)，会话多时方便找位置，不切去终端
-              locateNode(id);
-              return;
-            }
-            // 面板视图：选中该会话，按"上次的会话视图"显示(粘滞)，不再强制跳终端
+            // 主窗：左侧选会话 = 进它的会话视图(终端/转录)。画布在独立窗口，这里不再做画布定位。
+            setHomeOpen(false);
             setSelected(id);
-            if (lastSessionView === "transcript") {
-              setTab("transcript");
-            } else {
-              openTerminalForNode(id); // 终端视图：打开/聚焦它的终端
-            }
+            setCanvasCollapsed(true); // 让出右侧面板给会话视图
+            if (lastSessionView === "transcript") setTab("transcript");
+            else openTerminalForNode(id);
           }}
-          onAddSession={() => addNode("claude-session")}
+          onAddSession={() => void invoke("open_canvas_window").catch(() => {})}
         />
 
         <div className={`main ${canvasCollapsed ? "collapsed" : ""}`}>
-          {!canvasCollapsed && (
+          {WIN_MODE === "canvas" && (
           <div className="canvas">
           <FlowCanvas
             nodes={nodes}
@@ -1995,6 +2116,14 @@ function Inner() {
                 </div>
               )}
             </div>
+            <button
+              className="canvas-tool-btn"
+              onClick={exportCanvasImage}
+              disabled={exporting || nodes.length === 0}
+              title={t("导出高清画布图片（PNG，可分享）")}
+            >
+              {exporting ? t("导出中…") : t("⬇ 导出图片")}
+            </button>
           </div>
 
           {/* 加节点：左上角工具条 / 右键空白处 / 从端口拖到空白；底部留一行淡提示 */}
@@ -2254,54 +2383,64 @@ function Inner() {
           </div>
         )}
 
-        {/* 节点编辑浮窗：挂在 main 层级，画布收起(终端为主)时也能编辑选中的会话——不再是死胡同。
-            多选(≥2)时不显单节点检视，避免"显示一个却以为操作全局"的误导(改由对齐工具条主导)。 */}
-        {inspectorOpen && selectedNode && multiSelectCount < 2 && (
-          <div
-            className="popup popup-inspector"
-            style={{ "--nc": NODE_COLOR[selectedNode.type ?? ""] ?? "#8a93a0" } as CSSProperties}
-          >
-            <div className="popup-head">
-              <span className="pi-head-title">
-                <span className="pi-head-icon">{NODE_ICON[selectedNode.type ?? ""] ?? "▦"}</span>
-                {t("{0} 设置", t(NODE_LABEL[selectedNode.type ?? ""] ?? "节点"))}
-                {canvasCollapsed ? t("（画布已收起）") : ""}
-              </span>
-              <button className="popup-x" onClick={() => setInspectorOpen(false)} title={t("隐藏")}>
-                ×
-              </button>
-            </div>
-            <div className="popup-body">
-              <Inspector
-                node={selectedNode}
-                onPatch={patchSelected}
-                onDelete={deleteSelected}
-                sessions={sessions}
-                onListSessions={(cwd) => client.send({ type: "list-sessions", cwd })}
-                onRefreshSnapshot={(nodeId) => client.send({ type: "prepare-fork", nodeId })}
-                onReinjectSoul={(nodeId) => client.send({ type: "reinject-soul", nodeId })}
-                onEditSoul={(nodeId) => client.send({ type: "ensure-soul", nodeId })}
-                onEditSkill={(nodeId) => client.send({ type: "ensure-skill", nodeId })}
-                onEditSubagent={(nodeId) => client.send({ type: "ensure-subagent", nodeId })}
-                onEditGroupMemory={(chatId) => client.send({ type: "ensure-group-memory", chatId })}
-              />
-              {selectedIsClaude && (
-                <div className="test-box">
-                  <input
-                    value={testText}
-                    placeholder={t("给该会话发测试消息（绕过飞书）")}
-                    onChange={(e) => setTestText(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && sendTest()}
-                  />
-                  <button onClick={sendTest}>{t("发送")}</button>
+        {/* 节点编辑器：独立居中弹窗（modal）。后续 Loop/循环配置会让它变重，故从角落浮窗升级为带遮罩的
+            正式弹窗——更大、更聚焦。画布收起(终端为主)时也能编辑选中的会话。多选(≥2)时不显(改由对齐工具条主导)。
+            保留 .popup 类，让"点浮窗外关闭"的全局逻辑把弹窗内部当作浮窗内、不误关。 */}
+        {WIN_MODE === "canvas" && inspectorOpen && selectedNode && multiSelectCount < 2 &&
+          createPortal(
+            <div
+              className="node-modal-backdrop"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) setInspectorOpen(false);
+              }}
+            >
+              <div
+                className="popup popup-inspector node-modal"
+                style={{ "--nc": NODE_COLOR[selectedNode.type ?? ""] ?? "#8a93a0" } as CSSProperties}
+              >
+                <div className="popup-head">
+                  <span className="pi-head-title">
+                    <span className="pi-head-icon">{NODE_ICON[selectedNode.type ?? ""] ?? "▦"}</span>
+                    {t("{0} 设置", t(NODE_LABEL[selectedNode.type ?? ""] ?? "节点"))}
+                    {canvasCollapsed ? t("（画布已收起）") : ""}
+                  </span>
+                  <button className="popup-x" onClick={() => setInspectorOpen(false)} title={t("关闭")}>
+                    ×
+                  </button>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+                <div className="popup-body">
+                  <Inspector
+                    node={selectedNode}
+                    onPatch={patchSelected}
+                    onDelete={deleteSelected}
+                    sessions={sessions}
+                    onListSessions={(cwd) => client.send({ type: "list-sessions", cwd })}
+                    onRefreshSnapshot={(nodeId) => client.send({ type: "prepare-fork", nodeId })}
+                    onReinjectSoul={(nodeId) => client.send({ type: "reinject-soul", nodeId })}
+                    onEditSoul={(nodeId) => client.send({ type: "ensure-soul", nodeId })}
+                    onEditSkill={(nodeId) => client.send({ type: "ensure-skill", nodeId })}
+                    onEditSubagent={(nodeId) => client.send({ type: "ensure-subagent", nodeId })}
+                    onEditGroupMemory={(chatId) => client.send({ type: "ensure-group-memory", chatId })}
+                  />
+                  {selectedIsClaude && (
+                    <div className="test-box">
+                      <input
+                        value={testText}
+                        placeholder={t("给该会话发测试消息（绕过飞书）")}
+                        onChange={(e) => setTestText(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && sendTest()}
+                      />
+                      <button onClick={sendTest}>{t("发送")}</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
 
         {/* 画布展开时隐藏面板(但保持挂载，终端不掉)；收起时面板占满 */}
-        <aside className="side" style={canvasCollapsed ? { flex: 1, minWidth: 0 } : { display: "none" }}>
+        <aside className="side" style={!homeOpen && canvasCollapsed ? { flex: 1, minWidth: 0 } : { display: "none" }}>
           {/* 终端 / 转录是同一个会话的两种视图 → 面板顶部小页签切换（左侧选会话只换"哪个会话"，视图粘滞）。
               其余(审计/日志/收件箱)是全局面板，标题旁直接写一句功能说明。 */}
           {(tab === "terminal" || tab === "transcript") ? (
@@ -2421,6 +2560,31 @@ function Inner() {
             )}
           </div>
         </aside>
+
+        {/* 欢迎主页：盖在 main 区(终端/面板仍挂载在 .side 里，display:none 不掉会话)。点卡片即离开。 */}
+        {homeOpen && (
+          <HomeView
+            nodes={nodes}
+            edges={edges}
+            stats={glanceStats}
+            usage={usage}
+            cost={cost}
+            sessionCount={claudeNodes.length}
+            openTerminals={openedTerminals.length}
+            feishu={feishu}
+            app={appVer}
+            inboxBadge={pendingKnowledge}
+            onOpenCanvas={() => void invoke("open_canvas_window").catch(() => {})}
+            onOpenTerminal={() => {
+              setHomeOpen(false);
+              // 落到一个真实会话的开发终端（--resume 其 baseSessionId）；都没有就开画布窗去建一个
+              const target = viewedSessionId || activeTerminalId || claudeNodes[0]?.id || null;
+              if (target) openTerminalForNode(target);
+              else void invoke("open_canvas_window").catch(() => {});
+            }}
+            onOpenCost={() => setCostOpen(true)}
+          />
+        )}
         </div>
       </div>
 

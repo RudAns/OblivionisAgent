@@ -19,6 +19,17 @@ const base = (size = 20) => ({
   strokeLinejoin: "round" as const,
 });
 
+/** 主页/欢迎界面 */
+export function IconHome({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M4 11.5 12 4l8 7.5" />
+      <path d="M5.5 10v9.5h13V10" />
+      <path d="M9.7 19.5v-5.2h4.6v5.2" />
+    </svg>
+  );
+}
+
 /** 节点图/画布 */
 export function IconGraph({ size }: IconProps) {
   return (

@@ -42,13 +42,13 @@ function fmtN(n: number): string {
   return String(n);
 }
 /** token 量用小写 m/k（对齐 Claude /stats 的 "77.0m"） */
-function fmtTok(n: number): string {
+export function fmtTok(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "m";
   if (n >= 1000) return (n / 1000).toFixed(1) + "k";
   return String(n);
 }
 /** 时长 ms → "56d 21h 28m" */
-function fmtDur(ms: number): string {
+export function fmtDur(ms: number): string {
   if (!ms) return "—";
   const m = Math.floor(ms / 60000);
   const d = Math.floor(m / 1440);
@@ -77,7 +77,7 @@ function fmtBuild(ms: number): string {
 }
 
 /** "claude-opus-4-8" → "Opus 4.8" */
-function prettyModel(id: string): string {
+export function prettyModel(id: string): string {
   const m = /claude-(opus|sonnet|haiku|fable)-(\d+)-?(\d+)?/i.exec(id || "");
   if (!m) return id || "—";
   const fam = m[1] ?? "";
@@ -238,7 +238,7 @@ function mulberry32(seed: number): () => number {
   };
 }
 /** 按日期稳定抽「今日宜忌」：宜 2-3 个、忌 2-3 个、互不重复。同一天结果固定。 */
-function dayFortune(dateStr: string): { yi: string[]; ji: string[] } {
+export function dayFortune(dateStr: string): { yi: string[]; ji: string[] } {
   const rnd = mulberry32(hashStr(dateStr) || 1);
   const a = ALMANAC.slice();
   for (let i = a.length - 1; i > 0; i--) {
