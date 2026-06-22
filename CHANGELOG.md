@@ -9,6 +9,12 @@
 - 引擎侧:`splitButtons` 解析+剥离按钮块、`sendActionCard` 发卡、`card.action.trigger` 收 `kind:"session-input"` 回调合成入站消息。按钮文字与回灌文本对访客同样脱敏。
 - 配套技能模板:🧩 节点贴入即教会模型何时挂按钮(模板见 `~/.oblivionis/reports/操作按钮技能.md`)。
 
+### ✨ 会话支持「按群 fork」（隔离多群上下文）
+- 会话节点新增 **fork 粒度**选项(设了 baseSessionId 时显示):
+  - **按会话**(默认,旧行为):路由到本会话的多个群共用同一份 fork 上下文,可能互相串味。
+  - **按群**:每个群(chatId)各自从基础会话 fork 一份独立脱敏分身,群与群上下文互不污染。
+- 引擎按 `${nodeId}::${chatId}` 维护各群分身(`groupSessions` 映射),复用 `forkAndSanitize`(脱敏保证不变);按群模式下「刷新快照」=清空各群分身、下次各群重新 fork。
+
 ## [0.6.3] - 2026-06-22
 
 ### 🐛 修复

@@ -51,6 +51,23 @@ export class SessionManager {
 
     // 有 base：飞书走 fork 出的脱敏分身，绝不续接 base（base 留给终端）。首次先 fork+脱敏。
     if (node.data.baseSessionId) {
+      // 「按群 fork」：每个群(chatId)各自一份独立分身，群间上下文互不污染。拿不到 chatId 时退回按会话。
+      const chatId = permCtx?.chatId;
+      if (node.data.forkScope === "group" && chatId) {
+        const key = `${nodeId}::${chatId}`;
+        if (!node.data.groupSessions?.[chatId]) {
+          let inflight = this.forkInFlight.get(key);
+          if (!inflight) {
+            inflight = this.prepareGroupFork(nodeId, chatId).finally(() => this.forkInFlight.delete(key));
+            this.forkInFlight.set(key, inflight);
+          }
+          await inflight;
+        }
+        const fresh = this.findNode(nodeId)!;
+        const gsid = fresh.data.groupSessions?.[chatId];
+        const session = this.ensureSession(fresh, key, gsid, (id) => this.persistGroupSessionId(nodeId, chatId, id));
+        return session.send(text, permissionMode, appendSystemPrompt, permCtx, onText);
+      }
       if (!node.data.sessionId) {
         // 并发去重：同节点多条首条消息只跑一次 fork，其余等同一个 Promise
         let inflight = this.forkInFlight.get(nodeId);
@@ -86,6 +103,13 @@ export class SessionManager {
       this.log.warn(`节点 ${nodeId} 未设基础会话(baseSessionId)，无法 fork`);
       return;
     }
+    // 按群 fork 模式：刷新快照 = 清空所有群分身映射，各群下次来消息时各自重新 fork 一份新鲜的
+    if (node.data.forkScope === "group") {
+      this.clearGroupSessions(nodeId);
+      for (const k of [...this.sessions.keys()]) if (k.startsWith(`${nodeId}::`)) this.sessions.delete(k);
+      this.log.info(`节点 ${nodeId}: 已清空各群分身，下次各群重新 fork`);
+      return;
+    }
     const cfg = this.store.get();
     const cwd = node.data.cwd || cfg.claude.defaultCwd || process.cwd();
     this.log.info(`节点 ${nodeId}: 从 ${node.data.baseSessionId} fork 访客会话并脱敏…`);
@@ -99,6 +123,28 @@ export class SessionManager {
     this.persistSessionId(nodeId, forkId);
     this.sessions.delete(nodeId); // 丢弃旧实例，下次用新 fork
     this.log.info(`节点 ${nodeId}: 访客会话已就绪 sessionId=${forkId}`);
+  }
+
+  /** 「按群 fork」：为某个群(chatId)从 baseSessionId fork 一份独立脱敏分身，写进 groupSessions[chatId] */
+  async prepareGroupFork(nodeId: string, chatId: string): Promise<void> {
+    const node = this.findNode(nodeId);
+    if (!node || !node.data.baseSessionId) {
+      this.log.warn(`节点 ${nodeId} 未设基础会话，无法按群 fork`);
+      return;
+    }
+    const cfg = this.store.get();
+    const cwd = node.data.cwd || cfg.claude.defaultCwd || process.cwd();
+    this.log.info(`节点 ${nodeId} 群 ${chatId}: 从 ${node.data.baseSessionId} fork 独立分身并脱敏…`);
+    const forkId = await forkAndSanitize({
+      baseSessionId: node.data.baseSessionId,
+      cwd,
+      binPath: cfg.claude.binPath,
+      secrets: collectSecrets(feishuSecret.get()),
+      log: (lvl, m) => this.log[lvl](m),
+    });
+    this.persistGroupSessionId(nodeId, chatId, forkId);
+    this.sessions.delete(`${nodeId}::${chatId}`);
+    this.log.info(`节点 ${nodeId} 群 ${chatId}: 独立分身就绪 sessionId=${forkId}`);
   }
 
   /**
@@ -156,6 +202,29 @@ export class SessionManager {
     this.store.update((cfg) => {
       const target = cfg.graph.nodes.find((x) => x.id === nodeId);
       if (target && target.kind === "claude-session") target.data.sessionId = id;
+    });
+    this.hub.broadcast({ type: "config", config: this.store.get() });
+  }
+
+  /** 按群 fork：把某群的 fork id 写进 groupSessions[chatId] */
+  private persistGroupSessionId(nodeId: string, chatId: string, id: string): void {
+    const cur = this.findNode(nodeId)?.data.groupSessions?.[chatId];
+    if (cur === id) return;
+    this.store.update((cfg) => {
+      const target = cfg.graph.nodes.find((x) => x.id === nodeId);
+      if (target && target.kind === "claude-session") {
+        target.data.groupSessions = { ...(target.data.groupSessions ?? {}), [chatId]: id };
+      }
+    });
+    this.hub.broadcast({ type: "config", config: this.store.get() });
+  }
+
+  /** 清空某节点的所有群分身映射（按群 fork 模式下「刷新快照」用） */
+  private clearGroupSessions(nodeId: string): void {
+    if (!this.findNode(nodeId)?.data.groupSessions) return;
+    this.store.update((cfg) => {
+      const target = cfg.graph.nodes.find((x) => x.id === nodeId);
+      if (target && target.kind === "claude-session") target.data.groupSessions = {};
     });
     this.hub.broadcast({ type: "config", config: this.store.get() });
   }

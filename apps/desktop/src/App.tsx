@@ -3127,6 +3127,19 @@ function Inspector({
                 onChange={(e) => onPatch({ baseSessionId: e.target.value || undefined })}
               />
             </div>
+            {d.baseSessionId && (
+              <label className="field">
+                <span>{t("fork 粒度")}</span>
+                <select
+                  value={d.forkScope ?? "session"}
+                  title={t("按会话=路由到本会话的多个群共用同一份上下文(可能互相串味)；按群=每个群各自从基础会话 fork 一份独立分身，群间互不污染")}
+                  onChange={(e) => onPatch({ forkScope: e.target.value })}
+                >
+                  <option value="session">{t("按会话（多群共用一份上下文）")}</option>
+                  <option value="group">{t("按群（每群独立 fork，互不串味）")}</option>
+                </select>
+              </label>
+            )}
             <div className="fs-actions">
               <button
                 onClick={() => {

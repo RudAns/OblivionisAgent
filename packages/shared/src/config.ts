@@ -88,6 +88,14 @@ export const ClaudeSessionData = z.object({
     (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
     z.string().uuid().optional(),
   ),
+  /**
+   * fork 粒度（仅当设了 baseSessionId 时有意义）：
+   * - "session"（默认，旧行为）：整个会话一份 fork —— 多个群路由到本会话会共用同一上下文，可能互相串味。
+   * - "group"：每个群(chatId)各自从 base fork 一份独立分身，群与群上下文互不污染。
+   */
+  forkScope: z.enum(["session", "group"]).default("session"),
+  /** group 模式下各群(chatId)→对应 fork sessionId 的映射（引擎自动维护，勿手填） */
+  groupSessions: z.record(z.string()).optional(),
   /** 追加到默认 system prompt 之后的内容 */
   appendSystemPrompt: z.string().optional(),
   /**
