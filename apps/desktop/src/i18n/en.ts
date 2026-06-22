@@ -630,4 +630,30 @@ export const EN: Record<string, string> = {
   "周": "Wk",
   "(未命名)": "(unnamed)",
   "暂无花费数据 · 跑过会话后这里按花费排行": "No spend yet · sessions rank by cost here once they run",
+  // —— 循环节点(Loop) ——
+  "循环": "Loop",
+  "手动": "Manual",
+  "任务": "Task",
+  "停止": "Stop",
+  "轮": "r",
+  "满轮数": "max rounds",
+  "完成标记": "Done marker",
+  "停止方式": "Stop when",
+  "出现完成标记即停": "Done marker appears",
+  "固定跑满轮数": "Fixed N rounds",
+  "最多轮数(刹车)": "Max rounds (brake)",
+  "预算上限 $（0=不限）": "Budget cap $ (0=none)",
+  "触发时刻（空=仅手动）": "Schedule (blank=manual)",
+  "启用定时": "Enable schedule",
+  "▶ 跑一次": "▶ Run once",
+  "任务 prompt（第 1 轮发的指令）": "Task prompt (round 1)",
+  "继续语（第 2 轮起每轮发）": "Continue prompt (round 2+)",
+  "留空=只手动「跑一次」；或填 09:00 / every 30m 自动触发":
+    "Blank = manual run only; or 09:00 / every 30m to auto-trigger",
+  "留空=发到 Home Chat；必须连到一个「Claude 会话」节点才会跑":
+    "Blank = Home Chat; must connect to a Claude session node to run",
+  "运行中… 第 {0}/{1} 轮": "Running… round {0}/{1}",
+  "上次：{0}": "Last: {0}",
+  "循环会对下游会话反复发指令，直到完成标记/满轮数/超预算；只报告，破坏性操作仍走审批卡。":
+    "The loop repeatedly prompts the downstream session until the done marker / max rounds / budget cap; report-only — destructive actions still go through the approval card.",
 };

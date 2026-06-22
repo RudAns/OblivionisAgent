@@ -52,7 +52,7 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 ### packages/shared — 两端共享的契约
 | 文件 | 作用 |
 |---|---|
-| `config.ts` | **整个配置的 zod schema**（图/节点/边/owners/护栏）。节点种类: feishu-group / route / intent-switch / claude-session / cron / webhook / **soul / skill / subagent**（后三=连到会话「赋能口」的赋能节点）。改配置结构从这里开始（加节点种类见 [extending.md 配方 1](extending.md)） |
+| `config.ts` | **整个配置的 zod schema**（图/节点/边/owners/护栏）。节点种类: feishu-group / route / intent-switch / claude-session / cron / loop / webhook / **soul / skill / subagent**（后三=连到会话「赋能口」的赋能节点）。改配置结构从这里开始（加节点种类见 [extending.md 配方 1](extending.md)） |
 | `protocol.ts` | GUI↔bridge 的 WS 消息类型 |
 | `stream-json.ts` | claude stream-json 事件类型 + 辅助函数(assistantText 等) |
 
@@ -75,6 +75,7 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 | `usage-monitor.ts` | **订阅用量**：每 5 分钟 `claude -p "/usage"`（零 token、合规）解析 5h/周窗口百分比，广播 `usage-status` 给顶栏 |
 | `knowledge-store.ts` + `claude/extract-knowledge.ts` | **知识收件箱**：问答后 haiku 提取"规则性指令"候选→`~/.oblivionis/knowledge-inbox.jsonl`→GUI 裁决→采纳追加 cwd 的 CLAUDE.md「群聊沉淀规则」小节 |
 | `cron-scheduler.ts` | **定时任务**：30s tick；cron 节点到点→下游会话(脱敏分身)跑 prompt→结果(出站脱敏)发节点群或 homeChatId。栅栏：运行中跳过/无特权/不暴露建任务能力 |
+| `loop-runner.ts` | **循环节点(Loop Engineering 驱动器)**：cron 升级版——对下游会话**反复**跑(第1轮 prompt、之后 continuePrompt 回灌进同一分身)直到**完成标记/满 maxRounds/超 maxCostUsd** 才停，汇总发群。复用 cron 的 runPrompt/deliver;`run-loop` 消息手动触发;`shouldFire` 复用 cron。L1(只报告)，破坏性操作仍走审批卡。**约定**：长任务让会话把进度写 STATE.md，便于后续「每 N 轮新鲜上下文」(Phase 3)续接 |
 | `claude/reflect-soul.ts` | **人格反思**（人格自主演化）：每 24h 对有人格+有近期群聊的节点提议 SOUL.md 修订 → 收件箱(kind=soul) 主人裁决。**⚠️ 已按用户要求关闭**——`index.ts` 的 24h 调度已注释（人格由主人手写、严格设计）；实现保留，恢复=取消注释 |
 | `perm/mcp-perm-server.ts` | **审批 MCP 服务器**（`bridge --mcp-perm` 双模式自举）：claude 的 permission-prompt-tool → WS 回连 bridge → 等卡片决定 |
 | `perm/permission-broker.ts` | **审批中枢**：挂起请求 ↔ 飞书交互卡片 ↔ 仅主人有效的回调；100s 超时拒绝 |
@@ -106,7 +107,7 @@ GUI(桌面 app) 经 `ws://127.0.0.1:8920` 连 bridge（server.ts 是控制面）
 | `src/layout/StatusBar.tsx` | 底部状态栏：引擎 WS/飞书连接/会话统计/当前终端 |
 | `src/canvas/FlowCanvas.tsx` | React Flow 画布（劲道贝塞尔 curvature 0.5+箭头、彩色缩略图） |
 | `src/canvas/nodes/NodeShell.tsx` | 节点卡片统一外壳（彩头+暗体，--nc 控色） |
-| `src/canvas/nodes/*` | 九种节点卡片（基于 NodeShell）：飞书群/路由/意图分流/Claude会话/定时/Webhook/人格/技能/子代理 |
+| `src/canvas/nodes/*` | 十种节点卡片（基于 NodeShell）：飞书群/路由/意图分流/Claude会话/定时/循环/Webhook/人格/技能/子代理 |
 | `src/canvas/edges/ConditionEdge.tsx` | 连线：意图条件徽标 + 运行时流动；赋能连线(人格/技能/子代理→会话)改虚线+按类型上色 |
 | `src/panels/TerminalsHost.tsx` | **交互式终端（最核心、坑最多）**：多终端保活、历史回放缓冲、贴图、Ctrl+A/Ctrl+F、URL/md/html 可点击、ANSI 16 色精修、终端信息条、尺寸竞态对账。改前必读 pitfalls.md |
 | `src/panels/TranscriptPanel.tsx` | 访客会话转录（含引擎回放的近 3 天历史） |
