@@ -24,6 +24,18 @@ const die = (m) => {
 };
 const run = (cmd, opts = {}) => execSync(cmd, { stdio: "inherit", cwd: ROOT, ...opts });
 
+// gh CLI 可能不在当前 shell 的 PATH 里（不同启动环境会漂）——优先 PATH，回退常见安装路径
+const GH = (() => {
+  const cands = ["gh", join(process.env.ProgramFiles || "C:\\Program Files", "GitHub CLI", "gh.exe")];
+  for (const c of cands) {
+    try {
+      execSync(`"${c}" --version`, { stdio: "ignore" });
+      return c;
+    } catch {}
+  }
+  return "";
+})();
+
 // 1) 版本号（以 tauri.conf 为准）
 const confPath = join(ROOT, "apps/desktop/src-tauri/tauri.conf.json");
 const version = JSON.parse(readFileSync(confPath, "utf8")).version;
@@ -87,9 +99,10 @@ if (DRY) {
 }
 
 // 7) 创建 GitHub Release（上传 安装包 + latest.json；--latest 让 latest/download 解析到它）
+if (!GH) die("找不到 gh CLI（PATH 与常见安装路径都没有）。装好/登录后重试，或手动 gh release create。");
 const notesPath = join(nsisDir, "_notes.md");
 writeFileSync(notesPath, notes);
 console.log("▶ 创建 GitHub Release…");
-run(`gh release create ${tag} "${join(nsisDir, setup)}" "${latestPath}" --title "${tag}" --notes-file "${notesPath}" --latest`);
+run(`"${GH}" release create ${tag} "${join(nsisDir, setup)}" "${latestPath}" --title "${tag}" --notes-file "${notesPath}" --latest`);
 console.log(`✅ 发布完成：https://github.com/${REPO}/releases/tag/${tag}`);
 console.log("ℹ 老用户(≤0.5.0 便携版)需手动装这一版；之后版本会自动更新。");
