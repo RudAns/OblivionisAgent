@@ -26,6 +26,7 @@ import { RouteNode } from "./nodes/RouteNode.js";
 import { IntentSwitchNode } from "./nodes/IntentSwitchNode.js";
 import { ClaudeSessionNode } from "./nodes/ClaudeSessionNode.js";
 import { CronNode } from "./nodes/CronNode.js";
+import { LoopNode } from "./nodes/LoopNode.js";
 import { WebhookNode } from "./nodes/WebhookNode.js";
 import { SoulNode } from "./nodes/SoulNode.js";
 import { SkillNode } from "./nodes/SkillNode.js";
@@ -95,6 +96,7 @@ const NODE_COLORS: Record<string, string> = {
   "intent-switch": "#c68a32",
   "claude-session": "#d96745",
   cron: "#3a8fa0",
+  loop: "#0d9488",
   webhook: "#b7791f",
   soul: "#8167b2",
   skill: "#3a8fa0",
@@ -107,7 +109,7 @@ const miniMapStroke = (node: Node) => (node.selected ? "#d96745" : NODE_COLORS[n
 // 合法连线语法（像专业节点编辑器一样，连错当场拒绝）：
 //   群/路由/分流/定时/Webhook → 路由/分流/会话（cron/webhook 只直连会话）
 //   人格(soul) → 会话的「人格口」(targetHandle=fork)；人格口也只接 soul
-const ROUTING_SRC = new Set(["feishu-group", "route", "intent-switch", "cron", "webhook"]);
+const ROUTING_SRC = new Set(["feishu-group", "route", "intent-switch", "cron", "loop", "webhook"]);
 const ROUTING_TGT = new Set(["route", "intent-switch", "claude-session"]);
 
 export function FlowCanvas(props: Props) {
@@ -119,6 +121,7 @@ export function FlowCanvas(props: Props) {
       "intent-switch": IntentSwitchNode,
       "claude-session": ClaudeSessionNode,
       cron: CronNode,
+      loop: LoopNode,
       webhook: WebhookNode,
       soul: SoulNode,
       skill: SkillNode,
@@ -143,7 +146,7 @@ export function FlowCanvas(props: Props) {
       if (c.targetHandle === "fork") return false; // 人格·技能口只接 soul/skill/subagent（上面已放行）
       if (sk === "claude-session") return tk === "claude-session"; // 多会话流水线：会话产出 → 下游会话（fork 口上面已挡）
       if (!ROUTING_SRC.has(sk) || !ROUTING_TGT.has(tk)) return false;
-      if ((sk === "cron" || sk === "webhook") && tk !== "claude-session") return false; // 触发节点只直连会话
+      if ((sk === "cron" || sk === "loop" || sk === "webhook") && tk !== "claude-session") return false; // 触发节点只直连会话
       return true;
     },
     [kindById],

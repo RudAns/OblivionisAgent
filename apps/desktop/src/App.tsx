@@ -97,6 +97,20 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
     label: "定时任务",
     data: { schedule: "09:00", prompt: "", enabled: true },
   }),
+  loop: () => ({
+    kind: "loop",
+    label: "循环",
+    data: {
+      schedule: "",
+      prompt: "",
+      continuePrompt: "继续下一步。全部做完后，单独回复一行：[[DONE]]",
+      stopMode: "sentinel",
+      doneMarker: "[[DONE]]",
+      maxRounds: 5,
+      maxCostUsd: 0,
+      enabled: true,
+    },
+  }),
   soul: () => ({
     kind: "soul",
     label: "人格",
@@ -171,6 +185,7 @@ const PALETTE: [keyof typeof NEW_NODE_DEFAULTS, string][] = [
   ["intent-switch", "意图分流"],
   ["claude-session", "Claude 会话"],
   ["cron", "定时任务"],
+  ["loop", "循环"],
   ["webhook", "Webhook"],
   ["soul", "人格"],
   ["skill", "技能"],
@@ -204,6 +219,7 @@ const ADD_GROUPS: {
     items: [
       { kind: "claude-session", label: "Claude 会话", icon: "🤖", color: "#d96745" },
       { kind: "cron", label: "定时任务", icon: "⏰", color: "#3a8fa0" },
+      { kind: "loop", label: "循环", icon: "🔁", color: "#0d9488" },
     ],
   },
   {
@@ -222,6 +238,7 @@ const NODE_COLOR: Record<string, string> = {
   "intent-switch": "#c68a32",
   "claude-session": "#d96745",
   cron: "#3a8fa0",
+  loop: "#0d9488",
   webhook: "#b7791f",
   soul: "#9d7bc9",
   skill: "#3a8fa0",
@@ -233,6 +250,7 @@ const NODE_ICON: Record<string, string> = {
   "intent-switch": "🧠",
   "claude-session": "🤖",
   cron: "⏰",
+  loop: "🔁",
   webhook: "🪝",
   soul: "🎭",
   skill: "🧩",
@@ -246,7 +264,7 @@ function dropTargetsFor(
 ): { kind: keyof typeof NEW_NODE_DEFAULTS; handle?: string }[] {
   if (sourceKind === "soul" || sourceKind === "skill" || sourceKind === "subagent")
     return [{ kind: "claude-session", handle: "fork" }];
-  if (sourceKind === "cron" || sourceKind === "webhook") return [{ kind: "claude-session" }];
+  if (sourceKind === "cron" || sourceKind === "loop" || sourceKind === "webhook") return [{ kind: "claude-session" }];
   if (sourceKind === "feishu-group" || sourceKind === "route" || sourceKind === "intent-switch")
     return [{ kind: "route" }, { kind: "intent-switch" }, { kind: "claude-session" }];
   return [];
@@ -507,6 +525,8 @@ function Inner() {
   const [usage, setUsage] = useState<UsageSnapshot | null>(null); // 订阅用量(5h/周)
   const [cost, setCost] = useState<CostSnapshot | null>(null); // 成本看板汇总
   const [costOpen, setCostOpen] = useState(false); // 成本看板浮层（盖在主界面、点外部关）
+  // 循环节点运行进度（nodeId → 第几轮/是否在跑/停因）：检视面板里显示
+  const [loopProgress, setLoopProgress] = useState<Record<string, { round: number; max: number; running: boolean; note?: string }>>({});
   const [ctx, setCtx] = useState<{ ctxTokens: number; outTokens: number; model: string; baseTokens: number } | null>(
     null,
   ); // 当前终端会话上下文体量(读 transcript 估算)
@@ -604,6 +624,12 @@ function Inner() {
         }
         case "session-meta":
           setSessionMetas(msg.metas);
+          break;
+        case "loop-progress":
+          setLoopProgress((m) => ({
+            ...m,
+            [msg.nodeId]: { round: msg.round, max: msg.max, running: msg.running, note: msg.note },
+          }));
           break;
         case "session-active-path": {
           // C2 运行轨迹：非空=本轮真实走过这条链路 → 给每条连线计数(每条消息记一次)
@@ -2442,6 +2468,11 @@ function Inner() {
                     onEditSkill={(nodeId) => client.send({ type: "ensure-skill", nodeId })}
                     onEditSubagent={(nodeId) => client.send({ type: "ensure-subagent", nodeId })}
                     onEditGroupMemory={(chatId) => client.send({ type: "ensure-group-memory", chatId })}
+                    onRunLoop={(nodeId) => {
+                      save(); // 先把最新配置同步给引擎，再触发（WS 有序：set-config 先于 run-loop）
+                      client.send({ type: "run-loop", nodeId });
+                    }}
+                    loopProgress={selectedNode ? loopProgress[selectedNode.id] ?? null : null}
                   />
                   {selectedIsClaude && (
                     <div className="test-box">
@@ -2872,6 +2903,8 @@ function Inspector({
   onEditSkill,
   onEditSubagent,
   onEditGroupMemory,
+  onRunLoop,
+  loopProgress,
 }: {
   node: Node | null;
   onPatch: (patch: Record<string, unknown>) => void;
@@ -2884,6 +2917,8 @@ function Inspector({
   onEditSkill: (nodeId: string) => void;
   onEditSubagent: (nodeId: string) => void;
   onEditGroupMemory: (chatId: string) => void;
+  onRunLoop?: (nodeId: string) => void;
+  loopProgress?: { round: number; max: number; running: boolean; note?: string } | null;
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [pickFilter, setPickFilter] = useState("");
@@ -3059,6 +3094,67 @@ function Inspector({
               onChange={(e) => onPatch({ enabled: e.target.checked })}
             />
           </label>
+        </>
+      )}
+      {node.type === "loop" && (
+        <>
+          {fieldArea(t("任务 prompt（第 1 轮发的指令）"), d.prompt, "prompt", 3)}
+          {fieldArea(t("继续语（第 2 轮起每轮发）"), d.continuePrompt, "continuePrompt", 2)}
+          <label className="field">
+            <span>{t("停止方式")}</span>
+            <select value={d.stopMode ?? "sentinel"} onChange={(e) => onPatch({ stopMode: e.target.value })}>
+              <option value="sentinel">{t("出现完成标记即停")}</option>
+              <option value="count">{t("固定跑满轮数")}</option>
+            </select>
+          </label>
+          {(d.stopMode ?? "sentinel") === "sentinel" && field(t("完成标记"), d.doneMarker, "doneMarker")}
+          <label className="field">
+            <span>{t("最多轮数(刹车)")}</span>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={d.maxRounds ?? 5}
+              onChange={(e) => onPatch({ maxRounds: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })}
+            />
+          </label>
+          <label className="field">
+            <span>{t("预算上限 $（0=不限）")}</span>
+            <input
+              type="number"
+              min={0}
+              step={0.1}
+              value={d.maxCostUsd ?? 0}
+              onChange={(e) => onPatch({ maxCostUsd: Math.max(0, Number(e.target.value) || 0) })}
+            />
+          </label>
+          {field(t("触发时刻（空=仅手动）"), d.schedule, "schedule")}
+          <div className="hint" style={{ marginBottom: 6 }}>
+            {t("留空=只手动「跑一次」；或填 09:00 / every 30m 自动触发")}
+          </div>
+          {field(t("投递群 chatId"), d.chatId, "chatId")}
+          <div className="hint" style={{ marginBottom: 6 }}>
+            {t("留空=发到 Home Chat；必须连到一个「Claude 会话」节点才会跑")}
+          </div>
+          <label className="field">
+            <span>{t("启用定时")}</span>
+            <input
+              type="checkbox"
+              checked={d.enabled !== false}
+              onChange={(e) => onPatch({ enabled: e.target.checked })}
+            />
+          </label>
+          <button className="notice-btn" style={{ marginTop: 4 }} disabled={!!loopProgress?.running} onClick={() => onRunLoop?.(node.id)}>
+            {loopProgress?.running
+              ? t("运行中… 第 {0}/{1} 轮", loopProgress.round, loopProgress.max)
+              : t("▶ 跑一次")}
+          </button>
+          {loopProgress && !loopProgress.running && loopProgress.note && (
+            <div className="hint" style={{ marginTop: 6 }}>{t("上次：{0}", loopProgress.note)}</div>
+          )}
+          <div className="hint" style={{ marginTop: 6 }}>
+            {t("循环会对下游会话反复发指令，直到完成标记/满轮数/超预算；只报告，破坏性操作仍走审批卡。")}
+          </div>
         </>
       )}
       {node.type === "intent-switch" && (
