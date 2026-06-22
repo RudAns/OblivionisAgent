@@ -6,6 +6,12 @@
 
 _（暂无）_
 
+## [0.6.2] - 2026-06-22
+
+### 🐛 修复自动更新安装失败
+- 自动更新安装时报 **「Error opening file for writing … oblivionis-bridge.exe」**:更新装回器覆盖文件时,引擎 sidecar 还在运行、锁着自己的 exe。现在 NSIS 安装包加了**预安装钩子**,覆盖前先 `taskkill` 掉 `oblivionis-bridge.exe`,装完由新程序重新拉起。
+  - 钩子在「新安装包」里,所以从更早版本升级也会生效。
+
 ## [0.6.1] - 2026-06-22
 
 ### ✨ 自动更新体验
