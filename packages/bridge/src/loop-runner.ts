@@ -140,7 +140,7 @@ export class LoopRunner {
   /** 实际跑一次循环（多轮）；finally 复位 running。 */
   private async fire(loop: LoopNode, session: ClaudeSessionNode): Promise<void> {
     const d = loop.data;
-    const maxRounds = Math.max(1, Math.min(100, d.maxRounds || 5));
+    const maxRounds = Math.max(1, Math.min(500, d.maxRounds || 5));
     const reset = d.resetEvery && d.resetEvery > 0 ? Math.min(d.resetEvery, maxRounds) : 0;
     const startCost = this.deps.costTotal();
     const transcript: string[] = []; // 飞书汇总用(只回复，简洁)

@@ -3115,9 +3115,9 @@ function Inspector({
             <input
               type="number"
               min={1}
-              max={100}
+              max={500}
               value={d.maxRounds ?? 5}
-              onChange={(e) => onPatch({ maxRounds: Math.max(1, Math.min(100, Number(e.target.value) || 1)) })}
+              onChange={(e) => onPatch({ maxRounds: Math.max(1, Math.min(500, Number(e.target.value) || 1)) })}
             />
           </label>
           <label className="field">
