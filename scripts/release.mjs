@@ -44,9 +44,16 @@ console.log(`▶ 发版 ${tag}${DRY ? " （DRY RUN）" : ""}`);
 
 // 2) 前置检查
 if (!existsSync(KEY_PATH)) die(`找不到更新签名私钥：${KEY_PATH}\n  先跑：pnpm tauri signer generate -w "${KEY_PATH}"`);
+
+// 2.5) 重打 bridge sidecar —— 必须！否则有 bridge 改动的版本会装出旧引擎（曾差点漏带）。
+//      NSIS 通过 externalBin 把这个 exe 打进安装包，所以先于 tauri build 重打。
+if (process.env.OBL_SKIP_BRIDGE !== "1") {
+  console.log("▶ 重打 bridge sidecar（pnpm package）…");
+  run("pnpm package", { cwd: join(ROOT, "packages/bridge") });
+}
 const binDir = join(ROOT, "apps/desktop/src-tauri/binaries");
 if (!existsSync(binDir) || !readdirSync(binDir).some((f) => /^oblivionis-bridge.*\.exe$/.test(f)))
-  die("缺少引擎 sidecar：先在 packages/bridge 跑 `pnpm package`");
+  die("缺少引擎 sidecar：在 packages/bridge 跑 `pnpm package`（或别设 OBL_SKIP_BRIDGE=1）");
 
 // 3) 签名构建 NSIS（externalBin 已把 bridge 一起打进安装包）
 // 注意：Tauri build 读 TAURI_SIGNING_PRIVATE_KEY（私钥「内容」），不是 *_PATH —— 所以这里读出文件内容传进去。
