@@ -150,7 +150,7 @@ export const LoopData = z.object({
   /** sentinel 模式的完成标记 */
   doneMarker: z.string().default("[[DONE]]"),
   /** 轮数硬上限（永远生效的刹车，防失控空转） */
-  maxRounds: z.number().int().min(1).max(50).default(5),
+  maxRounds: z.number().int().min(1).max(100).default(5),
   /** 预算上限(USD)，本次循环累计花费超过即停；0=不限（仍受 maxRounds 兜底） */
   maxCostUsd: z.number().min(0).default(0),
   /**
