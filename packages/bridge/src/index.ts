@@ -837,6 +837,14 @@ async function main() {
     progress: (nodeId, round, max, running, note) =>
       hub.broadcast({ type: "loop-progress", nodeId, round, max, running, note }),
     costTotal: () => costLedger.summary().total,
+    // 把每轮指令实时镜像进会话转录：合成一条 session-event（转录面板渲染成「🔁 第N轮指令」）
+    mirrorInput: (nodeId, round, text) =>
+      hub.broadcast({
+        type: "session-event",
+        nodeId,
+        sessionId: "loop",
+        event: { type: "loop-input", round, text },
+      }),
   });
   loopRunner.start();
 

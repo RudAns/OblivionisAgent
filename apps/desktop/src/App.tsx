@@ -109,6 +109,7 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
       maxRounds: 5,
       maxCostUsd: 0,
       resetEvery: 0,
+      report: "none",
       enabled: true,
     },
   }),
@@ -3142,6 +3143,19 @@ function Inspector({
           {(d.resetEvery ?? 0) > 0 && (
             <div className="hint" style={{ marginBottom: 6 }}>
               {t("长循环防上下文膨胀：每 N 轮重新 fork 新鲜分身，靠工作目录 STATE.md 续接进度（引擎自动要求会话读写它）。")}
+            </div>
+          )}
+          <label className="field">
+            <span>{t("详细报告")}</span>
+            <select value={d.report ?? "none"} onChange={(e) => onPatch({ report: e.target.value })}>
+              <option value="none">{t("不生成")}</option>
+              <option value="md">{t("Markdown")}</option>
+              <option value="html">{t("HTML")}</option>
+            </select>
+          </label>
+          {(d.report ?? "none") !== "none" && (
+            <div className="hint" style={{ marginBottom: 6 }}>
+              {t("除审核群的简要汇总外，循环结束后再多跑一轮整理一份详细报告，存到 ~/.oblivionis/reports/（文档查看器可看）。")}
             </div>
           )}
           {field(t("触发时刻（空=仅手动）"), d.schedule, "schedule")}

@@ -30,6 +30,11 @@ export interface LoopDeps {
   progress: (nodeId: string, round: number, max: number, running: boolean, note?: string) => void;
   /** 当前累计花费 USD（用于预算刹车；取自成本账本 summary().total） */
   costTotal: () => number;
+  /**
+   * 把「本轮发给会话的指令」实时镜像进该会话的转录（GUI 能看到我每轮输入了什么，不只看到回复）。
+   * 实现：广播一条合成 session-event，转录面板渲染成「🔁 第N轮指令」。失败不影响循环。
+   */
+  mirrorInput: (sessionNodeId: string, round: number, text: string) => void;
 }
 
 interface LoopState {
@@ -160,6 +165,7 @@ export class LoopRunner {
           prompt = d.continuePrompt;
         }
         justReset = false;
+        this.deps.mirrorInput(session.id, round, prompt); // 把本轮指令实时镜像进转录
         const reply = (await this.deps.runPrompt(session.id, prompt)) ?? "";
         transcript.push(`【第 ${round} 轮】\n${reply.trim()}`);
         rounds.push({ prompt, reply: reply.trim() });
@@ -191,11 +197,18 @@ export class LoopRunner {
       const cfg = this.deps.store.get();
       const chatId = d.chatId || cfg.homeChatId;
       const spent = this.deps.costTotal() - startCost;
-      const head =
+      let head =
         `🔁「${loop.label}」循环完成 · ${round} 轮 · 停因：${stopReason}` +
         (spent > 0 ? ` · 花费 $${spent.toFixed(3)}` : "");
       const body = transcript.join("\n\n");
       this.writeRunLog(loop.label, head, rounds);
+
+      // 可选：在简要汇总之外，额外整理一份详细报告（md/html），落 ~/.oblivionis/reports/（多耗一轮）
+      if (d.report && d.report !== "none" && rounds.length) {
+        const reportPath = await this.generateReport(loop, session.id, rounds);
+        if (reportPath) head += `\n📄 详细报告：${reportPath}`;
+      }
+
       if (chatId && body.trim()) {
         await this.deps.deliver(chatId, `${head}\n\n${body}`);
       } else {
@@ -224,6 +237,53 @@ export class LoopRunner {
     } catch (e) {
       this.deps.log.warn(`循环 run-log 落盘失败: ${(e as Error).message}`);
     }
+  }
+
+  /**
+   * 多耗一轮：把本次循环各轮产出喂回给会话，让它整理成一份**详细报告**(md/html)，落 ~/.oblivionis/reports/。
+   * 不依赖会话当前上下文（即使中途重置过也行）——材料整段放进 prompt。返回报告文件路径；失败返回 null（不影响循环）。
+   */
+  private async generateReport(
+    loop: LoopNode,
+    sessionNodeId: string,
+    rounds: { prompt: string; reply: string }[],
+  ): Promise<string | null> {
+    const fmt = loop.data.report; // "md" | "html"
+    try {
+      this.deps.progress(loop.id, rounds.length, rounds.length, true, "整理详细报告…");
+      const material = rounds
+        .map((r, i) => `### 第 ${i + 1} 轮\n指令：${r.prompt}\n产出：\n${r.reply}`)
+        .join("\n\n")
+        .slice(0, 24000); // 防超长 prompt
+      const fmtHint =
+        fmt === "html"
+          ? "一段**自包含、可直接在浏览器打开**的 HTML（含 <!doctype html>、内联 <style>、干净排版）"
+          : "一份 **Markdown** 文档（合理的标题层级、列表、必要的代码块）";
+      const prompt =
+        `下面是本次「${loop.label}」循环逐轮的工作记录。请把它整理成${fmtHint}的**详细报告**：` +
+        `概述本次循环做了什么、每一步的关键产出与结论、遗留问题与后续建议。` +
+        `只输出报告正文本身，不要任何额外解释、寒暄或代码围栏。\n\n${material}`;
+      let content = (await this.deps.runPrompt(sessionNodeId, prompt)) ?? "";
+      content = this.stripFence(content).trim();
+      if (!content) return null;
+      const dir = join(homedir(), ".oblivionis", "reports");
+      mkdirSync(dir, { recursive: true });
+      const safe = loop.label.replace(/[\\/:*?"<>|]/g, "_").slice(0, 40) || "loop";
+      const ext = fmt === "html" ? "html" : "md";
+      const path = join(dir, `${safe}-${this.stamp()}.${ext}`);
+      writeFileSync(path, content + "\n", "utf8");
+      this.deps.log.info(`循环「${loop.label}」详细报告已生成：${path}`);
+      return path;
+    } catch (e) {
+      this.deps.log.warn(`循环「${loop.label}」生成详细报告失败: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  /** 去掉模型有时多套的 ```html / ```markdown ... ``` 代码围栏。 */
+  private stripFence(s: string): string {
+    const m = /^\s*```[a-zA-Z]*\s*\n([\s\S]*?)\n```\s*$/.exec(s.trim());
+    return m?.[1] ?? s;
   }
 
   /** YYYYMMDD-HHmmss（本地） */

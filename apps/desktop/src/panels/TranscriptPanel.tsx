@@ -8,9 +8,15 @@ interface Props {
   events: ClaudeStreamEvent[];
 }
 
+/** 循环节点每轮指令的合成事件（非 claude 原生，由 bridge 镜像注入，见 loop-runner mirrorInput） */
+function isLoopInput(e: ClaudeStreamEvent): e is { type: "loop-input"; round: number; text: string } {
+  return e.type === "loop-input";
+}
+
 /** 取一条事件里可供搜索/显示的文本 */
 function eventText(e: ClaudeStreamEvent): string {
   if (isAssistant(e)) return assistantText(e) ?? "";
+  if (isLoopInput(e)) return e.text ?? "";
   if (isInit(e)) return `init ${e.model} ${e.cwd}`;
   if (isResult(e)) return `done ${e.subtype}`;
   return "";
@@ -101,6 +107,14 @@ function EventRow({ e, highlight }: { e: ClaudeStreamEvent; highlight: string })
         {tools.map((t, i) => (
           <div key={i} className="evt-tool">🔧 {String(t.name)}</div>
         ))}
+      </div>
+    );
+  }
+  if (isLoopInput(e)) {
+    return (
+      <div className="evt evt-loop-input">
+        🔁 {t("第 {0} 轮指令", e.round)}
+        <div className="evt-text">{highlight ? mark(e.text, highlight) : e.text}</div>
       </div>
     );
   }

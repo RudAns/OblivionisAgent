@@ -159,6 +159,12 @@ export const LoopData = z.object({
    * 开启后靠工作目录的 STATE.md 续接进度——引擎会自动在指令里要求会话读写 STATE.md。
    */
   resetEvery: z.number().int().min(0).max(50).default(0),
+  /**
+   * 结束后是否额外整理一份**详细报告**(在审核群的简要汇总之外)：
+   * none=不生成；md=Markdown；html=自包含 HTML。生成的报告写入 ~/.oblivionis/reports/（文档查看器可看）。
+   * 多耗一轮(把各轮产出喂回去让它整理),按需开。
+   */
+  report: z.enum(["none", "md", "html"]).default("none"),
   /** 每轮/汇总发到的飞书群 chatId；留空=全局 homeChatId；都没有则只记日志 */
   chatId: z.string().optional(),
   enabled: z.boolean().default(true),

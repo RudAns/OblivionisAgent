@@ -2683,6 +2683,21 @@ button.primary {
 .evt-result.err {
   color: var(--st-err);
 }
+/* 循环节点每轮注入的指令（实时镜像）：青色左条标记，与会话回复区分 */
+.evt-loop-input {
+  color: #0d9488;
+  font-weight: 600;
+  border-left: 3px solid #0d9488;
+  padding-left: 8px;
+  margin: 2px 0;
+  background: color-mix(in srgb, #0d9488 8%, transparent);
+}
+.evt-loop-input .evt-text {
+  white-space: pre-wrap;
+  font-weight: 400;
+  color: var(--muted);
+  margin-top: 2px;
+}
 
 /* 终端容器：外层 .term-pane 控制 overflow，内层多终端保活堆叠 */
 .terms-wrap {

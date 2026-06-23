@@ -659,4 +659,9 @@ export const EN: Record<string, string> = {
   "每 N 轮重置上下文（0=不重置）": "Reset context every N rounds (0=off)",
   "长循环防上下文膨胀：每 N 轮重新 fork 新鲜分身，靠工作目录 STATE.md 续接进度（引擎自动要求会话读写它）。":
     "Long-loop anti-bloat: re-fork a fresh session every N rounds, carrying progress via STATE.md in the work dir (the engine auto-instructs the session to read/write it).",
+  "第 {0} 轮指令": "Round {0} prompt",
+  "详细报告": "Detailed report",
+  "不生成": "None",
+  "除审核群的简要汇总外，循环结束后再多跑一轮整理一份详细报告，存到 ~/.oblivionis/reports/（文档查看器可看）。":
+    "Beyond the brief summary in the review group, run one extra round after the loop to compile a detailed report into ~/.oblivionis/reports/ (visible in the doc viewer).",
 };
