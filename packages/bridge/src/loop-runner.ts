@@ -138,7 +138,8 @@ export class LoopRunner {
     const maxRounds = Math.max(1, Math.min(50, d.maxRounds || 5));
     const reset = d.resetEvery && d.resetEvery > 0 ? Math.min(d.resetEvery, maxRounds) : 0;
     const startCost = this.deps.costTotal();
-    const transcript: string[] = [];
+    const transcript: string[] = []; // 飞书汇总用(只回复，简洁)
+    const rounds: { prompt: string; reply: string }[] = []; // run-log 用(指令+回复，可审计)
     let stopReason = `跑满 ${maxRounds} 轮`;
     let round = 0;
     let justReset = false;
@@ -161,6 +162,7 @@ export class LoopRunner {
         justReset = false;
         const reply = (await this.deps.runPrompt(session.id, prompt)) ?? "";
         transcript.push(`【第 ${round} 轮】\n${reply.trim()}`);
+        rounds.push({ prompt, reply: reply.trim() });
 
         if (d.stopMode === "sentinel" && d.doneMarker && reply.includes(d.doneMarker)) {
           stopReason = `命中完成标记（第 ${round} 轮）`;
@@ -193,7 +195,7 @@ export class LoopRunner {
         `🔁「${loop.label}」循环完成 · ${round} 轮 · 停因：${stopReason}` +
         (spent > 0 ? ` · 花费 $${spent.toFixed(3)}` : "");
       const body = transcript.join("\n\n");
-      this.writeRunLog(loop.label, head, body);
+      this.writeRunLog(loop.label, head, rounds);
       if (chatId && body.trim()) {
         await this.deps.deliver(chatId, `${head}\n\n${body}`);
       } else {
@@ -209,12 +211,15 @@ export class LoopRunner {
     }
   }
 
-  /** 把本次循环完整 run-log 落盘到 ~/.oblivionis/loop-logs/，便于事后复看（失败不影响循环）。 */
-  private writeRunLog(label: string, head: string, body: string): void {
+  /** 把本次循环完整 run-log（每轮「指令 + 回复」成对）落盘到 ~/.oblivionis/loop-logs/，便于事后审计（失败不影响循环）。 */
+  private writeRunLog(label: string, head: string, rounds: { prompt: string; reply: string }[]): void {
     try {
       const dir = join(homedir(), ".oblivionis", "loop-logs");
       mkdirSync(dir, { recursive: true });
       const safe = label.replace(/[\\/:*?"<>|]/g, "_").slice(0, 40) || "loop";
+      const body = rounds
+        .map((r, i) => `## 第 ${i + 1} 轮\n\n**发出的指令：**\n\n${r.prompt}\n\n**会话回复：**\n\n${r.reply}`)
+        .join("\n\n---\n\n");
       writeFileSync(join(dir, `${safe}-${this.stamp()}.md`), `# ${head}\n\n${body}\n`, "utf8");
     } catch (e) {
       this.deps.log.warn(`循环 run-log 落盘失败: ${(e as Error).message}`);
