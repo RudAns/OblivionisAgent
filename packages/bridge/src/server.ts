@@ -56,8 +56,12 @@ export interface ServerDeps {
   knowledge: import("./knowledge-store.js").KnowledgeStore;
   /** 工具权限审批中枢 */
   permBroker: import("./perm/permission-broker.js").PermissionBroker;
-  /** 手动「跑一次」某个循环节点 */
+  /** 手动「跑一次」某个循环节点（从初始任务 prompt 开始） */
   runLoop: (nodeId: string) => void;
+  /** 强制中断某个正在运行的循环 */
+  stopLoop: (nodeId: string) => void;
+  /** 继续某个循环：直接用「继续语」往下接着跑 */
+  continueLoop: (nodeId: string) => void;
   /** 配置(graph)被 GUI 改写后回调 */
   onConfigChanged: () => void;
   /** 干跑路由(含意图分类)，返回 route-test-result，不真发飞书/不真跑会话 */
@@ -211,6 +215,12 @@ export class ControlServer {
         break;
       case "run-loop":
         this.deps.runLoop(msg.nodeId);
+        break;
+      case "stop-loop":
+        this.deps.stopLoop(msg.nodeId);
+        break;
+      case "continue-loop":
+        this.deps.continueLoop(msg.nodeId);
         break;
       case "reinject-soul":
         void this.deps

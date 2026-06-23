@@ -2474,6 +2474,11 @@ function Inner() {
                       save(); // 先把最新配置同步给引擎，再触发（WS 有序：set-config 先于 run-loop）
                       client.send({ type: "run-loop", nodeId });
                     }}
+                    onContinueLoop={(nodeId) => {
+                      save(); // 同上：继续语等配置先落引擎再触发
+                      client.send({ type: "continue-loop", nodeId });
+                    }}
+                    onStopLoop={(nodeId) => client.send({ type: "stop-loop", nodeId })}
                     loopProgress={selectedNode ? loopProgress[selectedNode.id] ?? null : null}
                   />
                   {selectedIsClaude && (
@@ -2906,6 +2911,8 @@ function Inspector({
   onEditSubagent,
   onEditGroupMemory,
   onRunLoop,
+  onStopLoop,
+  onContinueLoop,
   loopProgress,
 }: {
   node: Node | null;
@@ -2920,6 +2927,8 @@ function Inspector({
   onEditSubagent: (nodeId: string) => void;
   onEditGroupMemory: (chatId: string) => void;
   onRunLoop?: (nodeId: string) => void;
+  onStopLoop?: (nodeId: string) => void;
+  onContinueLoop?: (nodeId: string) => void;
   loopProgress?: { round: number; max: number; running: boolean; note?: string } | null;
 }) {
   const [showPicker, setShowPicker] = useState(false);
@@ -3174,11 +3183,30 @@ function Inspector({
               onChange={(e) => onPatch({ enabled: e.target.checked })}
             />
           </label>
-          <button className="notice-btn" style={{ marginTop: 4 }} disabled={!!loopProgress?.running} onClick={() => onRunLoop?.(node.id)}>
-            {loopProgress?.running
-              ? t("运行中… 第 {0}/{1} 轮", loopProgress.round, loopProgress.max)
-              : t("▶ 跑一次")}
-          </button>
+          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+            <button className="notice-btn" style={{ flex: 1 }} disabled={!!loopProgress?.running} onClick={() => onRunLoop?.(node.id)}>
+              {loopProgress?.running
+                ? t("运行中… 第 {0}/{1} 轮", loopProgress.round, loopProgress.max)
+                : t("▶ 跑一次")}
+            </button>
+            {loopProgress?.running ? (
+              <button className="notice-btn danger" style={{ flex: "0 0 auto", width: "auto" }} onClick={() => onStopLoop?.(node.id)}>
+                {t("⏹ 强制中断")}
+              </button>
+            ) : (
+              <button
+                className="notice-btn"
+                style={{ flex: "0 0 auto", width: "auto" }}
+                disabled={!(d.continuePrompt as string)?.trim()}
+                onClick={() => onContinueLoop?.(node.id)}
+              >
+                {t("⏵ 继续")}
+              </button>
+            )}
+          </div>
+          <div className="hint" style={{ marginTop: 6 }}>
+            {t("「跑一次」从初始任务开始；「继续」直接用「继续语」往下接着跑（不重发任务）；「强制中断」杀掉正在跑的那轮并停止。")}
+          </div>
           {loopProgress && !loopProgress.running && loopProgress.note && (
             <div className="hint" style={{ marginTop: 6 }}>{t("上次：{0}", loopProgress.note)}</div>
           )}

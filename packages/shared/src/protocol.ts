@@ -53,8 +53,12 @@ export type ClientMessage =
       input: unknown;
       ctx: { nodeId?: string; nodeLabel?: string; chatId?: string; senderId?: string; senderName?: string };
     }
-  /** 手动触发某个循环节点立即跑一次 */
-  | { type: "run-loop"; nodeId: string };
+  /** 手动触发某个循环节点立即跑一次（从初始任务 prompt 开始） */
+  | { type: "run-loop"; nodeId: string }
+  /** 强制中断某个正在运行的循环（杀掉在跑的那一轮，停止后续轮次） */
+  | { type: "stop-loop"; nodeId: string }
+  /** 继续某个循环：直接用「继续语」往下接着跑（不重发初始任务 prompt） */
+  | { type: "continue-loop"; nodeId: string };
 
 export interface AuditEntry {
   chatId: string;

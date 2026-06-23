@@ -664,4 +664,8 @@ export const EN: Record<string, string> = {
   "不生成": "None",
   "除审核群的简要汇总外，循环结束后再多跑一轮整理一份详细报告，存到 ~/.oblivionis/reports/（文档查看器可看）。":
     "Beyond the brief summary in the review group, run one extra round after the loop to compile a detailed report into ~/.oblivionis/reports/ (visible in the doc viewer).",
+  "⏹ 强制中断": "⏹ Force-stop",
+  "⏵ 继续": "⏵ Continue",
+  "「跑一次」从初始任务开始；「继续」直接用「继续语」往下接着跑（不重发任务）；「强制中断」杀掉正在跑的那轮并停止。":
+    "“Run once” starts from the initial task; “Continue” keeps going with the continue-prompt (without re-sending the task); “Force-stop” kills the in-flight round and stops.",
 };

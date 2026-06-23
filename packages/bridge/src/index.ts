@@ -845,6 +845,8 @@ async function main() {
         sessionId: "loop",
         event: { type: "loop-input", round, text },
       }),
+    // 强制中断：杀掉该会话节点正在跑的那一轮（与空闲看门狗同一机制）
+    interrupt: (nodeId) => sessions.interrupt(nodeId),
   });
   loopRunner.start();
 
@@ -912,6 +914,8 @@ async function main() {
     knowledge,
     permBroker,
     runLoop: (nodeId) => loopRunner.runNow(nodeId),
+    stopLoop: (nodeId) => loopRunner.cancel(nodeId),
+    continueLoop: (nodeId) => loopRunner.continueNow(nodeId),
     onConfigChanged: () => {
       // 图(graph)变更不必重连飞书；仅会话需要失效（已在 server 内处理）。
       // webhook 节点增删/端口改 → 重同步监听

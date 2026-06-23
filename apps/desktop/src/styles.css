@@ -1782,6 +1782,19 @@ button.primary {
 .notice-btn:hover {
   background: rgba(var(--accent-rgb), 0.2);
 }
+.notice-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* 危险动作（如循环「强制中断」）：红色描边 */
+.notice-btn.danger {
+  border-color: var(--st-err);
+  background: color-mix(in srgb, var(--st-err) 12%, transparent);
+  color: var(--st-err);
+}
+.notice-btn.danger:hover {
+  background: color-mix(in srgb, var(--st-err) 22%, transparent);
+}
 .popup-head {
   display: flex;
   align-items: center;

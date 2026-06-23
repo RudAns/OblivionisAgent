@@ -229,6 +229,15 @@ export class SessionManager {
     this.hub.broadcast({ type: "config", config: this.store.get() });
   }
 
+  /**
+   * 中断某会话节点正在进行的运行（杀掉在跑的 claude 子进程）。用于循环「强制中断」。
+   * 同时覆盖单分身(key=nodeId)与按群分身(key=nodeId::chatId)。与空闲看门狗同一杀进程机制，安全。
+   */
+  interrupt(nodeId: string): void {
+    this.sessions.get(nodeId)?.interrupt();
+    for (const [k, s] of this.sessions) if (k.startsWith(`${nodeId}::`)) s.interrupt();
+  }
+
   /** 配置变更后调用：丢弃已变更节点的实例，下次发消息重建 */
   invalidate(): void {
     this.sessions.clear();

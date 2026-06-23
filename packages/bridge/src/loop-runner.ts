@@ -35,6 +35,8 @@ export interface LoopDeps {
    * 实现：广播一条合成 session-event，转录面板渲染成「🔁 第N轮指令」。失败不影响循环。
    */
   mirrorInput: (sessionNodeId: string, round: number, text: string) => void;
+  /** 强制中断：杀掉该会话节点正在跑的那一轮（claude 子进程）。用于循环「强制中断」。 */
+  interrupt: (sessionNodeId: string) => void;
 }
 
 interface LoopState {
@@ -51,6 +53,8 @@ const ROUND_GAP_MS = 1500;
 export class LoopRunner {
   private timer: ReturnType<typeof setInterval> | null = null;
   private state = new Map<string, LoopState>();
+  /** 收到强制中断的循环 id：fire() 每轮检查到它就尽快停；杀进程在 cancel() 里同步发起。 */
+  private cancelled = new Set<string>();
 
   constructor(private deps: LoopDeps) {}
 
@@ -64,8 +68,33 @@ export class LoopRunner {
     this.timer = null;
   }
 
-  /** 手动「跑一次」：忽略 schedule 立即触发（仍受 running 守卫 + 各刹车）。 */
+  /** 手动「跑一次」：从初始任务 prompt 开始跑（仍受 running 守卫 + 各刹车）。 */
   runNow(nodeId: string): void {
+    this.trigger(nodeId, "fresh");
+  }
+
+  /** 「继续」：直接用「继续语」往下接着跑（不重发初始任务 prompt）。用于中断后续接、或推进一个已开了头的会话。 */
+  continueNow(nodeId: string): void {
+    this.trigger(nodeId, "continue");
+  }
+
+  /** 强制中断：标记取消 + 杀掉在跑的那一轮子进程；fire() 检测到取消即尽快收尾。 */
+  cancel(nodeId: string): void {
+    const st = this.state.get(nodeId);
+    if (!st || !st.running) {
+      this.deps.log.info(`循环 ${nodeId} 未在运行，无需中断`);
+      return;
+    }
+    this.cancelled.add(nodeId);
+    const cfg = this.deps.store.get();
+    const node = cfg.graph.nodes.find((n) => n.id === nodeId && n.kind === "loop") as LoopNode | undefined;
+    const session = this.downstream(cfg, nodeId);
+    if (session) this.deps.interrupt(session.id); // 立刻杀掉在跑的那一轮，await 会被 reject，fire 据此收尾
+    this.deps.log.warn(`循环「${node?.label ?? nodeId}」收到强制中断`);
+  }
+
+  /** runNow/continueNow 共用的触发：守卫(找节点/会话/running) → 置位 running → fire。 */
+  private trigger(nodeId: string, mode: "fresh" | "continue"): void {
     const cfg = this.deps.store.get();
     const node = cfg.graph.nodes.find((n) => n.id === nodeId && n.kind === "loop") as LoopNode | undefined;
     if (!node) {
@@ -87,10 +116,11 @@ export class LoopRunner {
       this.deps.log.warn(`循环「${node.label}」上一轮还在跑，忽略本次手动触发`);
       return;
     }
+    this.cancelled.delete(nodeId); // 清掉上次可能残留的取消标记
     st.running = true;
     st.startedAt = Date.now();
     st.lastFired = Date.now();
-    void this.fire(node, session);
+    void this.fire(node, session, mode);
   }
 
   private downstream(
@@ -137,8 +167,11 @@ export class LoopRunner {
     }
   }
 
-  /** 实际跑一次循环（多轮）；finally 复位 running。 */
-  private async fire(loop: LoopNode, session: ClaudeSessionNode): Promise<void> {
+  /**
+   * 实际跑一次循环（多轮）；finally 复位 running。
+   * mode="fresh"：第 1 轮发初始任务 prompt；mode="continue"：第 1 轮就用「继续语」（不重发初始任务）。
+   */
+  private async fire(loop: LoopNode, session: ClaudeSessionNode, mode: "fresh" | "continue" = "fresh"): Promise<void> {
     const d = loop.data;
     const maxRounds = Math.max(1, Math.min(500, d.maxRounds || 5));
     const reset = d.resetEvery && d.resetEvery > 0 ? Math.min(d.resetEvery, maxRounds) : 0;
@@ -153,23 +186,42 @@ export class LoopRunner {
     );
     try {
       for (round = 1; round <= maxRounds; round++) {
+        if (this.cancelled.has(loop.id)) {
+          stopReason = `强制中断（第 ${round} 轮前）`;
+          break;
+        }
         this.deps.progress(loop.id, round, maxRounds, true);
         let prompt: string;
-        if (round === 1) {
+        if (round === 1 && mode === "fresh") {
           prompt = d.prompt || "开始。";
           if (reset)
             prompt += `\n\n（这是多轮任务，每 ${reset} 轮会重置上下文。请把进度持续写入工作目录的 STATE.md；每轮先读 STATE.md 了解已完成到哪，再做下一步。全部完成时单独回复一行：${d.doneMarker}）`;
         } else if (justReset) {
           prompt = "（上下文已重置）请读取工作目录的 STATE.md，按已记录的进度继续下一步，并把新进度写回 STATE.md。";
         } else {
+          // round>1，或 continue 模式的第 1 轮：直接用「继续语」
           prompt = d.continuePrompt;
         }
         justReset = false;
         this.deps.mirrorInput(session.id, round, prompt); // 把本轮指令实时镜像进转录
-        const reply = (await this.deps.runPrompt(session.id, prompt)) ?? "";
+        let reply: string;
+        try {
+          reply = (await this.deps.runPrompt(session.id, prompt)) ?? "";
+        } catch (e) {
+          // 我们主动中断时，杀进程会让 runPrompt reject —— 当作干净停止，不当失败
+          if (this.cancelled.has(loop.id)) {
+            stopReason = `强制中断（第 ${round} 轮）`;
+            break;
+          }
+          throw e;
+        }
         transcript.push(`【第 ${round} 轮】\n${reply.trim()}`);
         rounds.push({ prompt, reply: reply.trim() });
 
+        if (this.cancelled.has(loop.id)) {
+          stopReason = `强制中断（第 ${round} 轮）`;
+          break;
+        }
         if (d.stopMode === "sentinel" && d.doneMarker && reply.includes(d.doneMarker)) {
           stopReason = `命中完成标记（第 ${round} 轮）`;
           break;
@@ -204,7 +256,8 @@ export class LoopRunner {
       this.writeRunLog(loop.label, head, rounds);
 
       // 可选：在简要汇总之外，额外整理一份详细报告（md/html），落 ~/.oblivionis/reports/（多耗一轮）
-      if (d.report && d.report !== "none" && rounds.length) {
+      // 被强制中断时跳过（用户要的是立刻停，别再多跑一轮整理报告）
+      if (d.report && d.report !== "none" && rounds.length && !this.cancelled.has(loop.id)) {
         const reportPath = await this.generateReport(loop, session.id, rounds);
         if (reportPath) head += `\n📄 详细报告：${reportPath}`;
       }
@@ -219,6 +272,7 @@ export class LoopRunner {
       this.deps.log.error(`循环「${loop.label}」失败: ${(e as Error).message}`);
       this.deps.progress(loop.id, round, maxRounds, false, `失败：${(e as Error).message}`);
     } finally {
+      this.cancelled.delete(loop.id);
       const s = this.state.get(loop.id);
       if (s) s.running = false;
     }
