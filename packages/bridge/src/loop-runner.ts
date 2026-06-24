@@ -197,7 +197,10 @@ export class LoopRunner {
           if (reset)
             prompt += `\n\n（这是多轮任务，每 ${reset} 轮会重置上下文。请把进度持续写入工作目录的 STATE.md；每轮先读 STATE.md 了解已完成到哪，再做下一步。全部完成时单独回复一行：${d.doneMarker}）`;
         } else if (justReset) {
-          prompt = "（上下文已重置）请读取工作目录的 STATE.md，按已记录的进度继续下一步，并把新进度写回 STATE.md。";
+          // 重置后这一轮：仍沿用用户的「继续语」(保住其逐轮纪律)，只在前面加一句重置提示。
+          // 旧版这里发的是通用「继续下一步」，会丢掉用户精心写的"一轮一项/做完停"约束，
+          // 导致每个重置点(如第 N×resetEvery 轮)模型放飞、一波批处理失控——这是已修的坑。
+          prompt = `（上下文刚被重置，请先读工作目录的 STATE.md 了解进度，再继续）\n\n${d.continuePrompt}`;
         } else {
           // round>1，或 continue 模式的第 1 轮：直接用「继续语」
           prompt = d.continuePrompt;

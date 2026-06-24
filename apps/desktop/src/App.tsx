@@ -3111,6 +3111,15 @@ function Inspector({
         <>
           {fieldArea(t("任务 prompt（第 1 轮发的指令）"), d.prompt, "prompt", 3)}
           {fieldArea(t("继续语（第 2 轮起每轮发）"), d.continuePrompt, "continuePrompt", 2)}
+          <details className="loop-tip">
+            <summary>{t("📖 怎么写好循环提示词？（点开）")}</summary>
+            <ul>
+              <li>{t("继续语要「自包含」：每轮自己读状态文件（如 STATE.md）判断进度，别靠上一轮的记忆——上下文会被压缩、开了重置会被清空。")}</li>
+              <li>{t("写明「一轮只做一件事、做完立即结束本轮、不要一轮做多个」，否则模型会自己一波跑完、失控。")}</li>
+              <li>{t("每轮把进度写回 STATE.md；检测规则/要求放系统提示或单独文件、每轮读，别只写在第 1 轮 prompt（一次性的，会被压缩/重置丢掉）。")}</li>
+              <li>{t("完成标记单独成行，且只在「全部做完」时才回。")}</li>
+            </ul>
+          </details>
           <label className="field">
             <span>{t("停止方式")}</span>
             <select value={d.stopMode ?? "sentinel"} onChange={(e) => onPatch({ stopMode: e.target.value })}>

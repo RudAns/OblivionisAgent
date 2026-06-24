@@ -668,4 +668,13 @@ export const EN: Record<string, string> = {
   "⏵ 继续": "⏵ Continue",
   "「跑一次」从初始任务开始；「继续」直接用「继续语」往下接着跑（不重发任务）；「强制中断」杀掉正在跑的那轮并停止。":
     "“Run once” starts from the initial task; “Continue” keeps going with the continue-prompt (without re-sending the task); “Force-stop” kills the in-flight round and stops.",
+  "📖 怎么写好循环提示词？（点开）": "📖 How to write good loop prompts? (expand)",
+  "继续语要「自包含」：每轮自己读状态文件（如 STATE.md）判断进度，别靠上一轮的记忆——上下文会被压缩、开了重置会被清空。":
+    "Make the continue-prompt self-contained: each round reads a state file (e.g. STATE.md) to know its progress — don't rely on the previous round's memory (context gets compacted, and reset wipes it).",
+  "写明「一轮只做一件事、做完立即结束本轮、不要一轮做多个」，否则模型会自己一波跑完、失控。":
+    "Spell out “do exactly one thing per round, stop immediately when done, never do multiple in one round” — otherwise the model runs ahead and does them all at once.",
+  "每轮把进度写回 STATE.md；检测规则/要求放系统提示或单独文件、每轮读，别只写在第 1 轮 prompt（一次性的，会被压缩/重置丢掉）。":
+    "Write progress back to STATE.md each round; put rules/requirements in the system prompt or a separate file read every round — not only in round 1's prompt (it's one-shot and gets lost to compaction/reset).",
+  "完成标记单独成行，且只在「全部做完」时才回。":
+    "Put the done-marker on its own line, and only emit it when everything is finished.",
 };
