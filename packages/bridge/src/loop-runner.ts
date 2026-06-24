@@ -20,8 +20,9 @@ import { shouldFire } from "./cron-scheduler.js";
 export interface LoopDeps {
   store: ConfigStore;
   log: Logger;
-  /** 跑一次：对目标会话节点发 prompt，返回回复文本（复用 cron/webhook 的同一实现：脱敏分身） */
-  runPrompt: (sessionNodeId: string, prompt: string) => Promise<string>;
+  /** 跑一次：对目标会话节点发 prompt，返回回复文本（复用 cron/webhook 的同一实现：脱敏分身）。
+   *  extraEnv：只注入到这一次 spawn 的会话进程的环境变量（循环节点的「运行时环境变量」）。 */
+  runPrompt: (sessionNodeId: string, prompt: string, extraEnv?: Record<string, string>) => Promise<string>;
   /** 把结果发到飞书群（出站脱敏由实现保证） */
   deliver: (chatId: string, text: string) => Promise<void>;
   /** 重置会话上下文（重新 fork 出新鲜脱敏分身）；用于「每 N 轮新鲜上下文」。复用「刷新快照」。 */
@@ -49,6 +50,19 @@ interface LoopState {
 const MAX_RUN_MS = 30 * 60_000;
 /** 轮间小憩，避免连发撞飞书限频。 */
 const ROUND_GAP_MS = 1500;
+
+/** 把「KEY=VALUE，每行一个」解析成环境变量表（# 开头、空行忽略）；空则返回 undefined。 */
+function parseEnv(s: string | undefined): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const line of (s ?? "").split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const eq = t.indexOf("=");
+    if (eq <= 0) continue;
+    out[t.slice(0, eq).trim()] = t.slice(eq + 1).trim();
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 export class LoopRunner {
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -175,6 +189,7 @@ export class LoopRunner {
     const d = loop.data;
     const maxRounds = Math.max(1, Math.min(500, d.maxRounds || 5));
     const reset = d.resetEvery && d.resetEvery > 0 ? Math.min(d.resetEvery, maxRounds) : 0;
+    const loopEnv = parseEnv(d.env); // 只注入到本循环 spawn 的会话进程的环境变量
     const startCost = this.deps.costTotal();
     const transcript: string[] = []; // 飞书汇总用(只回复，简洁)
     const rounds: { prompt: string; reply: string }[] = []; // run-log 用(指令+回复，可审计)
@@ -209,7 +224,7 @@ export class LoopRunner {
         this.deps.mirrorInput(session.id, round, prompt); // 把本轮指令实时镜像进转录
         let reply: string;
         try {
-          reply = (await this.deps.runPrompt(session.id, prompt)) ?? "";
+          reply = (await this.deps.runPrompt(session.id, prompt, loopEnv)) ?? "";
         } catch (e) {
           // 我们主动中断时，杀进程会让 runPrompt reject —— 当作干净停止，不当失败
           if (this.cancelled.has(loop.id)) {
@@ -320,7 +335,7 @@ export class LoopRunner {
         `下面是本次「${loop.label}」循环逐轮的工作记录。请把它整理成${fmtHint}的**详细报告**：` +
         `概述本次循环做了什么、每一步的关键产出与结论、遗留问题与后续建议。` +
         `只输出报告正文本身，不要任何额外解释、寒暄或代码围栏。\n\n${material}`;
-      let content = (await this.deps.runPrompt(sessionNodeId, prompt)) ?? "";
+      let content = (await this.deps.runPrompt(sessionNodeId, prompt, parseEnv(loop.data.env))) ?? "";
       content = this.stripFence(content).trim();
       if (!content) return null;
       const dir = join(homedir(), ".oblivionis", "reports");

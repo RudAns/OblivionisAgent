@@ -692,4 +692,7 @@ export const EN: Record<string, string> = {
   "将用 {0} 覆盖当前循环节点的配置，确定？": "Overwrite this loop node's config with {0}?",
   "导入失败（先「导出」一次或确认文件存在）：{0}":
     "Import failed (export once first, or check the file exists): {0}",
+  "运行时环境变量（KEY=VALUE，每行一个）": "Runtime env vars (KEY=VALUE, one per line)",
+  "只注入到本循环 spawn 的会话进程，不影响其他会话/全局。当作开关用：填了即开、清空即关。例：填 DOC_FIRST_GATE_BYPASS=1 让项目里读该变量的 hook 在本循环运行期间放行。":
+    "Injected only into the sessions this loop spawns — not other sessions or the global env. Use it as a switch: filled = on, empty = off. E.g. DOC_FIRST_GATE_BYPASS=1 makes a project hook that reads that var stand down while this loop runs.",
 };

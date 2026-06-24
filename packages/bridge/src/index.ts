@@ -803,18 +803,31 @@ async function main() {
   cronScheduler.start();
 
   // Webhook 入口：复用 cron 的 runPrompt/deliver（脱敏分身 + 出站脱敏）
-  const runWebhookPrompt = async (sessionNodeId: string, prompt: string) => {
+  // extraEnv：循环节点可注入运行时环境变量（只对它自己 spawn 的会话生效，如 DOC_FIRST_GATE_BYPASS）
+  const runWebhookPrompt = async (
+    sessionNodeId: string,
+    prompt: string,
+    extraEnv?: Record<string, string>,
+  ) => {
     const c = store.get();
     const n = c.graph.nodes.find((x) => x.id === sessionNodeId);
     const isSession = n?.kind === "claude-session";
     const soul = resolveSessionSoul(c, sessionNodeId, "fork")?.content;
     const append =
       [soul, isSession ? n.data.appendSystemPrompt : undefined].filter(Boolean).join("\n\n") || undefined;
-    return sessions.send(sessionNodeId, prompt, isSession ? n.data.permissionMode : undefined, append, {
-      nodeId: sessionNodeId,
-      nodeLabel: isSession ? n.label : undefined,
-      chatId: store.get().homeChatId || undefined,
-    });
+    return sessions.send(
+      sessionNodeId,
+      prompt,
+      isSession ? n.data.permissionMode : undefined,
+      append,
+      {
+        nodeId: sessionNodeId,
+        nodeLabel: isSession ? n.label : undefined,
+        chatId: store.get().homeChatId || undefined,
+      },
+      undefined,
+      extraEnv,
+    );
   };
   const deliverToChat = async (chatId: string, text: string) => {
     const safe = redactText(text, collectSecrets(feishuSecret.get()));

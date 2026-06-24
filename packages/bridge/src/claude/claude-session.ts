@@ -78,6 +78,8 @@ interface Job {
   permCtx?: PermCtxLite;
   /** 增量回调：每出现一段新的 assistant 文本就回传累计文本（用于飞书流式卡片） */
   onText?: (acc: string) => void;
+  /** 本次运行额外注入的环境变量（只对这一次 spawn 生效；如循环节点的 DOC_FIRST_GATE_BYPASS） */
+  extraEnv?: Record<string, string>;
   resolve: (finalText: string) => void;
   reject: (err: Error) => void;
 }
@@ -116,9 +118,10 @@ export class ClaudeSession {
     appendSystemPrompt?: string,
     permCtx?: PermCtxLite,
     onText?: (acc: string) => void,
+    extraEnv?: Record<string, string>,
   ): Promise<string> {
     return new Promise((resolve, reject) => {
-      this.queue.push({ text, permissionMode, appendSystemPrompt, permCtx, onText, resolve, reject });
+      this.queue.push({ text, permissionMode, appendSystemPrompt, permCtx, onText, extraEnv, resolve, reject });
       void this.pump();
     });
   }
@@ -138,7 +141,7 @@ export class ClaudeSession {
     this.busy = true;
     this.opts.onStatus("running");
     try {
-      const finalText = await this.runOnce(job.text, job.permissionMode, job.appendSystemPrompt, job.permCtx, job.onText);
+      const finalText = await this.runOnce(job.text, job.permissionMode, job.appendSystemPrompt, job.permCtx, job.onText, job.extraEnv);
       job.resolve(finalText);
       this.opts.onStatus("idle");
     } catch (err) {
@@ -189,23 +192,27 @@ export class ClaudeSession {
     appendSystemPrompt?: string,
     permCtx?: PermCtxLite,
     onText?: (acc: string) => void,
+    extraEnv?: Record<string, string>,
   ): Promise<string> {
     const o = this.opts;
     const args = this.buildArgs(permissionMode ?? o.permissionMode, appendSystemPrompt);
     o.log("info", `[${o.nodeId}] claude ${args.join(" ")} (cwd=${o.cwd})`);
 
     return new Promise<string>((resolve, reject) => {
+      // 基础环境 + 审批上下文（仅 approval 时）+ 本次调用额外注入的环境变量（循环节点等）
+      const baseEnv: NodeJS.ProcessEnv = o.approval
+        ? {
+            ...process.env,
+            OBLIVIONIS_PERM_CTX: JSON.stringify(permCtx ?? { nodeId: o.nodeId, nodeLabel: o.label }),
+            OBLIVIONIS_WS_PORT: String(o.wsPort ?? 8920),
+          }
+        : { ...process.env };
+      const spawnEnv = extraEnv ? { ...baseEnv, ...extraEnv } : baseEnv;
       // prompt 走 stdin，彻底规避 Windows 命令行引号/转义问题
       const child = spawn(o.binPath, args, {
         cwd: o.cwd,
         stdio: ["pipe", "pipe", "pipe"],
-        env: o.approval
-          ? {
-              ...process.env,
-              OBLIVIONIS_PERM_CTX: JSON.stringify(permCtx ?? { nodeId: o.nodeId, nodeLabel: o.label }),
-              OBLIVIONIS_WS_PORT: String(o.wsPort ?? 8920),
-            }
-          : process.env,
+        env: spawnEnv,
       });
       this.active = child;
 

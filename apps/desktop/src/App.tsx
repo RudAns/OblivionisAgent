@@ -110,6 +110,7 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
       maxCostUsd: 0,
       resetEvery: 0,
       report: "none",
+      env: "",
       enabled: true,
     },
   }),
@@ -3244,6 +3245,10 @@ function Inspector({
               {t("除审核群的简要汇总外，循环结束后再多跑一轮整理一份详细报告，存到 ~/.oblivionis/reports/（文档查看器可看）。")}
             </div>
           )}
+          {fieldArea(t("运行时环境变量（KEY=VALUE，每行一个）"), d.env, "env", 2, "DOC_FIRST_GATE_BYPASS=1")}
+          <div className="hint" style={{ marginBottom: 6 }}>
+            {t("只注入到本循环 spawn 的会话进程，不影响其他会话/全局。当作开关用：填了即开、清空即关。例：填 DOC_FIRST_GATE_BYPASS=1 让项目里读该变量的 hook 在本循环运行期间放行。")}
+          </div>
           {field(t("触发时刻（空=仅手动）"), d.schedule, "schedule")}
           <div className="hint" style={{ marginBottom: 6 }}>
             {t("留空=只手动「跑一次」；或填 09:00 / every 30m 自动触发")}

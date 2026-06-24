@@ -165,6 +165,12 @@ export const LoopData = z.object({
    * 多耗一轮(把各轮产出喂回去让它整理),按需开。
    */
   report: z.enum(["none", "md", "html"]).default("none"),
+  /**
+   * 运行时环境变量（KEY=VALUE，每行一个）：**只注入到本循环 spawn 的会话进程**，
+   * 不影响其他会话、也不污染全局。用作"开关"：例如填 `DOC_FIRST_GATE_BYPASS=1`
+   * 让项目里读该变量的 hook 在本循环运行期间放行；清空即关闭。
+   */
+  env: z.string().default(""),
   /** 每轮/汇总发到的飞书群 chatId；留空=全局 homeChatId；都没有则只记日志 */
   chatId: z.string().optional(),
   enabled: z.boolean().default(true),
