@@ -985,6 +985,17 @@ fn read_md(path: String) -> Result<String, String> {
     std::fs::read_to_string(p).map_err(|e| e.to_string())
 }
 
+/// 把文本写到指定路径（用于循环节点「导出配置到工作目录」）。父目录不存在则建。返回写入的完整路径。
+#[tauri::command]
+fn write_text_file(path: String, content: String) -> Result<String, String> {
+    let p = std::path::Path::new(&path);
+    if let Some(parent) = p.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(p, content.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(p.to_string_lossy().to_string())
+}
+
 /// 把本地图片读成 data URL——让 Markdown 里的相对路径图片在 webview 里直接显示，
 /// 免去配置 Tauri asset 协议/scope。path 为相对路径时按 base（文件所在目录）解析。
 #[tauri::command]
@@ -1112,7 +1123,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
             context_estimate, claude_stats, claude_status, app_version, set_feishu_secret, has_feishu_secret,
-            reports_dir, open_md_viewer, open_canvas_window, session_dirs, list_md_files, read_md, read_file_b64
+            reports_dir, open_md_viewer, open_canvas_window, session_dirs, list_md_files, read_md, read_file_b64,
+            write_text_file
         ])
         .setup(|app| {
             if std::env::var("OBLIVIONIS_NO_SIDECAR").as_deref() != Ok("1") {

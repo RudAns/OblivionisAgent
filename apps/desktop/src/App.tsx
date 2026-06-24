@@ -1418,6 +1418,22 @@ function Inner() {
     );
   };
 
+  // 循环节点「导出/导入配置」的目标文件：下游「Claude 会话」的工作目录 / oblivionis-loop-<名称>.json。
+  // 没连会话或会话没设 cwd 时回退到 claude.defaultCwd；都没有则返回 null（无法定位）。
+  const loopConfigPath = (g: OblivionisConfig["graph"], loopId: string): string | null => {
+    const loop = g.nodes.find((n) => n.id === loopId);
+    if (!loop) return null;
+    const targetIds = g.edges.filter((e) => e.source === loopId).map((e) => e.target);
+    const sess = g.nodes.find((n) => n.kind === "claude-session" && targetIds.includes(n.id));
+    const cwd = (sess?.data as { cwd?: string } | undefined)?.cwd || config?.claude.defaultCwd || "";
+    if (!cwd) return null;
+    const label =
+      String(loop.label || "loop")
+        .replace(/[\\/:*?"<>|]/g, "_")
+        .slice(0, 40) || "loop";
+    return cwd.replace(/[\\/]+$/, "") + "/oblivionis-loop-" + label + ".json";
+  };
+
   // 画布配置导出：整张图(节点+连线+位置)存成 JSON 下载；抹掉机器相关/敏感字段
   // (会话身份 sessionId/baseSessionId 导入后会自动重 fork；webhook token 不外泄)。
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -2479,6 +2495,54 @@ function Inner() {
                       client.send({ type: "continue-loop", nodeId });
                     }}
                     onStopLoop={(nodeId) => client.send({ type: "stop-loop", nodeId })}
+                    onExportLoop={async (nodeId) => {
+                      save(); // 先把当前编辑同步，导出的就是最新配置
+                      const g = rfToGraph(nodes, edges);
+                      const loop = g.nodes.find((n) => n.id === nodeId);
+                      if (!loop) return;
+                      const path = loopConfigPath(g, nodeId);
+                      if (!path) {
+                        window.alert(t("循环没连到带工作目录的「Claude 会话」，无法确定导出位置"));
+                        return;
+                      }
+                      const payload = {
+                        app: "OblivionisAgent",
+                        kind: "loop",
+                        version: 1,
+                        exportedAt: new Date().toISOString(),
+                        data: loop.data,
+                      };
+                      try {
+                        const written = await invoke<string>("write_text_file", {
+                          path,
+                          content: JSON.stringify(payload, null, 2),
+                        });
+                        window.alert(t("已导出到：{0}", written));
+                      } catch (e) {
+                        window.alert(t("导出失败：{0}", String(e)));
+                      }
+                    }}
+                    onImportLoop={async (nodeId) => {
+                      const g = rfToGraph(nodes, edges);
+                      const path = loopConfigPath(g, nodeId);
+                      if (!path) {
+                        window.alert(t("循环没连到带工作目录的「Claude 会话」，无法确定导入位置"));
+                        return null;
+                      }
+                      try {
+                        const raw = await invoke<string>("read_md", { path });
+                        const obj = JSON.parse(raw);
+                        const data = (obj?.data ?? obj) as Record<string, unknown>;
+                        if (!data || typeof data !== "object" || (data.prompt === undefined && data.continuePrompt === undefined)) {
+                          throw new Error(t("不是有效的循环配置（缺 data.prompt/continuePrompt）"));
+                        }
+                        if (!window.confirm(t("将用 {0} 覆盖当前循环节点的配置，确定？", path))) return null;
+                        return data;
+                      } catch (e) {
+                        window.alert(t("导入失败（先「导出」一次或确认文件存在）：{0}", String(e)));
+                        return null;
+                      }
+                    }}
                     loopProgress={selectedNode ? loopProgress[selectedNode.id] ?? null : null}
                   />
                   {selectedIsClaude && (
@@ -2913,6 +2977,8 @@ function Inspector({
   onRunLoop,
   onStopLoop,
   onContinueLoop,
+  onExportLoop,
+  onImportLoop,
   loopProgress,
 }: {
   node: Node | null;
@@ -2929,6 +2995,8 @@ function Inspector({
   onRunLoop?: (nodeId: string) => void;
   onStopLoop?: (nodeId: string) => void;
   onContinueLoop?: (nodeId: string) => void;
+  onExportLoop?: (nodeId: string) => void;
+  onImportLoop?: (nodeId: string) => Promise<Record<string, unknown> | null>;
   loopProgress?: { round: number; max: number; running: boolean; note?: string } | null;
 }) {
   const [showPicker, setShowPicker] = useState(false);
@@ -3219,6 +3287,24 @@ function Inspector({
           {loopProgress && !loopProgress.running && loopProgress.note && (
             <div className="hint" style={{ marginTop: 6 }}>{t("上次：{0}", loopProgress.note)}</div>
           )}
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <button className="notice-btn" style={{ flex: 1 }} onClick={() => onExportLoop?.(node.id)}>
+              {t("⬇ 导出配置")}
+            </button>
+            <button
+              className="notice-btn"
+              style={{ flex: 1 }}
+              onClick={async () => {
+                const data = await onImportLoop?.(node.id);
+                if (data) onPatch(data);
+              }}
+            >
+              {t("⬆ 导入配置")}
+            </button>
+          </div>
+          <div className="hint" style={{ marginTop: 4 }}>
+            {t("导出/导入到下游会话的工作目录（oblivionis-loop-<名称>.json）。可让别人或 Claude 改好这个文件，再点导入套用。")}
+          </div>
           <div className="hint" style={{ marginTop: 6 }}>
             {t("循环会对下游会话反复发指令，直到完成标记/满轮数/超预算；只报告，破坏性操作仍走审批卡。")}
           </div>

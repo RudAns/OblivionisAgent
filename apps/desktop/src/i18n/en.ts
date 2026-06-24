@@ -677,4 +677,19 @@ export const EN: Record<string, string> = {
     "Write progress back to STATE.md each round; put rules/requirements in the system prompt or a separate file read every round — not only in round 1's prompt (it's one-shot and gets lost to compaction/reset).",
   "完成标记单独成行，且只在「全部做完」时才回。":
     "Put the done-marker on its own line, and only emit it when everything is finished.",
+  "⬇ 导出配置": "⬇ Export config",
+  "⬆ 导入配置": "⬆ Import config",
+  "导出/导入到下游会话的工作目录（oblivionis-loop-<名称>.json）。可让别人或 Claude 改好这个文件，再点导入套用。":
+    "Export/import to the downstream session's working dir (oblivionis-loop-<name>.json). Let someone (or Claude) edit that file, then click Import to apply.",
+  "循环没连到带工作目录的「Claude 会话」，无法确定导出位置":
+    "The loop isn't connected to a Claude session with a working dir, so there's no export location.",
+  "循环没连到带工作目录的「Claude 会话」，无法确定导入位置":
+    "The loop isn't connected to a Claude session with a working dir, so there's no import location.",
+  "已导出到：{0}": "Exported to: {0}",
+  "导出失败：{0}": "Export failed: {0}",
+  "不是有效的循环配置（缺 data.prompt/continuePrompt）":
+    "Not a valid loop config (missing data.prompt/continuePrompt)",
+  "将用 {0} 覆盖当前循环节点的配置，确定？": "Overwrite this loop node's config with {0}?",
+  "导入失败（先「导出」一次或确认文件存在）：{0}":
+    "Import failed (export once first, or check the file exists): {0}",
 };
