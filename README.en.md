@@ -8,7 +8,7 @@
 
 **Whatever you can do in your local session, the forked guest session can do too.**
 
-Wire nodes on a canvas to orchestrate local claude sessions: multi-session routing, intent splitting, persona / skill / subagent capabilities, a built-in interactive terminal, sensitive-op approvals… turning "how you drive the Claude CLI" into something **visual and tunable**.
+Wire nodes on a canvas to orchestrate local claude sessions: multi-session routing, intent splitting, persona / skill / subagent capabilities, **autonomous loop runs**, a built-in interactive terminal, sensitive-op approvals… turning "how you drive the Claude CLI" into something **visual and tunable**.
 **One of its capabilities** is bridging **Feishu (Lark) group chats** — @-mention the bot in a group → routed to the matching project's session → rich-text reply that @-mentions the asker, with guests and your own dev never polluting each other.
 
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
@@ -70,7 +70,7 @@ Wire nodes on a canvas to orchestrate local claude sessions: multi-session routi
 
 | | |
 |---|---|
-| 🎛️ **Node-wiring canvas** | Feishu group → router → Claude session; drag and wire nodes to connect. Collapse into session cards to focus on the terminal |
+| 🎛️ **Node-wiring canvas (separate window)** | Feishu group → router → Claude session; drag and wire nodes to connect. The canvas is its own OS window; the main window = **welcome dashboard (node overview + calendar + subscription usage + cost ranking) + terminal**, kept in sync live |
 | 🔀 **Multi-group, multi-session + intent routing** | Different groups route to different projects (each with its own cwd / model / permissions); same-group messages branch by semantic intent |
 | 🛡️ **Owner / guest isolation** | The owner can let Claude edit code and run commands; guests go through a **redacted fork**, replies are **re-redacted** + safety guardrails — your dev context and guests' sessions never pollute each other (sensitive-op approval below) |
 | 🔐 **Tool-approval card** | When a guest triggers a sensitive tool (edit file / run command) → an interactive card pops in the group; only after the owner taps **[Allow]** does it run. After a decision or a 100s timeout the card **auto-updates its state and removes the buttons**. Approval is on by default (the backstop for the guest guardrail) |
@@ -81,14 +81,16 @@ Wire nodes on a canvas to orchestrate local claude sessions: multi-session routi
 | 🎭 **Capability nodes (persona / skill / subagent)** | SOUL.md (personality) · SKILL.md (operating rules) · native Claude Code subagent (heavy work in an isolated context) are all wireable nodes; connect to a session's capability port to take effect, one node shareable across sessions; after editing, tap **"Re-anchor"** to refresh into the connected sessions (keeps memory) |
 | 🌐 **Bilingual UI (中 / EN)** | One-tap switch between 中文 / English in settings; technical identifiers (sessionId / cwd, etc.) stay as-is, missing translations fall back to Chinese |
 | ⏰ **Cron / Webhook / group memory / knowledge inbox** | Create cron jobs in natural language, external triggers, per-group accumulated memory, Q&A distilled into rules pending judgment |
+| 🔁 **Loop (autonomous multi-round)** | Run a session **repeatedly** until a done-marker / max rounds / budget cap; **reset context every N rounds** (carried via a STATE.md journal) to avoid bloat; **mirror each round's prompt** into the transcript live; optionally emit a **detailed md / html report**; **force-stop / continue** mid-run; **runtime env vars** (injected only into this loop's sessions — a handy toggle for project hooks); **export / import** its config (let a human or Claude edit the file, then apply in one click). L1 report-only throughout — destructive ops still go through approval |
 | ✨ **Runtime animations** | Splash on startup, node-path flow lines (only the real path lights up; concurrent groups each light their own), session sweep (fork blue / terminal green / dual-run colorful), completion flag, desktop completion mascot |
-| 📋 **Audit + green deployment** | Everything — who asked what in which group — is persisted; single-instance guard, clean exit on close; Tauri-packaged, runs with just two exes |
+| 🔄 **Auto-update** | Built-in Tauri updater (minisign signature verification, ≠ code signing); new versions prompt automatically, one-click download-update-and-restart; manual "Check for updates" too |
+| 📋 **Audit + green deployment** | Everything — who asked what in which group — is persisted; single-instance guard, clean exit on close; Tauri-packaged (portable = two exes / auto-updatable = NSIS installer) |
 
 **Node types at a glance**
 
-| 🟢 Feishu group | 🟣 Router | 🟠 Intent split | 🔵 Claude session | 🩵 Cron | 🟡 Webhook | 🎭 Persona | 🧩 Skill | 🦾 Subagent |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| entry · by chatId | prefix / strip @ | LLM semantic branch | lands on a local session | cron-triggered | external HTTP | SOUL.md | SKILL.md | native subagent |
+| 🟢 Feishu group | 🟣 Router | 🟠 Intent split | 🔵 Claude session | 🩵 Cron | 🔁 Loop | 🟡 Webhook | 🎭 Persona | 🧩 Skill | 🦾 Subagent |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| entry · by chatId | prefix / strip @ | LLM semantic branch | lands on a local session | cron-triggered | autonomous multi-round | external HTTP | SOUL.md | SKILL.md | native subagent |
 
 > 🎭 Persona / 🧩 Skill / 🦾 Subagent are "capability nodes": drag onto a session's **persona / skill / subagent port** to affect that session's Feishu replies (persona = how it talks, skill = how it works, subagent = heavy lifting in an isolated context). One capability node can be shared across multiple sessions.
 

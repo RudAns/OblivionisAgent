@@ -1801,7 +1801,8 @@ function Inner() {
   const fetchGlance = useCallback((deep = false) => {
     const tzOffMin = -new Date().getTimezoneOffset(); // 东为正(UTC+8→480)，给后端把消息时间戳转本地日期
     void invoke<StatsData>("claude_stats", { deep, tzOffMin })
-      .then((s) => setGlanceStats(s && s.dailyActivity?.length ? s : null))
+      // 只在拿到有效数据时更新；空/读失败别覆盖已有数据（否则柱状图会突然变空）
+      .then((s) => { if (s && s.dailyActivity?.length) setGlanceStats(s); })
       .catch(() => {});
     void invoke<StatusData>("claude_status")
       .then((s) => setGlanceStatus(s && (s.version || s.name) ? s : null))
@@ -1810,8 +1811,10 @@ function Inner() {
   useEffect(() => {
     // 首取 deep：欢迎页仪表盘开机即展示活动日历，要带上「缓存截至日之后」的昨天/今天活动。
     fetchGlance(WIN_MODE === "main");
-    // 很慢(5 分钟)：两个小本地文件(19KB+52KB)、版本号已缓存。悬停/回主页(deep)才扫近期 transcript。
-    const id = setInterval(() => fetchGlance(false), 300000);
+    // 5 分钟轮询也用 deep：否则 recentDays(今天/昨天活动)取不到，「近 7 天」柱状图会随时间"变空"
+    // (只剩缓存截至日之前的日子、全归零)，得悬停触发 deep 才恢复。deep 只多扫近期本地 transcript、
+    // 不耗 token，5 分钟一次可接受。
+    const id = setInterval(() => fetchGlance(true), 300000);
     return () => clearInterval(id);
   }, [fetchGlance]);
 
