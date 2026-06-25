@@ -3,6 +3,7 @@ import type { UsageSnapshot, CostSnapshot } from "@oblivionis/shared";
 import { useT } from "../i18n/index.js";
 import { FeishuStatusDot, type FeishuState } from "../panels/FeishuPanel.js";
 import { dayFortune, fmtDur, prettyModel, type AppVer, type StatsData } from "./GlanceChips.js";
+import { FleetBoard, type LoopProgressMap } from "./FleetBoard.js";
 import appIcon from "../assets/app-icon.png";
 
 // 与画布同源的节点配色（缩略图按类型用色块表现，不放图标）。
@@ -335,16 +336,23 @@ export interface HomeViewProps {
   feishu: FeishuState;
   app: AppVer | null;
   inboxBadge: number;
+  loopProgress: LoopProgressMap;
   onOpenCanvas: () => void;
   onOpenTerminal: () => void;
   onOpenCost: () => void;
+  onRunLoop: (id: string) => void;
+  onStopLoop: (id: string) => void;
+  onContinueLoop: (id: string) => void;
 }
 
 /** 欢迎主页：占满视窗的「一图流」仪表盘——节点编排总览 + 订阅用量 + 成本看板 + 活动日历，
  *  各信息一眼尽收，不再是一堆跳转按钮。导航靠左侧图标栏。 */
 export function HomeView(props: HomeViewProps) {
   const t = useT();
-  const { nodes, edges, stats, usage, cost, sessionCount, openTerminals, feishu, app, inboxBadge, onOpenCanvas, onOpenTerminal, onOpenCost } = props;
+  const { nodes, edges, stats, usage, cost, sessionCount, openTerminals, feishu, app, inboxBadge, loopProgress, onOpenCanvas, onOpenTerminal, onOpenCost, onRunLoop, onStopLoop, onContinueLoop } = props;
+  const loops = nodes
+    .filter((n) => n.type === "loop")
+    .map((n) => ({ id: n.id, label: ((n.data as { label?: string }).label as string) || "循环" }));
 
   return (
     <div className="home-view">
@@ -407,6 +415,14 @@ export function HomeView(props: HomeViewProps) {
         <div className="dash-side">
           <ActivityCalendar stats={stats} />
           <UsageMeter usage={usage} />
+          <FleetBoard
+            loops={loops}
+            progress={loopProgress}
+            cost={cost}
+            onRun={onRunLoop}
+            onStop={onStopLoop}
+            onContinue={onContinueLoop}
+          />
         </div>
       </div>
     </div>

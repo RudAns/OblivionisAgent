@@ -699,4 +699,12 @@ export const EN: Record<string, string> = {
   "验收模型（空=haiku）": "Verifier model (blank = haiku)",
   "命中完成标记后，先用一次便宜模型读 原任务 + STATE.md + 最近几轮产出判 done/未done；未过则带理由继续，不会假完成。专治「会话糊弄完成条件」。":
     "When the done-marker is hit, a cheap model first reads the original task + STATE.md + recent rounds and judges done / not-done; if not, the loop continues with the reason — no fake completions. Counters sessions gaming the success condition.",
+  "循环舰队": "Loop fleet",
+  "全部空闲": "all idle",
+  "{0} 个在跑": "{0} running",
+  "运行中 · 第 {0}/{1} 轮": "Running · round {0}/{1}",
+  "待命": "Idle",
+  "跑一次": "Run once",
+  "强制中断": "Force-stop",
+  "继续": "Continue",
 };

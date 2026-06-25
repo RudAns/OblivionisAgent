@@ -2703,6 +2703,7 @@ function Inner() {
             feishu={feishu}
             app={appVer}
             inboxBadge={pendingKnowledge}
+            loopProgress={loopProgress}
             onOpenCanvas={() => void invoke("open_canvas_window").catch(() => {})}
             onOpenTerminal={() => {
               setHomeOpen(false);
@@ -2712,6 +2713,9 @@ function Inner() {
               else void invoke("open_canvas_window").catch(() => {});
             }}
             onOpenCost={() => setCostOpen(true)}
+            onRunLoop={(id) => { save(); client.send({ type: "run-loop", nodeId: id }); }}
+            onStopLoop={(id) => client.send({ type: "stop-loop", nodeId: id })}
+            onContinueLoop={(id) => { save(); client.send({ type: "continue-loop", nodeId: id }); }}
           />
         )}
         </div>
