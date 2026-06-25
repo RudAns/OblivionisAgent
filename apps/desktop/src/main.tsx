@@ -29,6 +29,15 @@ try {
   /* 浏览器开发版没有 Tauri，按主窗口走 */
 }
 
+// 透明「小人」窗：必须在**首帧之前**就把根背景设透明。WebView2 一旦用不透明背景
+// （深色主题的 --bg）合成过首帧，之后 useEffect 再改透明也回不去 → 残留黑底
+// （WebView2 运行时升级后这条变严，表现为"弹窗突然变黑"）。所以这里同步设，早于 React 渲染。
+if (label === "mascot") {
+  for (const el of [document.documentElement, document.body, document.getElementById("root")]) {
+    if (el) (el as HTMLElement).style.background = "transparent";
+  }
+}
+
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 root.render(
   <LangProvider>
