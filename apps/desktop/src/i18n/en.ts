@@ -707,4 +707,7 @@ export const EN: Record<string, string> = {
   "跑一次": "Run once",
   "强制中断": "Force-stop",
   "继续": "Continue",
+  "完成汇总用交互卡": "Interactive card for the summary",
+  "收尾汇总发成飞书交互卡，挂 ⏵继续 / ▶重跑 / 📄看轨迹 按钮（主人点一下即操作）。发卡失败自动回退纯文本。":
+    "Deliver the wrap-up summary as a Feishu interactive card with ⏵Continue / ▶Re-run / 📄Trace buttons (owner taps to act). Falls back to plain text if the card fails.",
 };

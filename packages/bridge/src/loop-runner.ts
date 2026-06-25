@@ -25,6 +25,8 @@ export interface LoopDeps {
   runPrompt: (sessionNodeId: string, prompt: string, extraEnv?: Record<string, string>) => Promise<string>;
   /** 把结果发到飞书群（出站脱敏由实现保证） */
   deliver: (chatId: string, text: string) => Promise<void>;
+  /** 把结果发成「带操作按钮」的飞书交互卡（按钮点击合成消息回灌）。发卡失败实现方应回退纯文本。 */
+  deliverCard: (chatId: string, text: string, buttons: { label: string; send: string }[]) => Promise<void>;
   /** 重置会话上下文（重新 fork 出新鲜脱敏分身）；用于「每 N 轮新鲜上下文」。复用「刷新快照」。 */
   resetSession: (sessionNodeId: string) => Promise<void>;
   /** 广播运行进度给 GUI（节点卡/检视显示第几轮、是否在跑、停因） */
@@ -74,6 +76,13 @@ export class LoopRunner {
   private state = new Map<string, LoopState>();
   /** 收到强制中断的循环 id：fire() 每轮检查到它就尽快停；杀进程在 cancel() 里同步发起。 */
   private cancelled = new Set<string>();
+  /** 每个循环最近一次 run-log 路径（供飞书卡「看轨迹」按钮回带）。 */
+  private lastLogPath = new Map<string, string>();
+
+  /** 取某循环最近一次 run-log 文件路径（没有返回 undefined）。 */
+  lastRunLog(nodeId: string): string | undefined {
+    return this.lastLogPath.get(nodeId);
+  }
 
   constructor(private deps: LoopDeps) {}
 
@@ -300,7 +309,8 @@ export class LoopRunner {
         head += `\n🔎 验收：${verifyNotes[verifyNotes.length - 1]}` + (verifyNotes.length > 1 ? `（共验收 ${verifyNotes.length} 次）` : "");
       }
       const body = transcript.join("\n\n");
-      this.writeRunLog(loop.label, head, rounds);
+      const logPath = this.writeRunLog(loop.label, head, rounds);
+      if (logPath) this.lastLogPath.set(loop.id, logPath);
 
       // 可选：在简要汇总之外，额外整理一份详细报告（md/html），落 ~/.oblivionis/reports/（多耗一轮）
       // 被强制中断时跳过（用户要的是立刻停，别再多跑一轮整理报告）
@@ -310,7 +320,17 @@ export class LoopRunner {
       }
 
       if (chatId && body.trim()) {
-        await this.deps.deliver(chatId, `${head}\n\n${body}`);
+        const full = `${head}\n\n${body}`;
+        if (d.feishuCard) {
+          // 交互卡：挂 继续 / 重跑 / 看轨迹 按钮（点击经合成消息走 /loop 命令）；发卡失败由实现回退纯文本
+          await this.deps.deliverCard(chatId, full, [
+            { label: "⏵ 继续", send: `/loop continue ${loop.id}` },
+            { label: "▶ 重跑", send: `/loop run ${loop.id}` },
+            { label: "📄 看轨迹", send: `/loop trace ${loop.id}` },
+          ]);
+        } else {
+          await this.deps.deliver(chatId, full);
+        }
       } else {
         this.deps.log.info(`循环「${loop.label}」完成(未配置投递群): ${round} 轮，${stopReason}`);
       }
@@ -371,8 +391,8 @@ export class LoopRunner {
     }
   }
 
-  /** 把本次循环完整 run-log（每轮「指令 + 回复」成对）落盘到 ~/.oblivionis/loop-logs/，便于事后审计（失败不影响循环）。 */
-  private writeRunLog(label: string, head: string, rounds: { prompt: string; reply: string }[]): void {
+  /** 把本次循环完整 run-log（每轮「指令 + 回复」成对）落盘到 ~/.oblivionis/loop-logs/，便于事后审计（失败不影响循环）。返回路径。 */
+  private writeRunLog(label: string, head: string, rounds: { prompt: string; reply: string }[]): string | null {
     try {
       const dir = join(homedir(), ".oblivionis", "loop-logs");
       mkdirSync(dir, { recursive: true });
@@ -380,9 +400,12 @@ export class LoopRunner {
       const body = rounds
         .map((r, i) => `## 第 ${i + 1} 轮\n\n**发出的指令：**\n\n${r.prompt}\n\n**会话回复：**\n\n${r.reply}`)
         .join("\n\n---\n\n");
-      writeFileSync(join(dir, `${safe}-${this.stamp()}.md`), `# ${head}\n\n${body}\n`, "utf8");
+      const path = join(dir, `${safe}-${this.stamp()}.md`);
+      writeFileSync(path, `# ${head}\n\n${body}\n`, "utf8");
+      return path;
     } catch (e) {
       this.deps.log.warn(`循环 run-log 落盘失败: ${(e as Error).message}`);
+      return null;
     }
   }
 

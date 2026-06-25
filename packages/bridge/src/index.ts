@@ -347,6 +347,40 @@ async function main() {
       ts: Date.now(),
     });
 
+    // /loop 命令(仅主人；通常来自循环交互卡的按钮回灌)：continue / run / stop / trace <loopNodeId>。路由之前拦截。
+    const loopCmd = inbound.text.trim().match(/^\/loop\s+(continue|run|stop|trace)\s+(\S+)/i);
+    if (loopCmd) {
+      const c0 = store.get();
+      const reply = (m: string) =>
+        gateway.transport?.reply(inbound.chatId, m, { replyToMessageId: inbound.messageId }).catch(() => {});
+      if (!c0.owners.some((o) => o.openId === inbound.senderId)) {
+        await reply("（循环控制仅主人可用）");
+        return;
+      }
+      const action = loopCmd[1]!.toLowerCase();
+      const loopId = loopCmd[2]!;
+      const ln = c0.graph.nodes.find((n) => n.id === loopId && n.kind === "loop");
+      if (!ln) {
+        await reply("（找不到该循环节点）");
+        return;
+      }
+      if (action === "continue") {
+        loopRunner.continueNow(loopId);
+        await reply(`⏵ 已继续「${ln.label}」`);
+      } else if (action === "run") {
+        loopRunner.runNow(loopId);
+        await reply(`▶ 已重跑「${ln.label}」`);
+      } else if (action === "stop") {
+        loopRunner.cancel(loopId);
+        await reply(`⏹ 已请求中断「${ln.label}」`);
+      } else {
+        const p = loopRunner.lastRunLog(loopId);
+        await reply(p ? `📄 最近 run-log：\n${p}` : "（暂无 run-log）");
+      }
+      log.info(`/loop ${action} ${loopId} by ${inbound.senderName}`);
+      return;
+    }
+
     // 自助命令(仅主人)：/status 状态卡、/doctor 自检卡(允许前面带 @机器人)。路由之前拦截。
     const cmdMatch = inbound.text.toLowerCase().match(/\/(status|doctor|retry|continue)\b/);
     if (cmdMatch) {
@@ -836,6 +870,18 @@ async function main() {
       hub.broadcast({ type: "outbound", chatId, text: safe, ts: Date.now() });
     }
   };
+  // 带操作按钮的交互卡投递（循环节点用）：发卡失败/传输不支持时回退纯文本，绝不丢消息
+  const deliverCard = async (chatId: string, text: string, buttons: { label: string; send: string }[]) => {
+    const safe = redactText(text, collectSecrets(feishuSecret.get()));
+    if (gateway.transport?.sendActionCard) {
+      const ok = await gateway.transport.sendActionCard(chatId, safe, buttons).catch(() => false);
+      if (ok) {
+        hub.broadcast({ type: "outbound", chatId, text: safe, ts: Date.now() });
+        return;
+      }
+    }
+    await deliverToChat(chatId, text); // 回退纯文本
+  };
   const webhookServer = new WebhookServer({ store, log, runPrompt: runWebhookPrompt, deliver: deliverToChat });
   webhookServer.sync();
 
@@ -846,6 +892,7 @@ async function main() {
     log,
     runPrompt: runWebhookPrompt,
     deliver: deliverToChat,
+    deliverCard,
     resetSession: (nodeId) => sessions.prepareGuestFork(nodeId),
     progress: (nodeId, round, max, running, note) =>
       hub.broadcast({ type: "loop-progress", nodeId, round, max, running, note }),

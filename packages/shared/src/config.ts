@@ -174,6 +174,11 @@ export const LoopData = z.object({
   /** 验收用的模型；留空=haiku（够便宜够快）。 */
   verifyModel: z.string().default(""),
   /**
+   * 收尾汇总用飞书交互卡（而非纯文本）：卡上挂 ⏵继续 / ▶重跑 / 📄看轨迹 按钮，
+   * 主人点一下即 continue/run/看 run-log（按钮经合成消息走 /loop 命令）。默认关；发卡失败自动回退纯文本。
+   */
+  feishuCard: z.boolean().default(false),
+  /**
    * 运行时环境变量（KEY=VALUE，每行一个）：**只注入到本循环 spawn 的会话进程**，
    * 不影响其他会话、也不污染全局。用作"开关"：例如填 `DOC_FIRST_GATE_BYPASS=1`
    * 让项目里读该变量的 hook 在本循环运行期间放行；清空即关闭。

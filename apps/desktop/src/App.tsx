@@ -112,6 +112,7 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
       report: "none",
       verifyDone: false,
       verifyModel: "",
+      feishuCard: false,
       env: "",
       enabled: true,
     },
@@ -3269,6 +3270,19 @@ function Inspector({
                 {t("命中完成标记后，先用一次便宜模型读 原任务 + STATE.md + 最近几轮产出判 done/未done；未过则带理由继续，不会假完成。专治「会话糊弄完成条件」。")}
               </div>
             </>
+          )}
+          <label className="field">
+            <span>{t("完成汇总用交互卡")}</span>
+            <input
+              type="checkbox"
+              checked={d.feishuCard === true}
+              onChange={(e) => onPatch({ feishuCard: e.target.checked })}
+            />
+          </label>
+          {d.feishuCard === true && (
+            <div className="hint" style={{ marginBottom: 6 }}>
+              {t("收尾汇总发成飞书交互卡，挂 ⏵继续 / ▶重跑 / 📄看轨迹 按钮（主人点一下即操作）。发卡失败自动回退纯文本。")}
+            </div>
           )}
           {fieldArea(t("运行时环境变量（KEY=VALUE，每行一个）"), d.env, "env", 2, "DOC_FIRST_GATE_BYPASS=1")}
           <div className="hint" style={{ marginBottom: 6 }}>

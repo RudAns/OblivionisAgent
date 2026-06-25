@@ -52,6 +52,18 @@ export async function route(
   })();
   // 永远去掉飞书 @ 占位符（@_user_1 之类对 Claude 是纯噪音）：意图分类和 prompt 都用这份干净文本
   const cleaned = stripMentions(inbound.text, mentionKeys);
+
+  // @handle 路由（附加、不破坏现有流程）：消息以「@<会话名 或 人格名> ...」开头、且名字命中某 Claude 会话
+  // （或连到会话的人格节点）→ 直接路由到该会话，跳过常规图遍历。命不中就当普通消息按原流程走。
+  const at = cleaned.match(/^@(\S+)\s*([\s\S]*)$/);
+  if (at) {
+    const target = findSessionByHandle(config, at[1]!);
+    if (target) {
+      const rest = (at[2] ?? "").trim();
+      return { sessionNode: target, text: rest || cleaned, userText: rest || cleaned, pathEdgeIds: [] };
+    }
+  }
+
   const intentText = cleaned;
   let text = cleaned;
   const visited = new Set<string>();
@@ -94,6 +106,25 @@ export async function route(
       return { sessionNode: next, text: text.trim(), userText: intentText, pathEdgeIds };
     }
     cursor = next;
+  }
+  return null;
+}
+
+/**
+ * 按「@handle」找目标会话：① 直接是某 Claude 会话的名字；② 是某「人格(soul)」节点的名字 → 它连到的那个会话。
+ * 名字大小写/空白不敏感。命不中返回 null（调用方按普通消息走原流程）。
+ */
+function findSessionByHandle(config: OblivionisConfig, handle: string): ClaudeSessionNode | null {
+  const { nodes, edges } = config.graph;
+  const norm = (s: string) => s.trim().toLowerCase();
+  const h = norm(handle);
+  const direct = nodes.find((n): n is ClaudeSessionNode => n.kind === "claude-session" && norm(n.label) === h);
+  if (direct) return direct;
+  const soul = nodes.find((n) => n.kind === "soul" && norm(n.label) === h);
+  if (soul) {
+    const e = edges.find((ed) => ed.source === soul.id);
+    const sess = e && nodes.find((n): n is ClaudeSessionNode => n.kind === "claude-session" && n.id === e.target);
+    if (sess) return sess;
   }
   return null;
 }
