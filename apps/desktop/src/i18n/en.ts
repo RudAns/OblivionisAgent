@@ -695,4 +695,8 @@ export const EN: Record<string, string> = {
   "运行时环境变量（KEY=VALUE，每行一个）": "Runtime env vars (KEY=VALUE, one per line)",
   "只注入到本循环 spawn 的会话进程，不影响其他会话/全局。当作开关用：填了即开、清空即关。例：填 DOC_FIRST_GATE_BYPASS=1 让项目里读该变量的 hook 在本循环运行期间放行。":
     "Injected only into the sessions this loop spawns — not other sessions or the global env. Use it as a switch: filled = on, empty = off. E.g. DOC_FIRST_GATE_BYPASS=1 makes a project hook that reads that var stand down while this loop runs.",
+  "完成前验收（maker-checker）": "Verify before done (maker-checker)",
+  "验收模型（空=haiku）": "Verifier model (blank = haiku)",
+  "命中完成标记后，先用一次便宜模型读 原任务 + STATE.md + 最近几轮产出判 done/未done；未过则带理由继续，不会假完成。专治「会话糊弄完成条件」。":
+    "When the done-marker is hit, a cheap model first reads the original task + STATE.md + recent rounds and judges done / not-done; if not, the loop continues with the reason — no fake completions. Counters sessions gaming the success condition.",
 };

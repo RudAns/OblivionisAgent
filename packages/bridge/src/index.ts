@@ -15,7 +15,7 @@ import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { collectSecrets, redactText } from "./secrets.js";
 import { feishuSecret } from "./secret-store.js";
-import { classifyIntent } from "./claude/classify-intent.js";
+import { classifyIntent, quickLLM } from "./claude/classify-intent.js";
 import { TranscriptStore } from "./transcript-store.js";
 import { UsageMonitor } from "./usage-monitor.js";
 import { CostLedger } from "./cost-ledger.js";
@@ -860,6 +860,13 @@ async function main() {
       }),
     // 强制中断：杀掉该会话节点正在跑的那一轮（与空闲看门狗同一机制）
     interrupt: (nodeId) => sessions.interrupt(nodeId),
+    // maker-checker 验收：在目标会话的 cwd 下跑一次便宜、无工具、不落会话的 LLM 判断
+    runChecker: (sessionNodeId, prompt, model) => {
+      const c = store.get();
+      const n = c.graph.nodes.find((x) => x.id === sessionNodeId);
+      const cwd = (n?.kind === "claude-session" ? n.data.cwd : "") || c.claude.defaultCwd || process.cwd();
+      return quickLLM(prompt, { binPath: c.claude.binPath, cwd, model, log: (m) => log.info(m) });
+    },
   });
   loopRunner.start();
 

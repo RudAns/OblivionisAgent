@@ -166,6 +166,14 @@ export const LoopData = z.object({
    */
   report: z.enum(["none", "md", "html"]).default("none"),
   /**
+   * maker-checker 验收：命中完成标记后，先用一次**便宜、无工具、不落会话**的 LLM 调用，
+   * 读 原始目标 + STATE.md + 最近几轮产出，判 done/not-done。判未过则不收尾、把理由作反馈继续；
+   * 判过（或验收器出错放行）才真正完成，并把裁决回帖。专治"会话自己糊弄完成条件"。
+   */
+  verifyDone: z.boolean().default(false),
+  /** 验收用的模型；留空=haiku（够便宜够快）。 */
+  verifyModel: z.string().default(""),
+  /**
    * 运行时环境变量（KEY=VALUE，每行一个）：**只注入到本循环 spawn 的会话进程**，
    * 不影响其他会话、也不污染全局。用作"开关"：例如填 `DOC_FIRST_GATE_BYPASS=1`
    * 让项目里读该变量的 hook 在本循环运行期间放行；清空即关闭。

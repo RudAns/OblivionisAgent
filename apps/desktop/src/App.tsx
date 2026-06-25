@@ -110,6 +110,8 @@ const NEW_NODE_DEFAULTS: Record<string, () => Omit<GraphNode, "id" | "position">
       maxCostUsd: 0,
       resetEvery: 0,
       report: "none",
+      verifyDone: false,
+      verifyModel: "",
       env: "",
       enabled: true,
     },
@@ -3247,6 +3249,22 @@ function Inspector({
             <div className="hint" style={{ marginBottom: 6 }}>
               {t("除审核群的简要汇总外，循环结束后再多跑一轮整理一份详细报告，存到 ~/.oblivionis/reports/（文档查看器可看）。")}
             </div>
+          )}
+          <label className="field">
+            <span>{t("完成前验收（maker-checker）")}</span>
+            <input
+              type="checkbox"
+              checked={d.verifyDone === true}
+              onChange={(e) => onPatch({ verifyDone: e.target.checked })}
+            />
+          </label>
+          {d.verifyDone === true && (
+            <>
+              {field(t("验收模型（空=haiku）"), d.verifyModel, "verifyModel")}
+              <div className="hint" style={{ marginBottom: 6 }}>
+                {t("命中完成标记后，先用一次便宜模型读 原任务 + STATE.md + 最近几轮产出判 done/未done；未过则带理由继续，不会假完成。专治「会话糊弄完成条件」。")}
+              </div>
+            </>
           )}
           {fieldArea(t("运行时环境变量（KEY=VALUE，每行一个）"), d.env, "env", 2, "DOC_FIRST_GATE_BYPASS=1")}
           <div className="hint" style={{ marginBottom: 6 }}>

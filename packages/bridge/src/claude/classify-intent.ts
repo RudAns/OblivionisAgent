@@ -42,6 +42,17 @@ export async function classifyIntent(
   return result;
 }
 
+/**
+ * 通用「一次性便宜 LLM 调用」（无工具、不落会话）：给 maker-checker 验收等场景复用同一 spawn 路径。
+ * 返回回复文本，出错/超时返回 null。默认 haiku。
+ */
+export async function quickLLM(
+  prompt: string,
+  opts: { binPath: string; cwd: string; model?: string; log?: (m: string) => void },
+): Promise<string | null> {
+  return runText(prompt, opts.model || "haiku", opts as ClassifyOptions);
+}
+
 function runText(prompt: string, model: string, opts: ClassifyOptions): Promise<string | null> {
   const args = [
     "-p",

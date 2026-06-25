@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ConfigStore } from "./config-store.js";
@@ -38,6 +38,11 @@ export interface LoopDeps {
   mirrorInput: (sessionNodeId: string, round: number, text: string) => void;
   /** 强制中断：杀掉该会话节点正在跑的那一轮（claude 子进程）。用于循环「强制中断」。 */
   interrupt: (sessionNodeId: string) => void;
+  /**
+   * maker-checker 验收：用一次便宜、无工具、不落会话的 LLM 调用，对给定材料下判断，返回原始文本（null=出错）。
+   * 在该会话节点的 cwd 下 spawn（默认 haiku）。loop-runner 自己解析 VERDICT。
+   */
+  runChecker: (sessionNodeId: string, prompt: string, model?: string) => Promise<string | null>;
 }
 
 interface LoopState {
@@ -193,6 +198,8 @@ export class LoopRunner {
     const startCost = this.deps.costTotal();
     const transcript: string[] = []; // 飞书汇总用(只回复，简洁)
     const rounds: { prompt: string; reply: string }[] = []; // run-log 用(指令+回复，可审计)
+    const verifyNotes: string[] = []; // maker-checker 每次验收的裁决(回帖+审计)
+    let checkerFeedback = ""; // 验收未过时，下一轮 prompt 带上的理由
     let stopReason = `跑满 ${maxRounds} 轮`;
     let round = 0;
     let justReset = false;
@@ -220,6 +227,11 @@ export class LoopRunner {
           // round>1，或 continue 模式的第 1 轮：直接用「继续语」
           prompt = d.continuePrompt;
         }
+        if (checkerFeedback) {
+          // 上一轮命中完成标记但验收未过：把理由塞进本轮，让它针对性修正
+          prompt += `\n\n（注意：上一次你回复了完成标记，但自动验收未通过——${checkerFeedback}。请针对这点修正后再继续；只有真正全部完成才再回完成标记。）`;
+          checkerFeedback = "";
+        }
         justReset = false;
         this.deps.mirrorInput(session.id, round, prompt); // 把本轮指令实时镜像进转录
         let reply: string;
@@ -241,8 +253,22 @@ export class LoopRunner {
           break;
         }
         if (d.stopMode === "sentinel" && d.doneMarker && reply.includes(d.doneMarker)) {
-          stopReason = `命中完成标记（第 ${round} 轮）`;
-          break;
+          let pass = true;
+          if (d.verifyDone) {
+            this.deps.progress(loop.id, round, maxRounds, true, "验收中…");
+            const v = await this.runVerify(loop, session, rounds);
+            pass = !v || v.done; // 验收器出错(null)→放行，别把循环卡死
+            verifyNotes.push(v ? `第 ${round} 轮 ${v.done ? "✅ 通过" : "❌ 未过"}：${v.reason}` : `第 ${round} 轮 ⚠ 验收器出错，放行`);
+            if (v && !v.done) {
+              transcript.push(`【验收·第 ${round} 轮】❌ 未通过：${v.reason}`);
+              checkerFeedback = v.reason; // 下一轮带上
+            }
+          }
+          if (pass) {
+            stopReason = d.verifyDone ? `命中完成标记 + 验收通过（第 ${round} 轮）` : `命中完成标记（第 ${round} 轮）`;
+            break;
+          }
+          // 验收未过：不 break，落到下面的预算/轮数/重置/间隔，继续下一轮（带 checkerFeedback）
         }
         if (d.maxCostUsd > 0 && this.deps.costTotal() - startCost >= d.maxCostUsd) {
           stopReason = `达预算上限 $${d.maxCostUsd}（第 ${round} 轮）`;
@@ -270,6 +296,9 @@ export class LoopRunner {
       let head =
         `🔁「${loop.label}」循环完成 · ${round} 轮 · 停因：${stopReason}` +
         (spent > 0 ? ` · 花费 $${spent.toFixed(3)}` : "");
+      if (d.verifyDone && verifyNotes.length) {
+        head += `\n🔎 验收：${verifyNotes[verifyNotes.length - 1]}` + (verifyNotes.length > 1 ? `（共验收 ${verifyNotes.length} 次）` : "");
+      }
       const body = transcript.join("\n\n");
       this.writeRunLog(loop.label, head, rounds);
 
@@ -293,6 +322,52 @@ export class LoopRunner {
       this.cancelled.delete(loop.id);
       const s = this.state.get(loop.id);
       if (s) s.running = false;
+    }
+  }
+
+  /**
+   * maker-checker 验收：读 原始目标 + STATE.md + 最近几轮产出，让便宜模型判 done/not-done。
+   * 出错返回 null（调用方按"放行"处理，别把循环卡死在验收上）。
+   */
+  private async runVerify(
+    loop: LoopNode,
+    session: ClaudeSessionNode,
+    rounds: { prompt: string; reply: string }[],
+  ): Promise<{ done: boolean; reason: string } | null> {
+    try {
+      const cfg = this.deps.store.get();
+      const cwd = session.data.cwd || cfg.claude.defaultCwd || "";
+      let stateMd = "";
+      if (cwd) {
+        try {
+          stateMd = readFileSync(join(cwd, "STATE.md"), "utf8").slice(0, 8000);
+        } catch {
+          /* 没有 STATE.md 就算了 */
+        }
+      }
+      const recent = rounds
+        .slice(-6)
+        .map((r, i) => `产出${i + 1}：\n${r.reply}`)
+        .join("\n\n")
+        .slice(0, 12000);
+      const prompt =
+        `你是一个严格的验收员。下面是一个多轮任务的【原始目标】、【进度文件 STATE.md】和【最近几轮的产出】。\n` +
+        `判断这个任务是否**真正全部完成**（不是声称完成、不是部分完成）。宁可判未完成，也别放过没做完的。\n` +
+        `严格只按下面两行格式回复，不要任何多余文字：\n` +
+        `VERDICT: DONE 或 NOT_DONE\n` +
+        `REASON: 一句话中文理由\n\n` +
+        `【原始目标】\n${(loop.data.prompt || "(空)").slice(0, 4000)}\n\n` +
+        `【进度文件 STATE.md】\n${stateMd || "(无)"}\n\n` +
+        `【最近几轮产出】\n${recent || "(无)"}`;
+      const out = await this.deps.runChecker(session.id, prompt, loop.data.verifyModel || undefined);
+      if (out === null) return null;
+      const done = /VERDICT:\s*DONE\b/i.test(out) && !/NOT[_\s]?DONE/i.test(out);
+      const m = out.match(/REASON:\s*(.+)/i);
+      const reason = ((m && m[1]) || out).replace(/\s+/g, " ").trim().slice(0, 200) || (done ? "通过" : "未通过");
+      return { done, reason };
+    } catch (e) {
+      this.deps.log.warn(`循环「${loop.label}」验收出错: ${(e as Error).message}`);
+      return null;
     }
   }
 
