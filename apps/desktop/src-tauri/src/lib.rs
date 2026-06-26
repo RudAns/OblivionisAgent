@@ -860,8 +860,8 @@ fn session_dirs() -> Result<serde_json::Value, String> {
                 } else {
                     seen.insert(key, out.len());
                     let title = cwd
-                        .trim_end_matches(|c| c == '\\' || c == '/')
-                        .rsplit(|c| c == '\\' || c == '/')
+                        .trim_end_matches(['\\', '/'])
+                        .rsplit(['\\', '/'])
                         .next()
                         .unwrap_or(&cwd)
                         .to_string();
@@ -936,7 +936,7 @@ fn list_md_files(dir: String) -> Result<serde_json::Value, String> {
             let fname = entry.file_name().to_string_lossy().to_string();
             let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
             if is_dir {
-                if depth + 1 <= MAX_DEPTH && !doc_skip_dir(&fname) {
+                if depth < MAX_DEPTH && !doc_skip_dir(&fname) {
                     stack.push((p, depth + 1));
                 }
                 continue;

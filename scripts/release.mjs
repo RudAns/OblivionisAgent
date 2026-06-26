@@ -55,6 +55,13 @@ const binDir = join(ROOT, "apps/desktop/src-tauri/binaries");
 if (!existsSync(binDir) || !readdirSync(binDir).some((f) => /^oblivionis-bridge.*\.exe$/.test(f)))
   die("缺少引擎 sidecar：在 packages/bridge 跑 `pnpm package`（或别设 OBL_SKIP_BRIDGE=1）");
 
+// 2.7) Rust 静态检查闸（clippy 零警告）——发版前卡一道，保持 lib.rs 干净。
+//      CI 故意不跑原生 Rust（要 webkit 等平台 SDK），所以放在本地发版流程里跑。OBL_SKIP_CLIPPY=1 可临时跳过。
+if (process.env.OBL_SKIP_CLIPPY !== "1") {
+  console.log("▶ Rust clippy 静态检查（-D warnings）…");
+  run("cargo clippy --quiet -- -D warnings", { cwd: join(ROOT, "apps/desktop/src-tauri") });
+}
+
 // 3) 签名构建 NSIS（externalBin 已把 bridge 一起打进安装包）
 // 注意：Tauri build 读 TAURI_SIGNING_PRIVATE_KEY（私钥「内容」），不是 *_PATH —— 所以这里读出文件内容传进去。
 console.log("▶ 构建签名安装包（pnpm tauri build）…");

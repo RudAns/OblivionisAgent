@@ -28,5 +28,15 @@ jobs:
       - name: Typecheck all workspaces
         run: pnpm -r --if-present typecheck
 
-# 说明：CI 只跑 TS 类型检查（快、零原生依赖）。
-# Tauri/Rust 原生构建需要平台 SDK，留给本地 `rebuild-deploy.bat` 与发布流程，不在 CI 内做。
+  cargo-deny:
+    name: cargo-deny (依赖许可证 / 安全公告)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: cargo-deny check
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: apps/desktop/src-tauri/Cargo.toml
+
+# 说明：CI 跑 ① TS 类型检查（快、零原生依赖）② cargo-deny（只读 lockfile 审依赖许可证/安全公告，不编译、无需平台 SDK）。
+# Tauri/Rust 原生构建 + clippy 需平台 SDK，留给本地 rebuild-deploy.bat 与 release.mjs（已内置 clippy 零警告闸），不在 PR CI 内做。
