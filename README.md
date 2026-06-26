@@ -4,271 +4,278 @@
 
 # 🌒 OblivionisAgent
 
-**给本地 Claude Code CLI 的「连线式控制台」- 可视化编排会话、不同群聊指向不同的本地会话、优化你驱动它的方式**
+**A node-wiring control panel for the local Claude Code CLI — orchestrate sessions visually, route different group chats to different local sessions, and optimize how you drive it**
 
-**你在本地会话能做到的功能，Fork后的访客会话也能做到**
+**Whatever you can do in your local session, the forked guest session can do too.**
 
-拖节点连线就能编排本地 claude 会话：多会话路由、意图分流、人格 / 技能 / 子代理赋能、**自主循环跑活**、内置交互终端、敏感操作审批……把「怎么驱动 Claude CLI」整套做成**可视化、可调优**。
-其中**一项能力**是接入**飞书群聊**——群里 @机器人 → 路由到对应项目的会话 → 富文本回帖并 @提问人，访客与你的开发互不污染。
+Wire nodes on a canvas to orchestrate local claude sessions: multi-session routing, intent splitting, persona / skill / subagent capabilities, **autonomous loop runs**, a built-in interactive terminal, sensitive-op approvals… turning "how you drive the Claude CLI" into something **visual and tunable**.
+**One of its capabilities** is bridging **Feishu (Lark) group chats** — @-mention the bot in a group → routed to the matching project's session → rich-text reply that @-mentions the asker, with guests and your own dev never polluting each other.
 
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
-![Claude](https://img.shields.io/badge/LLM-官方%20Claude%20CLI-D97757)
+![Claude](https://img.shields.io/badge/LLM-Official%20Claude%20CLI-D97757)
 ![License](https://img.shields.io/badge/License-GPL%20v3-3b82f6)
 [![CI](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/RudAns/OblivionisAgent/actions/workflows/ci.yml)
 
-[English](README.en.md) · **简体中文**
+**English** · [简体中文](README.zh.md)
 
-[更新日志 CHANGELOG](CHANGELOG.md) · [贡献指南 CONTRIBUTING](CONTRIBUTING.md) · [安全策略 SECURITY](SECURITY.md)
+[CHANGELOG](CHANGELOG.md) · [CONTRIBUTING](CONTRIBUTING.md) · [SECURITY](SECURITY.md)
+
+<br/>
+
+<img src="docs/screenshots/welcome.png" alt="OblivionisAgent welcome dashboard" width="880" />
+
+<sub>The welcome dashboard — node-graph overview · activity calendar · cost · subscription usage · loop fleet, all at a glance.</sub>
 
 </div>
 
 > [!IMPORTANT]
-> **为什么是「遥控本地 CLI」而不是调 API？**
-> 很多人用的是 Claude 订阅（Pro/Max）而非 API Key。Anthropic 禁止第三方工具直接使用订阅 OAuth
-> 令牌（2026‑01 服务端封禁、2026‑02 写入 ToS），所以本项目一切 LLM 调用都通过驱动 **官方 `claude`
-> CLI** 完成——合规、零额外成本，且完整复用你已有的会话历史与项目上下文。
-> 调研详情见 [`.claude/docs/research-hermes-oauth.md`](.claude/docs/research-hermes-oauth.md)。
+> **Why "drive the local CLI" instead of calling the API?**
+> Many people use a Claude subscription (Pro/Max) rather than an API key. Anthropic forbids third-party tools
+> from using subscription OAuth tokens directly (server-side block since 2026‑01, written into the ToS in 2026‑02),
+> so every LLM call in this project goes through driving the **official `claude` CLI** — compliant, zero extra cost,
+> and it fully reuses your existing session history and project context.
+> Research details: [`.claude/docs/research-hermes-oauth.md`](.claude/docs/research-hermes-oauth.md).
 
 ---
 
-## 📸 界面预览
+## 📸 Screenshots
 
-| 连线配置画布 | 内置交互终端 |
+| Node-wiring canvas | Built-in interactive terminal |
 |:---:|:---:|
-| ![连线画布](docs/screenshots/canvas.png) | ![内置终端](docs/screenshots/terminal.png) |
-| 飞书群 → 路由 → 会话，拖节点连线即接入 | 多终端保活 · 贴图喂图 · 运行时扫光 |
+| ![canvas](docs/screenshots/canvas.png) | ![terminal](docs/screenshots/terminal.png) |
+| Feishu group → router → session, wire nodes to connect | Multi-terminal keep-alive · paste-image input · runtime sweep |
 
-| 意图分流 | 飞书回帖效果 |
+| Intent routing | Feishu reply |
 |:---:|:---:|
-| ![意图分流](docs/screenshots/intent.png) | ![飞书回帖](docs/screenshots/feishu.png) |
-| 同群消息按语义走不同分支（LLM 判定） | 富文本回复并 @ 提问人 |
+| ![intent](docs/screenshots/intent.png) | ![feishu reply](docs/screenshots/feishu.png) |
+| Same-group messages take different branches by semantics (LLM-judged) | Rich-text reply that @-mentions the asker |
 
-| 可添加的节点 | 会话节点设置 |
+| Available node types | Claude session settings |
 |:---:|:---:|
-| ![节点类型](docs/screenshots/nodes.png) | ![会话节点设置](docs/screenshots/nodesetting.png) |
-| 画布支持的全部节点（输入源 / 路由决策 / 执行 / 技能） | cwd · 主客权限 · baseSessionId · 安全态势一览 |
+| ![node types](docs/screenshots/nodes.png) | ![session settings](docs/screenshots/nodesetting.png) |
+| Every node you can add (inputs / routing / execution / capability) | cwd · owner/guest permissions · baseSessionId · security posture |
 
-| 审计留痕 | 对话样例（触发打包 + 人格回复） |
+| Audit trail | Conversation example (trigger a build + persona reply) |
 |:---:|:---:|
-| ![审计](docs/screenshots/shenji.png) | ![对话样例](docs/screenshots/feishu2.png) |
-| 谁(主人/访客)问了什么、命中哪个会话——只读不可改 | 触发 CI 打包 → 按所连人格口吻回帖、标注作答会话 |
+| ![audit](docs/screenshots/shenji.png) | ![conversation](docs/screenshots/feishu2.png) |
+| Who (owner/guest) asked what, which session handled it — read-only | @bot to package → reply in the connected persona's voice, with the answering session labeled |
 
-| 📖 文档查看器（独立窗口） |
+| 📖 Document viewer (separate window) |
 |:---:|
-| ![文档查看器](docs/screenshots/md_html_fileviewer.png) |
-| 按各会话项目目录把 `.md` / `.html` 排成目录树，右侧渲染（公共 `reports` 目录也在内）——可边看文档边继续操作主窗 |
+| ![doc viewer](docs/screenshots/md_html_fileviewer.png) |
+| `.md` / `.html` across each session's project dir as a tree, rendered on the right (the shared `reports` dir is included too) — read docs while you keep driving the main window |
 
-| 📊 用量看板 · 活动统计 · 今日宜忌 |
+| 📊 Usage dashboard · activity stats · "today's almanac" |
 |:---:|
-| ![用量与统计](docs/screenshots/stats.png) |
-| 顶栏一眼看订阅用量 / 上下文余量；活动小标悬停=本月日历热力图 + 全量统计（常用模型 / 总 token / 连续活跃…）+ 开发版「今日宜忌」黄历（图一乐）。全部读本地缓存、不耗 token |
+| ![usage & stats](docs/screenshots/stats.png) |
+| Glance at subscription usage / context headroom in the top bar; hover the activity chip for a monthly heatmap + full stats (top model / total tokens / streaks…) + a tongue-in-cheek dev "almanac" (宜/忌). All read from local cache — no tokens spent |
 
 ---
 
-## ✨ 亮点功能
+## ✨ Highlights
 
 | | |
 |---|---|
-| 🎛️ **连线式画布（独立窗口）** | 飞书群 → 路由 → Claude 会话，拖节点连线即完成接入；画布独立成单独 OS 窗口，主窗 = **欢迎仪表盘（节点总览 + 月历 + 订阅用量 + 成本排行）+ 终端**，两窗经引擎实时同步 |
-| 🔀 **多群多会话 + 意图分流** | 不同群路由到不同项目（各自 cwd/模型/权限）；同群消息按语义意图走不同分支 |
-| 🛡️ **主人 / 访客隔离** | 主人可让 Claude 改代码、执行命令；访客走 **fork 脱敏分身**、回复**二次脱敏** + 安全护栏——你的开发上下文与访客的会话互不污染（敏感操作审批见下条） |
-| 🔐 **工具审批卡** | 访客触发改文件 / 命令等敏感工具 → 群里弹交互卡，主人 [允许 / 拒绝]，点「允许」才执行；裁决或 100s 超时后卡片**自动更新状态、去掉按钮**。审批默认开（兜底放开的访客护栏） |
-| 📊 **自助命令** | `/status` 状态卡（传输/模型/cwd/git 分支/会话数）· `/doctor` 自检 · `/retry` 重跑上一条 · `/continue` 续跑，仅主人可用 |
-| 📄 **飞书富交互** | 读 **docx / Wiki / Sheets / 多维表** 喂上下文；**读消息里的文件附件**（含被引用消息——文本类自动内联正文、其余落地让 Claude 用 Read 打开）；长回复自动转**飞书文件**回传（不撑爆气泡）；回复含 Markdown 表格 → 飞书**原生表格**；执行中**逐工具进度**流式卡（正在 运行命令 / 读取文件…） |
-| 🖥️ **内置交互终端** | 双击节点打开开发会话（完整历史回放）；多终端保活·拖拽排序、剪贴板贴图喂图、**字号缩放（设置滑杆 / Ctrl±）** |
-| 📖 **文档查看器** | 独立窗口浏览各会话项目目录下的 **`.md` / `.html`**：按**目录树**归置、Markdown 渲染（含原始 HTML / 本地图片）、HTML 沙箱原样显示；公共 `reports` 目录也并入——**可边看文档边继续操作主窗** |
-| 🎭 **赋能节点（人格 / 技能 / 子代理）** | SOUL.md（性格）· SKILL.md（操作规范）· Claude Code 原生 subagent（独立上下文做重活）都做成可连线节点，连到会话赋能口即生效，一格可共享多会话；改完点「**重锚**」一键刷新到所连会话（留记忆） |
-| 🌐 **中英双语界面** | 设置里一键切换 中文 / English；技术标识符（sessionId/cwd 等）保持原样，漏译自动回退中文 |
-| ⏰ **定时 / Webhook / 群记忆 / 知识收件箱** | 自然语言建定时任务、外部触发、按群积累记忆、问答沉淀规则待裁决 |
-| 🔁 **循环（自主多轮）** | 对一个会话**反复跑**直到命中完成标记 / 满轮数 / 超预算才停；每 N 轮**重置上下文**（靠工作目录 STATE.md 续接）防膨胀；每轮指令**实时镜像**进转录；可另出**详细 md / html 报告**；运行中可**强制中断 / 继续**；**运行时环境变量**（只注入本循环会话，当项目 hook 的开关用）；配置可**导出 / 导入**（让人或 Claude 把文件改好再一键套用）。全程 L1 只报告，破坏性操作仍走审批 |
-| ✨ **运行时动效** | 启动闪屏、节点链路流线（只点亮真实路径，多群并发各自点亮）、会话扫光（fork 蓝 / 终端绿 / 双跑彩）、完成小红旗、桌面完成小人 |
-| 🔄 **自动更新** | 内置 Tauri 官方更新器（minisign 签名校验，≠代码签名）；有新版自动提示、一键下载更新并重启；也可手动「检查更新」 |
-| 📋 **审计 + 绿色部署** | 谁在哪个群问了什么全部落盘；单实例防重开、关窗即净退；Tauri 打包（便携版两 exe / 可自动更新版为 NSIS 安装包） |
+| 🎛️ **Node-wiring canvas (separate window)** | Feishu group → router → Claude session; drag and wire nodes to connect. The canvas is its own OS window; the main window = **welcome dashboard (node overview + calendar + subscription usage + cost ranking) + terminal**, kept in sync live |
+| 🔀 **Multi-group, multi-session + intent routing** | Different groups route to different projects (each with its own cwd / model / permissions); same-group messages branch by semantic intent |
+| 🛡️ **Owner / guest isolation** | The owner can let Claude edit code and run commands; guests go through a **redacted fork**, replies are **re-redacted** + safety guardrails — your dev context and guests' sessions never pollute each other (sensitive-op approval below) |
+| 🔐 **Tool-approval card** | When a guest triggers a sensitive tool (edit file / run command) → an interactive card pops in the group; only after the owner taps **[Allow]** does it run. After a decision or a 100s timeout the card **auto-updates its state and removes the buttons**. Approval is on by default (the backstop for the guest guardrail) |
+| 📊 **Self-serve commands** | `/status` (transport / model / cwd / git branch / session count) · `/doctor` self-check · `/retry` re-run the last one · `/continue` resume — owner only |
+| 📄 **Rich Feishu interactions** | Read **docx / Wiki / Sheets / Bitable** for context; **read file attachments in messages** (including quoted messages — text files are inlined automatically, others are saved locally for Claude to open with Read); long replies are auto-converted to a **Feishu file** (so bubbles don't blow up); replies with Markdown tables → **native Feishu tables**; **per-tool progress** streaming card during execution (running command / reading file…) |
+| 🖥️ **Built-in interactive terminal** | Double-click a node to open the dev session (full history replay); multi-terminal keep-alive · drag to reorder, paste images from the clipboard as input, **font scaling (settings slider / Ctrl±)** |
+| 📖 **Document viewer** | A separate window to browse **`.md` / `.html`** under each session's project dir: organized as a **tree**, Markdown rendered (incl. raw HTML / local images), HTML shown as-is in a sandbox; the shared `reports` dir is folded in — **read docs while you keep using the main window** |
+| 🎭 **Capability nodes (persona / skill / subagent)** | SOUL.md (personality) · SKILL.md (operating rules) · native Claude Code subagent (heavy work in an isolated context) are all wireable nodes; connect to a session's capability port to take effect, one node shareable across sessions; after editing, tap **"Re-anchor"** to refresh into the connected sessions (keeps memory) |
+| 🌐 **Bilingual UI (中 / EN)** | One-tap switch between 中文 / English in settings; technical identifiers (sessionId / cwd, etc.) stay as-is, missing translations fall back to Chinese |
+| ⏰ **Cron / Webhook / group memory / knowledge inbox** | Create cron jobs in natural language, external triggers, per-group accumulated memory, Q&A distilled into rules pending judgment |
+| 🔁 **Loop (autonomous multi-round)** | Run a session **repeatedly** until a done-marker / max rounds / budget cap; **reset context every N rounds** (carried via a STATE.md journal) to avoid bloat; **mirror each round's prompt** into the transcript live; optionally emit a **detailed md / html report**; **force-stop / continue** mid-run; **runtime env vars** (injected only into this loop's sessions — a handy toggle for project hooks); **export / import** its config (let a human or Claude edit the file, then apply in one click). L1 report-only throughout — destructive ops still go through approval |
+| ✨ **Runtime animations** | Splash on startup, node-path flow lines (only the real path lights up; concurrent groups each light their own), session sweep (fork blue / terminal green / dual-run colorful), completion flag, desktop completion mascot |
+| 🔄 **Auto-update** | Built-in Tauri updater (minisign signature verification, ≠ code signing); new versions prompt automatically, one-click download-update-and-restart; manual "Check for updates" too |
+| 📋 **Audit + green deployment** | Everything — who asked what in which group — is persisted; single-instance guard, clean exit on close; Tauri-packaged (portable = two exes / auto-updatable = NSIS installer) |
 
-**节点类型一览**
+**Node types at a glance**
 
-| 🟢 飞书群 | 🟣 路由 | 🟠 意图分流 | 🔵 Claude 会话 | 🩵 定时 | 🔁 循环 | 🟡 Webhook | 🎭 人格 | 🧩 技能 | 🦾 子代理 |
+| 🟢 Feishu group | 🟣 Router | 🟠 Intent split | 🔵 Claude session | 🩵 Cron | 🔁 Loop | 🟡 Webhook | 🎭 Persona | 🧩 Skill | 🦾 Subagent |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 入口·按 chatId | 加前缀/去@ | LLM 语义分支 | 落到本地会话 | cron 触发 | 自主多轮 | 外部 HTTP | SOUL.md | SKILL.md | 原生 subagent |
+| entry · by chatId | prefix / strip @ | LLM semantic branch | lands on a local session | cron-triggered | autonomous multi-round | external HTTP | SOUL.md | SKILL.md | native subagent |
 
-> 🎭人格 / 🧩技能 / 🦾子代理 是「赋能节点」：拖到会话的**人格/技能/子代理口**即作用于该会话的飞书回复（人格管怎么说话、技能管怎么做事、子代理在独立上下文做重活）。一个赋能节点可共享给多个会话。
+> 🎭 Persona / 🧩 Skill / 🦾 Subagent are "capability nodes": drag onto a session's **persona / skill / subagent port** to affect that session's Feishu replies (persona = how it talks, skill = how it works, subagent = heavy lifting in an isolated context). One capability node can be shared across multiple sessions.
 
 ---
 
-## 🧠 它是怎么工作的
+## 🧠 How it works
 
-### 总体数据流
+### Overall data flow
 
 ```mermaid
 flowchart TD
-    A["💬 飞书群 · @机器人提问"]
-    subgraph BR["⚙️ bridge 引擎 · oblivionis-bridge.exe"]
-        B["index.ts 主循环<br/>判主人 / 访客 · 审计落盘"] --> C["router.ts 图路由"]
-        C -->|"条件边 = 意图"| D["classify-intent<br/>haiku 无状态分类"]
+    A["💬 Feishu group · @bot question"]
+    subgraph BR["⚙️ bridge engine · oblivionis-bridge.exe"]
+        B["index.ts main loop<br/>owner / guest check · audit log"] --> C["router.ts graph routing"]
+        C -->|"conditional edge = intent"| D["classify-intent<br/>haiku stateless classify"]
         D --> C
-        C --> E["session-manager<br/>两会话模型"]
-        E -->|"飞书一律走"| F["脱敏分身 fork<br/>注入 人格·技能·子代理 / 护栏 / 群记忆"]
-        F --> G["claude-session<br/>spawn 官方 claude CLI"]
+        C --> E["session-manager<br/>two-session model"]
+        E -->|"all Feishu msgs go to"| F["redacted fork<br/>injects persona·skill·subagent / guardrail / group memory"]
+        F --> G["claude-session<br/>spawn official claude CLI"]
     end
-    A -->|"WebSocket 长连接"| B
-    G -->|"回复 · 访客二次脱敏"| H["📨 飞书富文本回帖 · @提问人"]
-    E -.->|"开发只用·永不被污染"| I["🖥️ 原始会话 base · 内置终端"]
-    GUI["🪟 桌面 App · React + Tauri"] <-->|"ws://127.0.0.1:8920"| B
+    A -->|"WebSocket long connection"| B
+    G -->|"reply · guest re-redaction"| H["📨 Feishu rich-text reply · @asker"]
+    E -.->|"dev only · never polluted"| I["🖥️ original base session · built-in terminal"]
+    GUI["🪟 desktop app · React + Tauri"] <-->|"ws://127.0.0.1:8920"| B
 ```
 
-### 两会话模型 + 人格（Soul / Fork）
+### Two-session model + persona (Soul / Fork)
 
-一个「Claude 会话」节点背后是 **两条 claude 会话**，飞书永远只碰 fork：
+Behind one "Claude session" node are **two claude sessions**; Feishu only ever touches the fork:
 
 ```mermaid
 flowchart LR
-    FS["💬 飞书群 @机器人"]
-    SOUL["🎭 人格节点 · SOUL.md"]
-    subgraph CS["🔵 Claude 会话节点"]
-        BASE["原始 base<br/>你的开发终端会话"]
-        FORK["脱敏分身 fork<br/>飞书消息一律走这条<br/>注入 护栏 / 群记忆 / 人格·技能·子代理"]
+    FS["💬 Feishu group @bot"]
+    SOUL["🎭 persona node · SOUL.md"]
+    subgraph CS["🔵 Claude session node"]
+        BASE["base<br/>your dev terminal session"]
+        FORK["redacted fork<br/>all Feishu msgs go here<br/>injects guardrail / group memory / persona·skill·subagent"]
     end
-    FS -->|消息入站| FORK
-    SOUL -->|"人格口（作用于飞书回复）"| FORK
-    FORK --> OUT["出站二次脱敏 → 回帖"]
-    BASE -.->|"永不被飞书碰"| TERM["软件内置终端做开发"]
+    FS -->|message inbound| FORK
+    SOUL -->|"persona port (affects Feishu replies)"| FORK
+    FORK --> OUT["outbound re-redaction → reply"]
+    BASE -.->|"never touched by Feishu"| TERM["built-in terminal for dev"]
 ```
 
-- **base**：软件里的开发终端会话。飞书永不续接它（避免污染开发上下文），不注入人格/护栏。
-- **fork**：从 base fork + 抹密钥而来。**所有飞书消息（主人+访客）都走它**；赋能节点（人格 / 技能 / 子代理）、访客护栏、群记忆都注入这条。
+- **base**: the dev terminal session inside the app. Feishu never resumes it (to avoid polluting dev context); no persona / guardrail injected.
+- **fork**: forked from base + keys scrubbed. **All Feishu messages (owner + guests) go here**; capability nodes (persona / skill / subagent), guest guardrail, and group memory are all injected into this one.
 
-### 一条消息的旅程
+### The journey of a message
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant U as 群成员
-    participant F as 飞书
-    participant B as bridge 引擎
+    participant U as Group member
+    participant F as Feishu
+    participant B as bridge engine
     participant C as claude CLI
-    U->>F: @机器人「打包角色管线」
+    U->>F: @bot "package the character pipeline"
     F->>B: im.message.receive_v1
-    B->>B: 判主人/访客 · 审计落盘
-    B->>C: 意图分类(haiku) → 命中「打包」分支
+    B->>B: owner/guest check · audit log
+    B->>C: intent classify (haiku) → hits "package" branch
     B->>C: spawn claude -p --resume (fork sid)
-    C-->>B: stream-json 事件（实时广播给 GUI）
-    B->>B: 访客回复二次脱敏
-    B->>F: 富文本回帖 · @提问人
-    F->>U: 收到回复
+    C-->>B: stream-json events (broadcast to GUI live)
+    B->>B: guest reply re-redaction
+    B->>F: rich-text reply · @asker
+    F->>U: reply delivered
 ```
 
 ---
 
-## 🚀 快速开始
+## 🚀 Quick start
 
-### 1. 环境要求
+### 1. Requirements
 
 - Windows 10/11
-- [Node.js](https://nodejs.org) ≥ 20 + pnpm（`npm i -g pnpm`）
-- Rust 工具链（[rustup](https://rustup.rs)，构建桌面壳用）
-- 已登录的 [Claude Code](https://claude.com/claude-code) CLI（`claude` 在 PATH 里）
+- [Node.js](https://nodejs.org) ≥ 20 + pnpm (`npm i -g pnpm`)
+- Rust toolchain ([rustup](https://rustup.rs), for building the desktop shell)
+- A signed-in [Claude Code](https://claude.com/claude-code) CLI (`claude` on PATH)
 
 <details>
-<summary><b>📋 飞书企业自建应用机器人配置（点开）</b></summary>
+<summary><b>📋 Feishu custom-app bot setup (click to expand)</b></summary>
 
-- **收发与读资源权限**：`im:message` / `im:message:send_as_bot` / `im:chat` / `im:resource`
-- **显示发送者真实姓名**：`contact:user.base:readonly`（并把「通讯录权限范围 / 数据范围」设为包含相关成员，否则查名返回 400）。
-  > 不加也能跑——会退回用群成员列表（`im:chat`）取名，再不行才显示 open_id。
-- **事件订阅**：选 **长连接（WebSocket）** 并订阅 `im.message.receive_v1`（无需公网回调）
-- 添加「机器人」能力并发布
+- **Send/receive + resource-read permissions**: `im:message` / `im:message:send_as_bot` / `im:chat` / `im:resource`
+- **Show the sender's real name**: `contact:user.base:readonly` (and set the "contact permission scope / data scope" to include the relevant members, otherwise name lookup returns 400).
+  > It runs without this too — it falls back to the group member list (`im:chat`) for names, and only shows the open_id as a last resort.
+- **Event subscription**: choose **long connection (WebSocket)** and subscribe to `im.message.receive_v1` (no public callback needed)
+- Add the "Bot" capability and publish
 
 </details>
 
-### 2. 构建
+### 2. Build
 
 ```bash
 pnpm install
-cd packages/bridge && pnpm package                    # 引擎打包成 sidecar exe
-cd ../../apps/desktop && pnpm tauri build --no-bundle  # 构建桌面应用
+cd packages/bridge && pnpm package                    # package the engine into a sidecar exe
+cd ../../apps/desktop && pnpm tauri build --no-bundle  # build the desktop app
 ```
 
-产物组成绿色版（放进同一目录）：
+The portable build is made of these (put them in the same directory):
 
-| 文件 | 说明 |
+| File | Notes |
 |---|---|
-| `apps/desktop/src-tauri/target/release/oblivionis-desktop.exe` | 主程序（改名随意） |
-| `apps/desktop/src-tauri/binaries/oblivionis-bridge-x86_64-pc-windows-msvc.exe` | 引擎 sidecar，改名 `oblivionis-bridge.exe` |
+| `apps/desktop/src-tauri/target/release/oblivionis-desktop.exe` | main program (rename as you like) |
+| `apps/desktop/src-tauri/binaries/oblivionis-bridge-x86_64-pc-windows-msvc.exe` | engine sidecar, rename to `oblivionis-bridge.exe` |
 
-> 💡 日常开发用根目录 **`rebuild-deploy.bat`** 一键完成 构建 → 部署 → 重启；热重载用 `cd apps/desktop && pnpm tauri dev`。
+> 💡 For day-to-day dev, the root **`rebuild-deploy.bat`** does build → deploy → restart in one click; for hot reload use `cd apps/desktop && pnpm tauri dev`.
 
-### 3. 配置（全部在 GUI 内完成）
+### 3. Configure (all inside the GUI)
 
-1. 启动应用 → 顶栏「飞书」→ 填 App ID / App Secret → 连接（状态灯转绿 = 长连接建立）。Secret 会存进**系统凭据管理器**，不落明文 `config.json`
-2. 画布连线 **飞书群 → 路由 → Claude 会话**（机器人入群后发条消息，顶部会弹「未路由 chatId」横幅，可一键建群节点）
-3. 会话节点填项目目录 `cwd` 和 `baseSessionId`（点「列出该目录的会话」从历史里选）——`baseSessionId` 就是双击节点在终端里打开的开发会话；访客消息自动 fork 一份脱敏分身
-4. 「飞书」面板把自己设为 owner（支持手机号/邮箱查 openId）
-5. 群里 @机器人 即可。改动自动保存到 `~/.oblivionis/config.json`
+1. Launch the app → top bar "Feishu" → fill in App ID / App Secret → Connect (status light turns green = long connection established). The Secret is stored in the **OS credential manager**, never written as plaintext into `config.json`.
+2. On the canvas, wire **Feishu group → Router → Claude session** (after the bot joins a group, send a message; a "no route for chatId" banner appears at the top, with one-click group-node creation).
+3. Fill the session node's project dir `cwd` and `baseSessionId` (tap "list sessions in this dir" to pick from history) — `baseSessionId` is the dev session you open in the terminal by double-clicking the node; guest messages auto-fork a redacted clone.
+4. In the "Feishu" panel, set yourself as owner (lookup openId by phone / email supported).
+5. @-mention the bot in the group. Changes auto-save to `~/.oblivionis/config.json`.
 
 ---
 
-## 🗂️ 仓库结构
+## 🗂️ Repository layout
 
 ```
 OblivionisAgent/
 ├─ packages/
-│  ├─ shared/              # 两端共享契约：配置 schema(zod)、WS 协议、stream-json 类型
-│  └─ bridge/              # 引擎(Node)：飞书长连接、路由、会话管理、fork 脱敏、审计
+│  ├─ shared/              # shared contract for both sides: config schema (zod), WS protocol, stream-json types
+│  └─ bridge/              # engine (Node): Feishu long connection, routing, session management, fork redaction, audit
 │     └─ src/
-│        ├─ index.ts       #   主循环：入站→主客判定→路由→会话→出站脱敏→回帖
-│        ├─ router.ts      #   图路由 + 意图条件边
-│        ├─ claude/        # ★ 驱动 claude CLI 的核心（两会话模型/执行器/fork脱敏/意图分类）
-│        ├─ secrets.ts     #   密钥收集与脱敏
-│        ├─ secret-store.ts #  飞书 App Secret 运行时持有（来自凭据管理器，不落盘）
-│        └─ transport/     #   飞书长连接 / mock
-├─ apps/desktop/           # 桌面应用(Tauri v2 + React 18)
-│  ├─ src/App.tsx          #   主界面：画布状态/配置同步/终端管理
-│  ├─ src/canvas/          #   React Flow 画布与节点卡片
-│  ├─ src/i18n/            #   中英双语（中文原文即 key，漏译回退中文）
-│  ├─ src/panels/TerminalsHost.tsx  # ★ 交互式终端(多终端保活/贴图/快捷键)
-│  ├─ src-tauri/src/lib.rs # ★ Rust：PTY、贴图落盘、路径打开、sidecar 拉起、凭据管理器
-│  └─ src-tauri/examples/  #   PTY 调试探针(抓字节/测按键序列)
-├─ rebuild-deploy.bat      # 一键构建+部署
-├─ CLAUDE.md               # Claude Code 项目说明(打开仓库自动加载)
-└─ .claude/docs/           # ★ 知识库：架构地图/踩坑记录/工作流/选型研究
+│        ├─ index.ts       #   main loop: inbound → owner/guest check → route → session → outbound redaction → reply
+│        ├─ router.ts      #   graph routing + intent conditional edges
+│        ├─ claude/        # ★ core that drives the claude CLI (two-session model / executor / fork redaction / intent classify)
+│        ├─ secrets.ts     #   secret collection & redaction
+│        ├─ secret-store.ts #  Feishu App Secret held at runtime (from credential manager, never on disk)
+│        └─ transport/     #   Feishu long connection / mock
+├─ apps/desktop/           # desktop app (Tauri v2 + React 18)
+│  ├─ src/App.tsx          #   main UI: canvas state / config sync / terminal management
+│  ├─ src/canvas/          #   React Flow canvas and node cards
+│  ├─ src/i18n/            #   bilingual (Chinese source IS the key, missing translations fall back to Chinese)
+│  ├─ src/panels/TerminalsHost.tsx  # ★ interactive terminal (multi-terminal keep-alive / paste image / hotkeys)
+│  ├─ src-tauri/src/lib.rs # ★ Rust: PTY, paste-image to disk, open path, sidecar spawn, credential manager
+│  └─ src-tauri/examples/  #   PTY debug probes (capture bytes / test key sequences)
+├─ rebuild-deploy.bat      # one-click build + deploy
+├─ CLAUDE.md               # Claude Code project notes (auto-loaded when you open the repo)
+└─ .claude/docs/           # ★ knowledge base: architecture map / pitfalls / workflows / design research
 ```
 
-**Fork 后二次开发请先读 [`.claude/docs/`](.claude/docs/)**：
+**Forking for further development? Read [`.claude/docs/`](.claude/docs/) first:**
 
-| 文档 | 内容 |
+| Doc | Content |
 |---|---|
-| [architecture.md](.claude/docs/architecture.md) | 数据流图 + 每个核心文件干什么（**地图**） |
-| [conventions.md](.claude/docs/conventions.md) | 代码规范 / 约定 / 安全硬约束（**写代码前读**） |
-| [extending.md](.claude/docs/extending.md) | **加功能 step-by-step 配方**：加节点 / 命令 / 面板 / 消息 / transport / i18n |
-| [pitfalls.md](.claude/docs/pitfalls.md) | 全部踩坑记录（会话路径编码、PTY 竞态、xterm 渲染、Windows 编码…） |
-| [workflows.md](.claude/docs/workflows.md) | 构建/调试/冒烟测试/接新群的标准流程 |
-| [research-hermes-oauth.md](.claude/docs/research-hermes-oauth.md) | 选型研究与订阅合规依据 |
+| [architecture.md](.claude/docs/architecture.md) | data-flow diagrams + what each core file does (**the map**) |
+| [conventions.md](.claude/docs/conventions.md) | code conventions / rules / hard security constraints (**read before coding**) |
+| [extending.md](.claude/docs/extending.md) | **step-by-step recipes to add features**: node / command / panel / message / transport / i18n |
+| [pitfalls.md](.claude/docs/pitfalls.md) | every pitfall paid for (session path encoding, PTY races, xterm rendering, Windows encoding…) |
+| [workflows.md](.claude/docs/workflows.md) | standard flows for build / debug / smoke test / onboarding a new group |
+| [research-hermes-oauth.md](.claude/docs/research-hermes-oauth.md) | design research and the subscription-compliance rationale |
 
-> 用 Claude Code 打开本仓库会自动加载 `CLAUDE.md`，AI 辅助二次开发体验最佳。
+> Opening this repo with Claude Code auto-loads `CLAUDE.md` for the best AI-assisted development experience.
 
 ---
 
-## 🔐 安全模型
+## 🔐 Security model
 
-| 措施 | 实现位置 |
+| Measure | Where it lives |
 |---|---|
-| 订阅合规：只驱动官方 CLI，不碰 OAuth 令牌 | 整体架构 |
-| 飞书 App Secret 存 **Windows 凭据管理器**，不明文落 `config.json`、不经 WS 广播 | `secret-store.ts` + `src-tauri/lib.rs` |
-| 访客会话 fork 自开发会话，transcript 密钥替换为 `[REDACTED]` | `fork-prepare.ts` |
-| 访客回复出站前二次脱敏 | `index.ts` + `secrets.ts` |
-| 访客护栏 system prompt（严禁泄露密钥/凭据/敏感文件/权限/个人信息） | 配置 `guestGuardrail` |
-| 访客敏感操作（改文件/命令）经主人**飞书审批卡**放行；fork 专属 `ask` 规则兜底全局 `allow` | `perm/` + `~/.oblivionis/fork-settings.json` |
-| 主人/访客分级 permission mode | 会话节点配置 |
-| 全量入站审计 `~/.oblivionis/audit.jsonl` | `index.ts` |
+| Subscription compliance: only drive the official CLI, never touch OAuth tokens | overall architecture |
+| Feishu App Secret stored in the **Windows Credential Manager**, never plaintext in `config.json`, never WS-broadcast | `secret-store.ts` + `src-tauri/lib.rs` |
+| Guest sessions forked from the dev session, transcript keys replaced with `[REDACTED]` | `fork-prepare.ts` |
+| Guest replies re-redacted before going out | `index.ts` + `secrets.ts` |
+| Guest guardrail system prompt (strictly no leaking keys / credentials / sensitive files / permissions / personal info) | `guestGuardrail` config |
+| Guest sensitive ops (edit file / command) gated by the owner's **Feishu approval card**; fork-specific `ask` rule backstops the global `allow` | `perm/` + `~/.oblivionis/fork-settings.json` |
+| Tiered permission mode for owner / guest | session node config |
+| Full inbound audit at `~/.oblivionis/audit.jsonl` | `index.ts` |
 
 > [!NOTE]
-> exe / 安装包**未做代码签名**：首次打开 Windows SmartScreen 会拦——点「**更多信息 → 仍要运行**」即可。这是未签名导致的正常拦截，不影响功能与安全。
+> The exe / installer is **not code-signed**: on first launch Windows SmartScreen will block it — click **"More info → Run anyway"**. This is the normal block for unsigned binaries and does not affect functionality or security.
 
 ---
 
 ## 📜 License
 
-[**GNU General Public License v3.0（GPL-3.0）**](LICENSE) —— 自由软件、强 copyleft：**任何人可自由使用、修改、再分发，甚至商用**；但只要**分发**（含打包成 exe 给别人），就**必须以 GPL-3.0 继续开源、并提供（含你改动的）完整源码**。不允许把它改成闭源专有产品。
+[**GNU General Public License v3.0 (GPL-3.0)**](LICENSE) — free software, strong copyleft: **anyone may freely use, modify, redistribute, and even use it commercially**; but as soon as you **distribute** it (including packaging it into an exe for others), you **must keep it open-source under GPL-3.0 and provide the complete source (including your changes)**. Turning it into a closed-source proprietary product is not allowed.
 
 **Copyright © 2026 Derek·JW·Chen** — Licensed under GPL-3.0.
 
-成品捆绑的第三方开源组件的许可证与版权声明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)（随发行物分发；`node scripts/gen-notices.cjs` 可重新生成）。其中含 5 个 MPL‑2.0 弱 copyleft 组件（Tauri 的 CSS 解析链，未改动即可使用）。
+Licenses and copyright notices for the bundled third-party open-source components are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) (shipped with the release; regenerate with `node scripts/gen-notices.cjs`). It includes 5 MPL‑2.0 weak-copyleft components (Tauri's CSS-parsing chain, usable as-is when unmodified).
