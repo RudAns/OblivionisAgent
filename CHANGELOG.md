@@ -4,7 +4,14 @@
 
 ## [Unreleased]
 
-_（暂无）_
+### ✨ 增强（部分学自 OTTY 调研）
+- **转录块状语义复制**：转录面板每个回复 / 🔁循环指令块悬停浮现「⧉ 复制这块」，搜索栏加「复制全部」。
+- **会话快捷发起（Quick Launch）**：会话节点可存常用 prompt（每行一条），在「发测试消息」上方渲染成可点小标签，点一下绕过飞书直发。
+
+### 🔧 工程 / 合规（对运行无影响）
+- **cargo-deny 合规闸**：`deny.toml`（许可证白名单 + 漏洞/yanked 卡死）+ CI 加 cargo-deny job（只读 lockfile、不编译）。
+- **clippy 零警告闸**：修 lib.rs 既有告警；`release.mjs` 发版前跑 `cargo clippy -- -D warnings`。
+- **AGENTS.md**：指向 `CLAUDE.md` 单一事实源，避免多份 agent 规范漂移。
 
 ## [0.9.8] - 2026-06-26
 
