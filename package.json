@@ -1,6 +1,6 @@
 {
   "name": "oblivionis-agent",
-  "version": "0.9.8",
+  "version": "0.9.9",
   "private": true,
   "description": "飞书 ↔ 本地 Claude Code 会话桥接（订阅登录态，非 API Key）。不同飞书群 → 不同本地 Claude 会话，连线式配置 GUI，实时观看本地 CLI 运行。",
   "license": "GPL-3.0-only",
