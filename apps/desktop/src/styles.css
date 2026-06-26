@@ -2729,6 +2729,49 @@ button.primary {
   color: var(--muted);
   margin-top: 2px;
 }
+/* 语义复制按钮：块右上角悬停浮现，可单独复制这条命令/回复 */
+.evt-assistant,
+.evt-loop-input {
+  position: relative;
+}
+.evt-copy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.evt-assistant:hover .evt-copy,
+.evt-loop-input:hover .evt-copy,
+.evt-copy:focus-visible {
+  opacity: 1;
+}
+.evt-copy:hover {
+  background: var(--hover);
+}
+/* 搜索栏里的「复制全部」：常驻可见、不绝对定位 */
+.transcript-search .evt-copy {
+  position: static;
+  opacity: 0.7;
+  flex: 0 0 auto;
+}
+.transcript-search .evt-copy:hover {
+  opacity: 1;
+}
 
 /* 终端容器：外层 .term-pane 控制 overflow，内层多终端保活堆叠 */
 .terms-wrap {

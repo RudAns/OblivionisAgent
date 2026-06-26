@@ -22,6 +22,46 @@ function eventText(e: ClaudeStreamEvent): string {
   return "";
 }
 
+/** 把整段转录拼成可读纯文本（块化、带语义标签），用于「复制全部」 */
+function transcriptToText(events: ClaudeStreamEvent[]): string {
+  return events
+    .map((e) => {
+      if (isLoopInput(e)) return `🔁 第${e.round}轮指令:\n${e.text}`;
+      if (isAssistant(e)) return assistantText(e) || "";
+      if (isResult(e)) return `✅ 完成 · ${e.subtype}`;
+      if (isInit(e)) return `⚙️ 初始化 · model=${e.model}`;
+      if (e.type === "user") return "↪️ 工具结果";
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/** 语义复制按钮：悬停浮现，复制该块原文（命令 / 回复 / 整段都复用它）。失败静默。 */
+function CopyBtn({ text, title }: { text: string; title?: string }) {
+  const t = useT();
+  const [done, setDone] = useState(false);
+  if (!text) return null;
+  return (
+    <button
+      className="evt-copy"
+      title={title ?? t("复制这块")}
+      onClick={(ev) => {
+        ev.stopPropagation();
+        navigator.clipboard
+          ?.writeText(text)
+          .then(() => {
+            setDone(true);
+            window.setTimeout(() => setDone(false), 1200);
+          })
+          .catch(() => {});
+      }}
+    >
+      {done ? "✓" : "⧉"}
+    </button>
+  );
+}
+
 /** 解析 stream-json，把一个会话节点的运行过程渲染成可读转录（支持关键词过滤） */
 export function TranscriptPanel({ nodeId, events }: Props) {
   const t = useT();
@@ -56,6 +96,7 @@ export function TranscriptPanel({ nodeId, events }: Props) {
             {filtered.length}/{events.length}
           </span>
         )}
+        <CopyBtn text={transcriptToText(filtered)} title={t("复制全部（当前显示）")} />
       </div>
       <div className="transcript">
         {filter && filtered.length === 0 && <div className="panel-empty">{t("没有匹配的内容")}</div>}
@@ -103,6 +144,7 @@ function EventRow({ e, highlight }: { e: ClaudeStreamEvent; highlight: string })
     const tools = e.message.content.filter((b) => b.type === "tool_use");
     return (
       <div className="evt evt-assistant">
+        {text ? <CopyBtn text={text} /> : null}
         {text ? <div className="evt-text">{highlight ? mark(text, highlight) : text}</div> : null}
         {tools.map((t, i) => (
           <div key={i} className="evt-tool">🔧 {String(t.name)}</div>
@@ -113,6 +155,7 @@ function EventRow({ e, highlight }: { e: ClaudeStreamEvent; highlight: string })
   if (isLoopInput(e)) {
     return (
       <div className="evt evt-loop-input">
+        <CopyBtn text={e.text} />
         🔁 {t("第 {0} 轮指令", e.round)}
         <div className="evt-text">{highlight ? mark(e.text, highlight) : e.text}</div>
       </div>
