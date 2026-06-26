@@ -6,6 +6,11 @@
 
 _（暂无）_
 
+## [0.9.10] - 2026-06-26
+
+### 🐛 修复
+- **终端 Ctrl+C 复制失效**：复制只用 `navigator.clipboard.writeText`，WebView2 某些状态下它缺失/被拦会**静默失败**（与小人黑底同类的运行时问题）。改为 `writeClipboard`：优先 `navigator.clipboard`，失败回退老式 `textarea + execCommand('copy')` 再把焦点还给终端；Ctrl+C / Ctrl+Shift+C / 剪切都走它，粘贴加 `?.` 防同步抛错。
+
 ## [0.9.9] - 2026-06-26
 
 ### ✨ 增强（部分学自 OTTY 调研）
