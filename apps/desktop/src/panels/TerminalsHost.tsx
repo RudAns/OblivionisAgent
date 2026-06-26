@@ -273,14 +273,47 @@ function TerminalView({
     const unlisteners: UnlistenFn[] = [];
 
     const doPaste = () => {
+      // navigator.clipboard 在某些 WebView2 状态下会缺失/被拦（与小人黑底同类的运行时问题）——用 ?. 防同步抛错
       navigator.clipboard
-        .readText()
-        .then((t) => t && term.paste(t))
+        ?.readText?.()
+        ?.then((t) => t && term.paste(t))
         .catch(() => {});
+    };
+    // 写剪贴板：优先 navigator.clipboard.writeText；它缺失/失败时（WebView2 偶发）回退老式 textarea+execCommand，
+    // 最后把焦点还给终端。修「Ctrl+C 复制突然失效」。
+    const writeClipboard = (text: string) => {
+      const fallback = () => {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.top = "-1000px";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+        } catch {
+          /* ignore */
+        }
+        try {
+          term.focus();
+        } catch {
+          /* ignore */
+        }
+      };
+      try {
+        const p = navigator.clipboard?.writeText?.(text);
+        if (p && typeof p.then === "function") p.then(() => {}, fallback);
+        else fallback();
+      } catch {
+        fallback();
+      }
     };
     const doCopy = () => {
       const sel = term.getSelection();
-      if (sel) navigator.clipboard.writeText(sel).catch(() => {});
+      if (sel) writeClipboard(sel);
     };
     // 贴图：剪贴板里若是图片，存成临时文件并把路径插入输入框（claude 用 Read 工具读图）。
     // 返回 true=确实贴了图；false=不是图片(交给文字粘贴)。
@@ -473,7 +506,7 @@ function TerminalView({
         .filter((c) => !inSel(c.absRow, c.col))
         .map((c) => c.ch)
         .join("");
-      if (cut) navigator.clipboard.writeText(sel.map((c) => c.ch).join("")).catch(() => {});
+      if (cut) writeClipboard(sel.map((c) => c.ch).join(""));
       let data = "\x05"; // Ctrl+E → 行尾
       const n = cells.length + (reg.endRow - reg.startRow) + 3; // 足量退格，行首多打无害
       for (let i = 0; i < n; i++) data += "\x7f";
