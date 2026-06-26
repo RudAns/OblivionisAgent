@@ -2553,15 +2553,40 @@ function Inner() {
                     loopProgress={selectedNode ? loopProgress[selectedNode.id] ?? null : null}
                   />
                   {selectedIsClaude && (
-                    <div className="test-box">
-                      <input
-                        value={testText}
-                        placeholder={t("给该会话发测试消息（绕过飞书）")}
-                        onChange={(e) => setTestText(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && sendTest()}
-                      />
-                      <button onClick={sendTest}>{t("发送")}</button>
-                    </div>
+                    <>
+                      {(() => {
+                        const qp = String((selectedNode?.data as { quickPrompts?: string })?.quickPrompts || "")
+                          .split(/\r?\n/)
+                          .map((s) => s.trim())
+                          .filter(Boolean);
+                        return qp.length ? (
+                          <div className="quick-prompts" title={t("快捷发起（点一下直发，绕过飞书）")}>
+                            {qp.map((p, i) => (
+                              <button
+                                key={i}
+                                className="qp-chip"
+                                title={p}
+                                onClick={() => {
+                                  save();
+                                  if (selected) client.send({ type: "send-to-session", nodeId: selected, text: p });
+                                }}
+                              >
+                                {p.length > 24 ? p.slice(0, 24) + "…" : p}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
+                      <div className="test-box">
+                        <input
+                          value={testText}
+                          placeholder={t("给该会话发测试消息（绕过飞书）")}
+                          onChange={(e) => setTestText(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && sendTest()}
+                        />
+                        <button onClick={sendTest}>{t("发送")}</button>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -3400,6 +3425,10 @@ function Inspector({
             </select>
           </label>
           {field(t("追加 system prompt"), d.appendSystemPrompt, "appendSystemPrompt")}
+          {fieldArea(t("快捷发起（每行一条常用 prompt）"), d.quickPrompts, "quickPrompts", 3, "打包角色管线\n跑一遍冒烟测试")}
+          <div className="hint" style={{ marginBottom: 6 }}>
+            {t("会在「发测试消息」上方渲染成可点小标签，点一下绕过飞书直发该会话。")}
+          </div>
           <label className="field">
             <span>{t("敏感操作飞书审批")}</span>
             <input

@@ -2624,6 +2624,30 @@ button.primary {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
 }
+/* 快捷发起标签：点一下绕过飞书直发该会话 */
+.quick-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 8px 12px 0;
+}
+.qp-chip {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  border-radius: 14px;
+  padding: 3px 11px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.qp-chip:hover {
+  background: var(--hover);
+  border-color: var(--accent);
+}
 .test-box input {
   flex: 1;
   background: var(--input);

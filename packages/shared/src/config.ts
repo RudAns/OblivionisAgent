@@ -98,6 +98,8 @@ export const ClaudeSessionData = z.object({
   groupSessions: z.record(z.string()).optional(),
   /** 追加到默认 system prompt 之后的内容 */
   appendSystemPrompt: z.string().optional(),
+  /** 快捷发起：每行一条常用 prompt；检视区会渲染成可点的小标签，点一下绕过飞书直发该会话。 */
+  quickPrompts: z.string().default(""),
   /**
    * 敏感操作飞书审批：开启后，工具调用需要授权时（按 permissionMode 规则）
    * 往来源群发交互卡片，主人点[允许/拒绝]决定放行（官方 Channels 没有的能力）。
