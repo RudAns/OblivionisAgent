@@ -163,8 +163,6 @@ function TerminalView({
   clearChipsRef.current = clearChips;
   // 缩略图芯片浮层"贴着 claude 输入框上方"的底部偏移(px)，由 measureRef 按输入框实际位置动态算
   const [chipBottom, setChipBottom] = useState(64);
-  // 最近一次在本终端提交的提问（顶部预览条用，最多 3 行；只显示、不跳转）
-  const [lastPrompt, setLastPrompt] = useState("");
   const measureRef = useRef<() => number>(() => 64);
   const inputTextRef = useRef<() => string | null>(() => null); // 读 claude 输入框当前文本(null=读不到，别误清)
   // 卸载时统一释放所有缩略图 blob URL
@@ -620,13 +618,6 @@ function TerminalView({
       // 排除输入法组词中的回车(确认候选，不是提交)
       if (e.key === "Enter" && !e.shiftKey && !ctrl && !e.isComposing) {
         if (chipsRef.current.length) clearChipsRef.current();
-        // 捕获本次提交的提问文本（去掉 ❯/> 前缀），渲染成顶部「最近提问」预览条
-        try {
-          const sent = (inputTextRef.current?.() ?? "").replace(/^\s*[❯>]\s*/, "").trim();
-          if (sent) setLastPrompt(sent);
-        } catch {
-          /* ignore */
-        }
         return true;
       }
       return true;
@@ -1083,14 +1074,6 @@ function TerminalView({
           </span>
         )}
       </div>
-      {lastPrompt && (
-        <div className="term-lastprompt" title={lastPrompt}>
-          <span className="tlp-icon" aria-hidden>
-            ❯
-          </span>
-          <span className="tlp-text">{lastPrompt}</span>
-        </div>
-      )}
       {searchOpen && (
         <div className="term-search">
           <input

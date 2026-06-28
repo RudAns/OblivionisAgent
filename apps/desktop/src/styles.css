@@ -2914,33 +2914,6 @@ button.primary {
   flex-shrink: 0;
   user-select: none;
 }
-/* 最近提问预览条：贴在信息栏下方，最多 3 行（-webkit-line-clamp）；只显示、不跳转 */
-.term-lastprompt {
-  display: flex;
-  gap: 6px;
-  align-items: flex-start;
-  padding: 5px 10px 6px;
-  background: color-mix(in srgb, var(--accent) 7%, var(--surface-2));
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--muted);
-  flex-shrink: 0;
-}
-.tlp-icon {
-  flex: 0 0 auto;
-  color: var(--accent);
-  font-weight: 600;
-}
-.tlp-text {
-  flex: 1 1 auto;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
 .ti-cwd-icon {
   font-size: 11px;
   flex-shrink: 0;
