@@ -22,6 +22,8 @@ tauri-plugin-global-shortcut = "2"
 # 自动更新：updater 下载/安装签名过的新版安装包；process 用于装完重启
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+# 原生文件/文件夹选择弹窗（会话节点选 cwd 用）
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 portable-pty = "0.8"

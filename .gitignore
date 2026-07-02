@@ -32,3 +32,7 @@ Thumbs.db
 
 # 用户放在根目录的原始图标(已生成进 src-tauri/icons)
 /icon.png
+
+# 本地调研/交接报告：只留本机，不进仓库
+docs/*-report-*.html
+docs/otty-research-*.html

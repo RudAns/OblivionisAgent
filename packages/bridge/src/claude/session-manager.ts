@@ -171,7 +171,8 @@ export class SessionManager {
       baseSessionId: sid ? undefined : node.data.baseSessionId,
       binPath: cfg.claude.binPath,
       cwd: node.data.cwd || cfg.claude.defaultCwd || process.cwd(),
-      model: node.data.model,
+      // 模型优先级：节点自己的 model > 全局「分身统一模型」(claude.forkModel) > CLI 默认
+      model: node.data.model || cfg.claude.forkModel || undefined,
       permissionMode: node.data.permissionMode,
       appendSystemPrompt: node.data.appendSystemPrompt,
       includePartialMessages: node.data.includePartialMessages,

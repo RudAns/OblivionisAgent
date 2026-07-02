@@ -39,6 +39,7 @@ import {
 } from "@oblivionis/shared";
 import { toPng } from "html-to-image";
 import { invoke } from "@tauri-apps/api/core";
+import { open as openNativeDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow, currentMonitor, ProgressBarStatus } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
@@ -1607,6 +1608,18 @@ function Inner() {
     client.send({ type: "set-config", config: next });
   };
 
+  /** 设置全局「分身统一模型」（引擎 spawn 的飞书/定时/循环会话统一用），立即存盘 */
+  const setForkModel = (model: string) => {
+    if (!config) return;
+    if ((config.claude.forkModel ?? "") === model) return;
+    const graph = rfToGraph(nodes, edges);
+    const next = { ...config, claude: { ...config.claude, forkModel: model }, graph };
+    setConfig(next);
+    configRef.current = next;
+    lastSavedSig.current = JSON.stringify(graph);
+    client.send({ type: "set-config", config: next });
+  };
+
   /** 用某个 chatId 一键新建飞书群节点（联调/onboarding 用） */
   const addGroupForChat = (chatId: string) => {
     const id = crypto.randomUUID();
@@ -2298,6 +2311,28 @@ function Inner() {
                   {t("切换会一并设置 Claude 终端主题；浅色参考 Claude 主页配色，部分细节仍在调。")}
                 </div>
               )}
+
+              {/* 分身统一模型：新模型上线时在这里改一处，所有引擎 spawn 的会话(飞书/定时/循环)全员切换 */}
+              <div className="settings-label" style={{ marginTop: 16 }}>{t("分身统一模型")}</div>
+              <input
+                key={config?.claude.forkModel ?? ""}
+                defaultValue={config?.claude.forkModel ?? ""}
+                list="fork-model-presets"
+                placeholder={t("留空=CLI 默认；如 sonnet / opus / claude-sonnet-5")}
+                style={{ width: "100%" }}
+                onBlur={(e) => setForkModel(e.target.value.trim())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+              />
+              <datalist id="fork-model-presets">
+                <option value="sonnet" />
+                <option value="opus" />
+                <option value="haiku" />
+              </datalist>
+              <div className="hint" style={{ marginTop: 6 }}>
+                {t("引擎拉起的所有分身会话（飞书问答 / 定时 / 循环）统一用它；会话节点单独填了「模型」则以节点为准。改完即存，下一条消息生效——续接原会话，上下文不丢。")}
+              </div>
 
               <div className="settings-label" style={{ marginTop: 16 }}>{t("完成任务桌面提示")}</div>
               <div className="seg">
@@ -3050,6 +3085,28 @@ function Inspector({
       <input value={value ?? ""} onChange={(e) => onPatch({ [key]: e.target.value })} />
     </label>
   );
+  /** 目录字段：输入框 + 📁 原生 Windows 文件夹弹窗（手输/粘贴路径仍然可用） */
+  const dirField = (label: string, value: string, key: string) => (
+    <label className="field">
+      <span>{label}</span>
+      <input value={value ?? ""} onChange={(e) => onPatch({ [key]: e.target.value })} />
+      <button
+        type="button"
+        className="browse-btn"
+        title={t("浏览文件夹…")}
+        onClick={(e) => {
+          e.preventDefault();
+          void openNativeDialog({ directory: true, defaultPath: value || undefined })
+            .then((sel) => {
+              if (typeof sel === "string" && sel) onPatch({ [key]: sel });
+            })
+            .catch(() => {});
+        }}
+      >
+        📁
+      </button>
+    </label>
+  );
   const fieldArea = (label: string, value: string, key: string, rows = 3, placeholder?: string) => (
     <label className="field" style={{ alignItems: "flex-start" }}>
       <span>{label}</span>
@@ -3396,8 +3453,8 @@ function Inspector({
       )}
       {node.type === "claude-session" && (
         <>
-          {field(t("工作目录 cwd"), d.cwd, "cwd")}
-          {field(t("模型(可空)"), d.model, "model")}
+          {dirField(t("工作目录 cwd"), d.cwd, "cwd")}
+          {field(t("模型(空=跟随全局统一模型)"), d.model, "model")}
           <label className="field">
             <span>{t("主人权限(你@时)")}</span>
             <select

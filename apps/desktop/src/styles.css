@@ -2529,6 +2529,20 @@ button.primary {
   resize: vertical;
   min-height: 56px;
 }
+/* 目录字段的「浏览」按钮：贴着输入框右侧，风格与输入框一致 */
+.field .browse-btn {
+  flex: 0 0 auto;
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 4px 9px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.field .browse-btn:hover {
+  border-color: var(--accent);
+}
 .hint {
   color: var(--muted);
   font-size: 11px;

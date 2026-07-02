@@ -154,7 +154,14 @@ export const EN: Record<string, string> = {
   "指令 prompt": "Prompt",
   "分类模型(可空=haiku)": "Classifier model (blank = haiku)",
   "工作目录 cwd": "Working dir (cwd)",
-  "模型(可空)": "Model (optional)",
+  "浏览文件夹…": "Browse folder…",
+  "模型(空=跟随全局统一模型)": "Model (blank = follow the global unified model)",
+  "跟随全局": "Follows global",
+  // 设置 · 分身统一模型
+  "分身统一模型": "Unified fork model",
+  "留空=CLI 默认；如 sonnet / opus / claude-sonnet-5": "Blank = CLI default; e.g. sonnet / opus / claude-sonnet-5",
+  "引擎拉起的所有分身会话（飞书问答 / 定时 / 循环）统一用它；会话节点单独填了「模型」则以节点为准。改完即存，下一条消息生效——续接原会话，上下文不丢。":
+    "All engine-spawned fork sessions (Feishu Q&A / cron / loops) use this model; a session node's own \"Model\" field overrides it. Saved immediately, takes effect on the next message — same session resumes, no context lost.",
   "追加 system prompt": "Extra system prompt",
   // feishu-group
   "@机器人才触发": "Only when @bot",

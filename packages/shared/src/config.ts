@@ -298,6 +298,11 @@ export const OblivionisConfig = z.object({
       binPath: z.string().default("claude"),
       /** 新建会话节点时的默认 cwd */
       defaultCwd: z.string().default(""),
+      /**
+       * 分身统一模型：引擎 spawn 的所有会话（飞书分身/定时/循环）在**节点未单独设 model 时**用它；
+       * 留空 = 跟随 claude CLI 默认。新模型上线改这一处即全员切换；节点自己的 model 填了则覆盖它。
+       */
+      forkModel: z.string().default(""),
     })
     .default({ binPath: "claude", defaultCwd: "" }),
   /**

@@ -10,15 +10,15 @@ import type { SessionManager } from "./claude/session-manager.js";
 import type { PtyManager } from "./pty/pty-manager.js";
 import { listSessions } from "./claude/session-listing.js";
 
-/** 图的"会话相关指纹"：忽略坐标/标签，只看 id/kind/data 与连线，用于判断是否需要重建会话 */
-function materialGraph(cfg: { graph: { nodes: Array<{ id: string; kind: string; data: unknown }>; edges: Array<{ source: string; target: string }> } }): string {
+/** 图的"会话相关指纹"：忽略坐标/标签，只看 id/kind/data 与连线 + 全局 claude 配置(binPath/forkModel 等)，用于判断是否需要重建会话 */
+function materialGraph(cfg: { claude?: unknown; graph: { nodes: Array<{ id: string; kind: string; data: unknown }>; edges: Array<{ source: string; target: string }> } }): string {
   const nodes = cfg.graph.nodes
     .map((n) => ({ id: n.id, kind: n.kind, data: n.data }))
     .sort((a, b) => (a.id < b.id ? -1 : 1));
   const edges = cfg.graph.edges
     .map((e) => ({ s: e.source, t: e.target }))
     .sort((a, b) => (a.s + a.t < b.s + b.t ? -1 : 1));
-  return JSON.stringify({ nodes, edges });
+  return JSON.stringify({ claude: cfg.claude, nodes, edges });
 }
 
 export interface ServerDeps {

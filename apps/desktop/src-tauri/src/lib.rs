@@ -1113,6 +1113,8 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_shell::init())
+        // 原生文件夹选择弹窗（会话节点选 cwd 用）
+        .plugin(tauri_plugin_dialog::init())
         // 自动更新（updater 查端点/下载安装签名包，process 用于装完重启）
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())

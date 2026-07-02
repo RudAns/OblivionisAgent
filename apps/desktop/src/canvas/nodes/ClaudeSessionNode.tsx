@@ -51,7 +51,7 @@ export function ClaudeSessionNode({ id, data, selected }: NodeProps) {
       <span className="soul-port-label" style={{ left: "50%" }}>{t("🎭人格/🧩技能/🦾子代理")}</span>
 
       <Row k="cwd" v={tailTruncate(d.cwd) || t("(未设置)")} dim={!d.cwd} title={d.cwd || undefined} />
-      <Row k={t("模型")} v={d.model || t("默认")} />
+      <Row k={t("模型")} v={d.model || t("跟随全局")} />
       <Row k={t("权限")} v={`${d.permissionMode} / ${d.guestPermissionMode ?? "default"}`} />
       {/* 原始(终端)会话：显示最终修改日期，而非人类不可读的 md5 sid */}
       <Row

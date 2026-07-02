@@ -100,6 +100,19 @@ Wire nodes on a canvas to orchestrate local claude sessions: multi-session routi
 
 > 🎭 Persona / 🧩 Skill / 🦾 Subagent are "capability nodes": drag onto a session's **persona / skill / subagent port** to affect that session's Feishu replies (persona = how it talks, skill = how it works, subagent = heavy lifting in an isolated context). One capability node can be shared across multiple sessions.
 
+### 🔁 Loop node ≠ the official `/loop`
+
+Claude Code ships its own `/loop` / `/goal` (since 2026-06) — "making a session go round" is no longer scarce. The Loop node is about the four things the official one doesn't have:
+
+| | Official `/loop` | 🔁 Loop node |
+|---|---|---|
+| ✅ **Acceptance gate (maker-checker)** | The session declares itself done | On hitting the done-marker, an **independent cheap model** reads the original task + STATE.md + recent output and rules done / not-done; a failed verdict feeds back as the reason to keep going — no more gamed completion |
+| 📱 **Live Feishu mirroring** | Terminal only | Every round's prompt / reply streams into the transcript + the Feishu group — watch an overnight run from your phone |
+| 💰 **Budget guardrails** | Mostly round-count | Hard round cap (≤500) + a **dollar budget** (maxCostUsd) + **force-stop** anytime — three independent brakes |
+| 📊 **Fleet dashboard** | None | The main-window dashboard shows every loop's status / rounds / spend, with one-click run / continue / stop |
+
+> They compose rather than compete: at the terminal, use the official `/loop`; for unattended runs you want to watch from a group chat — with acceptance and brakes — use the Loop node.
+
 ---
 
 ## 🧠 How it works
