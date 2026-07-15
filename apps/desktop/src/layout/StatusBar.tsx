@@ -39,11 +39,19 @@ function prettyModel(id: string): string {
   return `${fam} ${m[2] ?? ""}${m[3] ? "." + m[3] : ""}`;
 }
 
+/** 上下文窗口按模型粗判（仅用于百分比展示）：Fable / Opus 4.x / Sonnet 5+ 是 1M，其余按 200k */
+function ctxWindow(model: string): number {
+  const m = model || "";
+  if (/fable|opus/i.test(m)) return 1_000_000;
+  const s = /sonnet-?(\d+)/i.exec(m);
+  if (s && Number(s[1]) >= 5) return 1_000_000;
+  return 200_000;
+}
+
 /** 底部状态栏（参考专业 IDE）：后台服务状态、会话统计、当前终端（悬停看上下文用量）、自动保存提示 */
 export function StatusBar({ bridgeUp, sessionCount, openTerminals, activeLabel, ctx, onCtxHover, saved, version }: Props) {
   const t = useT();
-  // 上下文窗口按模型粗判：Opus 4.x 是 1M，其余按 200k（仅用于百分比展示）
-  const win = ctx && /opus/i.test(ctx.model) ? 1_000_000 : 200_000;
+  const win = ctx ? ctxWindow(ctx.model) : 200_000;
   const pct = ctx ? Math.min(100, Math.round((ctx.ctxTokens / win) * 100)) : 0;
   // 把已用上下文粗分成「固定开销(基线)」与「对话消息」，空闲=窗口-已用
   const overhead = ctx ? Math.min(ctx.baseTokens, ctx.ctxTokens) : 0;
