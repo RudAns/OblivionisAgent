@@ -2988,10 +2988,12 @@ button.primary {
 .terminal-host {
   flex: 1;
   min-height: 0;
-  /* 左右各留 ~10px(半个多字符)，长行文字不贴边；fit 会据此少算一列、提前折行 */
-  padding: 6px 10px 6px 10px;
+  /* ⚠️ padding 绝不能放这层：FitAddon 拿本容器 computed height 当可用高度（border-box 下含 padding），
+     却只会扣 .xterm 自身的 padding——放这里=行数按多 12px 算，余数小的窗口高度下多算一行，
+     claude 底部状态行被砍半截。内边距移到下面 .xterm 上（FitAddon 的设计用法）。 */
+  padding: 0;
   overflow: hidden;
-  /* 用终端色，让这圈 padding 与终端融为一体(原来是 --panel，浅色下成了白边一圈) */
+  /* 用终端色，让边缘与终端融为一体(原来是 --panel，浅色下成了白边一圈) */
   background: var(--term-bg);
 }
 /* 只让 .xterm 根填满容器；绝不强撑 .xterm-screen——它被拉高后，
@@ -2999,6 +3001,9 @@ button.primary {
    让整数行 fit 后的不足一行余量落回 .xterm/.terminal-host 的 var(--panel) 底色即可。 */
 .terminal-host .xterm {
   height: 100% !important;
+  /* 左右各 ~10px(半个多字符)长行不贴边、上下 6px；FitAddon 明确会扣 terminal.element 的 padding，
+     所以行列数与可视区域严格一致，底部状态行不会再被裁 */
+  padding: 6px 10px;
 }
 /* 画布是整数字符格，窗口放大后的余量露底——只给【外层容器】刷主题色消黑边。
    ⚠️ 绝不能给 xterm 内部元素(canvas/.xterm-screen/.xterm-viewport)设不透明背景：
