@@ -175,6 +175,12 @@ claude 实际是 `.cmd`，Rust/Node 直接 spawn 会找不到。统一
 ### D4. 端口
 8787 在本机常被占用，默认用 8920。
 
+### D5. Tauri 同步命令跑在主线程 → 慢命令卡死所有窗口
+Tauri v2 里不带 `async` 的 `#[tauri::command] fn` 在**主线程**执行。读盘/扫目录慢一点
+（`list_md_files` 扫 Unity 工程实测 ~7s、`claude_stats` deep 扫 ~80MB transcript）就会让主窗/画布/文档窗
+一起冻住，表现为"切界面卡 10s 再恢复"。**凡是碰文件系统的命令一律写成 `xxx_blocking` + async 包装走
+`off_main`（spawn_blocking）**，见 lib.rs。慢于 300ms 的调用记在 `~/.oblivionis/ui-slow.log`。
+
 ## F. 连线画布 / 明暗主题（@xyflow + CSS 变量）
 
 ### F1. React Flow 吞掉画布上的 mousedown → document 级"点外部关闭"要用捕获阶段

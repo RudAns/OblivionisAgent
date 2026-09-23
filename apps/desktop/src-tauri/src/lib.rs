@@ -100,8 +100,7 @@ fn read_window(path: &std::path::Path, start: u64, max: u64) -> String {
 /// (input + cache_read + cache_creation = 这一轮加载进去的上下文)。纯读文件、不调模型、不耗 token。
 /// `since_mtime`：前端上次拿到的文件修改时间(ms)。一致就直接返回 {unchanged:true} 不读文件——
 /// 空闲轮询只花一次 stat(几微秒)，几十 MB 的 transcript 只在真的变了(完成一回合 / /compact)时才读。
-#[tauri::command]
-fn context_estimate(
+fn context_estimate_blocking(
     cwd: String,
     session_id: String,
     since_mtime: Option<u64>,
@@ -472,8 +471,7 @@ fn pty_close(state: tauri::State<PtyState>, id: String) -> Result<(), String> {
 }
 
 /// 把粘贴的图片(base64)落成临时文件，返回绝对路径。前端再把路径插入 claude 输入框，claude 用 Read 读图。
-#[tauri::command]
-fn save_paste_image(b64: String, ext: String) -> Result<String, String> {
+fn save_paste_image_blocking(b64: String, ext: String) -> Result<String, String> {
     use base64::{engine::general_purpose, Engine as _};
     let bytes = general_purpose::STANDARD
         .decode(b64.trim())
@@ -670,8 +668,7 @@ fn scan_recent_sessions(home: &std::path::Path, last_computed: &str, tz_off_min:
 /// 常用模型/总 token/活跃天/连续天/最活跃日等都在前端算(有 Date)。
 /// 注：缓存只到 lastComputedDate，常滞后；`deep=true`(悬停时)才额外扫近期 transcript 补「截至日之后」
 /// 那几天的活动(recentSessions)，前端按本地日期合并进 dailyActivity，让昨天/今天的格子也有色。
-#[tauri::command]
-fn claude_stats(deep: Option<bool>, tz_off_min: Option<i64>) -> Result<serde_json::Value, String> {
+fn claude_stats_blocking(deep: Option<bool>, tz_off_min: Option<i64>) -> Result<serde_json::Value, String> {
     let empty = serde_json::json!({ "dailyActivity": [], "modelUsage": {}, "totalSessions": 0, "totalMessages": 0, "longestSessionMs": 0, "firstSessionDate": serde_json::Value::Null, "lastComputedDate": serde_json::Value::Null, "recentDays": [] });
     let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
     if home.is_empty() {
@@ -744,8 +741,7 @@ fn claude_cli_version(claude_dir: &std::path::Path) -> String {
 
 /// 给 GUI 顶部「状态」小标用：Claude CLI 版本 + 登录账号 + 套餐。纯读本地文件(+至多一次缓存的版本探测)、不耗 token。
 /// 账号读 ~/.claude.json 的 oauthAccount(displayName/emailAddress/组织类型/限额档)，敏感令牌在 .credentials.json 里、不碰。
-#[tauri::command]
-fn claude_status() -> Result<serde_json::Value, String> {
+fn claude_status_blocking() -> Result<serde_json::Value, String> {
     let none = serde_json::json!({ "version": "", "name": "", "email": "", "org": "", "tier": "" });
     let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
     if home.is_empty() {
@@ -824,8 +820,7 @@ fn norm_path(p: &str) -> String {
 
 /// 从 ~/.oblivionis/config.json 读出各「Claude 会话」节点的工作目录，去重整理成切换列表。
 /// 多个会话同一目录 → 合并成一条并带上用到它的会话名。
-#[tauri::command]
-fn session_dirs() -> Result<serde_json::Value, String> {
+fn session_dirs_blocking() -> Result<serde_json::Value, String> {
     let home = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".to_string());
     let cfg = std::path::Path::new(&home).join(".oblivionis").join("config.json");
     let mut out: Vec<serde_json::Value> = Vec::new();
@@ -911,8 +906,7 @@ fn doc_kind(name_lower: &str) -> Option<&'static str> {
 }
 
 /// 递归列出某目录下所有 .md / .html（跳过重目录、限深度/数量）——防 Unity 工程百万文件拖死界面。
-#[tauri::command]
-fn list_md_files(dir: String) -> Result<serde_json::Value, String> {
+fn list_md_files_blocking(dir: String) -> Result<serde_json::Value, String> {
     let root = std::path::Path::new(&dir);
     if !root.is_dir() {
         return Ok(serde_json::json!({ "dir": dir, "files": [], "truncated": false, "exists": false }));
@@ -974,8 +968,7 @@ fn list_md_files(dir: String) -> Result<serde_json::Value, String> {
 }
 
 /// 读文本文档内容（.md / .html，UTF-8，限大小，防误读巨型文件）。
-#[tauri::command]
-fn read_md(path: String) -> Result<String, String> {
+fn read_md_blocking(path: String) -> Result<String, String> {
     let p = std::path::Path::new(&path);
     let meta = std::fs::metadata(p).map_err(|e| e.to_string())?;
     const MAX: u64 = 8 * 1024 * 1024;
@@ -986,8 +979,7 @@ fn read_md(path: String) -> Result<String, String> {
 }
 
 /// 把文本写到指定路径（用于循环节点「导出配置到工作目录」）。父目录不存在则建。返回写入的完整路径。
-#[tauri::command]
-fn write_text_file(path: String, content: String) -> Result<String, String> {
+fn write_text_file_blocking(path: String, content: String) -> Result<String, String> {
     let p = std::path::Path::new(&path);
     if let Some(parent) = p.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -998,8 +990,7 @@ fn write_text_file(path: String, content: String) -> Result<String, String> {
 
 /// 把本地图片读成 data URL——让 Markdown 里的相对路径图片在 webview 里直接显示，
 /// 免去配置 Tauri asset 协议/scope。path 为相对路径时按 base（文件所在目录）解析。
-#[tauri::command]
-fn read_file_b64(path: String, base: String) -> Result<String, String> {
+fn read_file_b64_blocking(path: String, base: String) -> Result<String, String> {
     let p = std::path::Path::new(&path);
     let full = if p.is_absolute() || base.is_empty() {
         p.to_path_buf()
@@ -1098,6 +1089,97 @@ fn migrate_plaintext_secret(cfg_path: &str) -> Option<String> {
 /// 本次启动要交给 bridge 的飞书密钥：凭据管理器优先；没有则尝试从旧 config.json 迁移。
 fn feishu_secret_for_bridge(cfg_path: Option<&str>) -> Option<String> {
     read_feishu_secret().or_else(|| cfg_path.and_then(migrate_plaintext_secret))
+}
+
+// ============================================================
+//  读盘/扫目录类命令一律「async + spawn_blocking」跑在后台线程。
+//  ⚠️ Tauri v2 的同步 `fn` 命令跑在主线程(窗口事件循环)上：扫 Unity 大目录(list_md_files，
+//  实测十几万条目 ~7s)、deep 扫近期 transcript(claude_stats，~80MB)时会把**所有窗口**一起卡死，
+//  表现为"切界面卡 10s 再恢复"。放后台线程后最多只是那个面板在转圈。
+//  超过 SLOW_MS 的调用写 ~/.oblivionis/ui-slow.log，下次再卡有据可查。
+// ============================================================
+const SLOW_MS: u128 = 300;
+
+fn log_slow(name: &str, ms: u128) {
+    if ms < SLOW_MS {
+        return;
+    }
+    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
+    if home.is_empty() {
+        return;
+    }
+    let path = std::path::Path::new(&home).join(".oblivionis").join("ui-slow.log");
+    // 防无限增长：超过 1MB 就截掉重写
+    if std::fs::metadata(&path).map(|m| m.len() > 1024 * 1024).unwrap_or(false) {
+        let _ = std::fs::remove_file(&path);
+    }
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = writeln!(f, "{ts}	{name}	{ms}ms");
+    }
+}
+
+/// 在后台阻塞线程池里跑 f，并记录慢调用。
+async fn off_main<T: Send + 'static>(
+    name: &'static str,
+    f: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, String> {
+    let t0 = std::time::Instant::now();
+    let r = tauri::async_runtime::spawn_blocking(f).await.map_err(|e| format!("{name} 执行失败: {e}"));
+    log_slow(name, t0.elapsed().as_millis());
+    r
+}
+
+#[tauri::command]
+async fn context_estimate(
+    cwd: String,
+    session_id: String,
+    since_mtime: Option<u64>,
+) -> Result<serde_json::Value, String> {
+    off_main("context_estimate", move || context_estimate_blocking(cwd, session_id, since_mtime)).await?
+}
+
+#[tauri::command]
+async fn save_paste_image(b64: String, ext: String) -> Result<String, String> {
+    off_main("save_paste_image", move || save_paste_image_blocking(b64, ext)).await?
+}
+
+#[tauri::command]
+async fn claude_stats(deep: Option<bool>, tz_off_min: Option<i64>) -> Result<serde_json::Value, String> {
+    off_main("claude_stats", move || claude_stats_blocking(deep, tz_off_min)).await?
+}
+
+#[tauri::command]
+async fn claude_status() -> Result<serde_json::Value, String> {
+    off_main("claude_status", claude_status_blocking).await?
+}
+
+#[tauri::command]
+async fn session_dirs() -> Result<serde_json::Value, String> {
+    off_main("session_dirs", session_dirs_blocking).await?
+}
+
+#[tauri::command]
+async fn list_md_files(dir: String) -> Result<serde_json::Value, String> {
+    off_main("list_md_files", move || list_md_files_blocking(dir)).await?
+}
+
+#[tauri::command]
+async fn read_md(path: String) -> Result<String, String> {
+    off_main("read_md", move || read_md_blocking(path)).await?
+}
+
+#[tauri::command]
+async fn write_text_file(path: String, content: String) -> Result<String, String> {
+    off_main("write_text_file", move || write_text_file_blocking(path, content)).await?
+}
+
+#[tauri::command]
+async fn read_file_b64(path: String, base: String) -> Result<String, String> {
+    off_main("read_file_b64", move || read_file_b64_blocking(path, base)).await?
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
