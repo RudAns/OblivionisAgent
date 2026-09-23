@@ -180,6 +180,11 @@ Tauri v2 里不带 `async` 的 `#[tauri::command] fn` 在**主线程**执行。�
 （`list_md_files` 扫 Unity 工程实测 ~7s、`claude_stats` deep 扫 ~80MB transcript）就会让主窗/画布/文档窗
 一起冻住，表现为"切界面卡 10s 再恢复"。**凡是碰文件系统的命令一律写成 `xxx_blocking` + async 包装走
 `off_main`（spawn_blocking）**，见 lib.rs。慢于 300ms 的调用记在 `~/.oblivionis/ui-slow.log`。
+**PTY 同理**：ConPTY 的 WriteFile/ResizePseudoConsole 在 conhost 忙时会阻塞 → `pty_write`/`pty_resize`
+只往该 PTY 专属写线程的 channel 里投递(保序、不阻塞)；输出由发送线程按 8ms/256KB 合并后再 emit
+(每次 emit 都占主线程往 WebView2 注脚本，4KB 一发在整屏重绘时是上千次)。
+**卡顿探针**：`MAIN-STALL`(Rust 主线程心跳 ≥1s) 与 `JS 事件循环停顿/longtask`(各窗口 main.tsx) 同写 ui-slow.log，
+对照即可判断卡在宿主主线程还是页面 JS。
 
 ## F. 连线画布 / 明暗主题（@xyflow + CSS 变量）
 

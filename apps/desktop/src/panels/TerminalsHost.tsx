@@ -241,6 +241,8 @@ function TerminalView({
         }
         webgl = null;
         webglRef.current = null;
+        // GPU 重置(睡眠唤醒/最小化还原)后别永久退回慢得多的 DOM 渲染器：标脏，下次可见时重建 WebGL
+        themeDirtyRef.current = true;
       });
       term.loadAddon(webgl);
       webglRef.current = webgl;
@@ -662,8 +664,14 @@ function TerminalView({
       syncImeAnchor();
     };
     // 重获焦点后焦点/布局/IME 上下文需要时间稳定 → 多打几拍兜住（单次 rAF 常常太早）
+    // DOM focus / visibilitychange / Tauri onFocusChanged 三路信号在一次还原里会几乎同时到——合并成一轮，
+    // 否则 3×3 次 blur/focus，每次都让 xterm 向 claude 发焦点序列([O[I)，逼它重绘好几遍。
+    let focusBurstUntil = 0;
     const onWinFocus = () => {
       if (!activeRef.current) return;
+      const now = performance.now();
+      if (now < focusBurstUntil) return;
+      focusBurstUntil = now + 400;
       requestAnimationFrame(reanchorIme);
       window.setTimeout(reanchorIme, 90);
       window.setTimeout(reanchorIme, 300);
@@ -760,10 +768,11 @@ function TerminalView({
       // 这些早到的输出先缓存，拿到 ptyId 后再回放，否则历史会被直接丢弃（=终端只剩头部那行）。
       const earlyBuffer: { id: string; data: string }[] = [];
       let exited = false;
+      let openFailed = false; // pty_open 失败后别再缓存别的终端的输出(否则 earlyBuffer 无限增长)
       unlisteners.push(
         await listen<{ id: string; data: string }>("pty-data", (e) => {
           if (ptyId === null) {
-            earlyBuffer.push(e.payload);
+            if (!openFailed) earlyBuffer.push(e.payload);
             return;
           }
           if (e.payload.id === ptyId) {
@@ -775,7 +784,7 @@ function TerminalView({
       unlisteners.push(
         await listen<{ id: string }>("pty-exit", (e) => {
           // ptyId 已知就按 id 匹配；还没拿到 id 就退出=秒退，也照样提示
-          if (ptyId === null || e.payload.id === ptyId) {
+          if ((ptyId === null && !openFailed) || e.payload.id === ptyId) {
             exited = true;
             reportActive(false);
             term.writeln(`\r\n\x1b[90m${tr("[进程已退出]")}\x1b[0m`);
@@ -814,6 +823,8 @@ function TerminalView({
         // 跳过 pty_resize，claude 就一直按打开时的旧列数渲染(输入框画在 2/3 宽度处)。这里对账一次。
         ptySizeRef.current?.send(term.cols, term.rows);
       } catch (err) {
+        openFailed = true;
+        earlyBuffer.length = 0;
         term.writeln(`\r\n\x1b[31m打开终端失败: ${String(err)}\x1b[0m`);
       }
     })();
@@ -959,6 +970,7 @@ function TerminalView({
           /* ignore */
         }
         webglRef.current = null;
+        themeDirtyRef.current = true; // 同上：下次可见时重建
       });
       t.loadAddon(wgl);
       webglRef.current = wgl;

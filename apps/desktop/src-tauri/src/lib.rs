@@ -11,7 +11,7 @@ use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
-use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
 use tauri::{Emitter, Manager};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
@@ -19,9 +19,16 @@ use tauri_plugin_shell::ShellExt;
 #[derive(Default)]
 struct BridgeProc(Mutex<Option<CommandChild>>);
 
+/// 发给某个 PTY 专属写线程的指令。写/改尺寸都走它：ConPTY 在 conhost 忙(比如 claude 整屏重绘)时
+/// WriteFile / ResizePseudoConsole 会阻塞——以前直接在同步命令里做，而同步命令跑在主线程 → 整个 App 卡死。
+/// 现在命令只往 channel 里丢一条就返回，阻塞只发生在该 PTY 自己的线程里；单线程串行也保证按键顺序。
+enum PtyCmd {
+    Write(String),
+    Resize(u16, u16),
+}
+
 struct PtySession {
-    master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
+    tx: std::sync::mpsc::Sender<PtyCmd>,
     child: Box<dyn Child + Send + Sync>,
 }
 
@@ -310,16 +317,15 @@ fn resolve_terminal_skills(sid: &str) -> Option<String> {
     }
 }
 
-#[tauri::command]
-fn pty_open(
+fn pty_open_blocking(
     app: tauri::AppHandle,
-    state: tauri::State<PtyState>,
     cwd: String,
     bin: String,
     sid: String,
     cols: u16,
     rows: u16,
 ) -> Result<String, String> {
+    let state = app.state::<PtyState>();
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -377,19 +383,57 @@ fn pty_open(
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
     let id = format!("pty-{}", state.counter.fetch_add(1, Ordering::SeqCst));
-    state.map.lock().unwrap().insert(
-        id.clone(),
-        PtySession {
-            master: pair.master,
-            writer,
-            child,
-        },
-    );
+    let (tx, rx) = std::sync::mpsc::channel::<PtyCmd>();
+    state.map.lock().unwrap().insert(id.clone(), PtySession { tx, child });
 
+    // 写线程：独占 master/writer。pty_close 移除会话(drop sender)后 recv 出错 → 线程退出、释放 ConPTY 句柄。
+    let master = pair.master;
+    let mut writer = writer;
+    let id_w = id.clone();
+    std::thread::spawn(move || {
+        while let Ok(cmd) = rx.recv() {
+            let t0 = std::time::Instant::now();
+            let what = match cmd {
+                PtyCmd::Write(data) => {
+                    let _ = writer.write_all(data.as_bytes());
+                    let _ = writer.flush();
+                    "pty_write"
+                }
+                PtyCmd::Resize(cols, rows) => {
+                    let _ = master.resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 });
+                    "pty_resize"
+                }
+            };
+            log_slow(&format!("{what}[{id_w}] (PTY 写线程，不卡界面)"), t0.elapsed().as_millis());
+        }
+    });
+
+    // 读线程只管读 + UTF-8 拼接，解码好的文本交给发送线程；发送线程把突发输出合并成大块再 emit。
+    // 为什么合并：每次 emit 都要在主线程往 WebView2 注入一段脚本。claude 整屏重绘 / --resume 回放
+    // 一次吐几 MB，按 4KB 一块就是上千次 emit，主线程和渲染进程一起被淹 → 卡顿。
+    let (dtx, drx) = std::sync::mpsc::channel::<String>();
     let app2 = app.clone();
     let id2 = id.clone();
     std::thread::spawn(move || {
-        let mut buf = [0u8; 4096];
+        const MAX_BATCH: usize = 256 * 1024;
+        const WINDOW: std::time::Duration = std::time::Duration::from_millis(8);
+        while let Ok(first) = drx.recv() {
+            let mut batch = first;
+            let deadline = std::time::Instant::now() + WINDOW;
+            while batch.len() < MAX_BATCH {
+                let left = deadline.saturating_duration_since(std::time::Instant::now());
+                match drx.recv_timeout(left) {
+                    Ok(more) => batch.push_str(&more),
+                    Err(_) => break, // 攒满 8ms，或读线程已结束
+                }
+            }
+            let _ = app2.emit("pty-data", PtyData { id: id2.clone(), data: batch });
+        }
+        // 读线程结束(dtx 被 drop)且剩余数据都已发出后才报退出，保证顺序
+        let _ = app2.emit("pty-exit", PtyExit { id: id2.clone() });
+    });
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 16384];
         // ⚠️ 不能逐块 from_utf8_lossy：多字节 UTF-8(中文3字节/─线3字节)跨块被切断会变 U+FFFD，
         // 字形是菱形——曾被当成"乱码◇"追了很久。残缺尾字节留到下一块拼上再解码。
         let mut pending: Vec<u8> = Vec::new();
@@ -424,40 +468,32 @@ fn pty_open(
                             }
                         }
                     }
-                    if !out.is_empty() {
-                        let _ = app2.emit("pty-data", PtyData { id: id2.clone(), data: out });
+                    if !out.is_empty() && dtx.send(out).is_err() {
+                        break;
                     }
                 }
                 Err(_) => break,
             }
         }
-        let _ = app2.emit("pty-exit", PtyExit { id: id2.clone() });
     });
 
     Ok(id)
 }
 
+/// 只把按键丢进该 PTY 的写线程队列，立即返回——绝不在主线程上做可能阻塞的 WriteFile。
 #[tauri::command]
 fn pty_write(state: tauri::State<PtyState>, id: String, data: String) -> Result<(), String> {
-    let mut map = state.map.lock().unwrap();
-    let s = map.get_mut(&id).ok_or("pty 不存在")?;
-    s.writer.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
-    let _ = s.writer.flush();
-    Ok(())
+    let map = state.map.lock().unwrap();
+    let s = map.get(&id).ok_or("pty 不存在")?;
+    s.tx.send(PtyCmd::Write(data)).map_err(|e| e.to_string())
 }
 
+/// 同上：ResizePseudoConsole 在 conhost 忙时会阻塞，放到写线程里做。
 #[tauri::command]
 fn pty_resize(state: tauri::State<PtyState>, id: String, cols: u16, rows: u16) -> Result<(), String> {
     let map = state.map.lock().unwrap();
     if let Some(s) = map.get(&id) {
-        s.master
-            .resize(PtySize {
-                rows,
-                cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .map_err(|e| e.to_string())?;
+        s.tx.send(PtyCmd::Resize(cols, rows)).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -1113,10 +1149,7 @@ fn log_slow(name: &str, ms: u128) {
     if std::fs::metadata(&path).map(|m| m.len() > 1024 * 1024).unwrap_or(false) {
         let _ = std::fs::remove_file(&path);
     }
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
         let _ = writeln!(f, "{ts}	{name}	{ms}ms");
     }
@@ -1131,6 +1164,52 @@ async fn off_main<T: Send + 'static>(
     let r = tauri::async_runtime::spawn_blocking(f).await.map_err(|e| format!("{name} 执行失败: {e}"));
     log_slow(name, t0.elapsed().as_millis());
     r
+}
+
+/// 打开终端：查会话文件(可能扫全部 project 目录)、读 config 解析技能、起 cmd/claude —— 都放后台线程。
+#[tauri::command]
+async fn pty_open(
+    app: tauri::AppHandle,
+    cwd: String,
+    bin: String,
+    sid: String,
+    cols: u16,
+    rows: u16,
+) -> Result<String, String> {
+    off_main("pty_open", move || pty_open_blocking(app, cwd, bin, sid, cols, rows)).await?
+}
+
+/// 前端卡顿探针上报：JS 事件循环停顿 / longtask，写进同一个 ui-slow.log。
+#[tauri::command]
+fn log_ui_stall(what: String, ms: u64) {
+    let what: String = what.chars().take(300).collect();
+    log_slow(&format!("JS {what}"), ms as u128);
+}
+
+/// 主线程心跳：每秒往主线程(窗口事件循环)投一个空任务，量它隔多久才被执行。
+/// 超过 1s 记 `MAIN-STALL`——说明卡在 Rust/WebView2 宿主主线程，而不是某个页面的 JS。
+fn spawn_main_thread_watchdog(app: tauri::AppHandle) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let (tx, rx) = std::sync::mpsc::channel::<()>();
+        let t0 = std::time::Instant::now();
+        if app
+            .run_on_main_thread(move || {
+                let _ = tx.send(());
+            })
+            .is_err()
+        {
+            return; // App 正在退出
+        }
+        if rx.recv_timeout(std::time::Duration::from_secs(300)).is_err() {
+            log_slow("MAIN-STALL 主线程超过 300s 无响应", 300_000);
+            continue;
+        }
+        let ms = t0.elapsed().as_millis();
+        if ms >= 1000 {
+            log_slow("MAIN-STALL 主线程被占用", ms);
+        }
+    });
 }
 
 #[tauri::command]
@@ -1208,9 +1287,10 @@ pub fn run() {
             pty_open, pty_write, pty_resize, pty_close, save_paste_image, open_path,
             context_estimate, claude_stats, claude_status, app_version, set_feishu_secret, has_feishu_secret,
             reports_dir, open_md_viewer, open_canvas_window, session_dirs, list_md_files, read_md, read_file_b64,
-            write_text_file
+            write_text_file, log_ui_stall
         ])
         .setup(|app| {
+            spawn_main_thread_watchdog(app.handle().clone());
             if std::env::var("OBLIVIONIS_NO_SIDECAR").as_deref() != Ok("1") {
                 if let Err(e) = spawn_bridge(app.handle()) {
                     eprintln!("[oblivionis] 启动 Bridge sidecar 失败: {e}");

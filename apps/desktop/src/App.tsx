@@ -540,6 +540,17 @@ function Inner() {
   const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]); // 知识收件箱
   const eventsRef = useRef<Record<string, ClaudeStreamEvent[]>>({});
   const [, forceRender] = useState(0);
+  // 实时事件合并到下一帧再重渲染：一轮回复可能连着来几十条事件，逐条 forceRender = 整棵 App(含终端)
+  // 重渲染几十次，占满 JS 线程。
+  const renderQueuedRef = useRef(false);
+  const scheduleRender = () => {
+    if (renderQueuedRef.current) return;
+    renderQueuedRef.current = true;
+    requestAnimationFrame(() => {
+      renderQueuedRef.current = false;
+      forceRender((x) => x + 1);
+    });
+  };
   const statusRef = useRef<Record<string, string>>({});
   const activeTermRef = useRef<string | null>(null); // 当前在看的终端(供 WS 回调判断要不要点红点)
   const saveRef = useRef<() => void>(() => {}); // 指向最新 save()，供快捷键 Ctrl+S 调用(避免闭包过期)
@@ -614,10 +625,13 @@ function Inner() {
           break;
         }
         case "session-event": {
-          const arr = eventsRef.current[msg.nodeId] ?? [];
-          arr.push(msg.event);
-          eventsRef.current[msg.nodeId] = arr;
-          forceRender((x) => x + 1);
+          // 不可变追加(转录面板的 useMemo([events]) 靠引用变化才重算过滤) + 与引擎一致封顶 600 条，
+          // 否则常开几天会无限增长(tool_result 里还带整段文件/命令输出)。
+          const prev = eventsRef.current[msg.nodeId] ?? [];
+          const next = prev.length >= 600 ? prev.slice(prev.length - 599) : prev.slice();
+          next.push(msg.event);
+          eventsRef.current[msg.nodeId] = next;
+          scheduleRender();
           break;
         }
         case "session-status": {
@@ -1830,7 +1844,8 @@ function Inner() {
     // 5 分钟轮询也用 deep：否则 recentDays(今天/昨天活动)取不到，「近 7 天」柱状图会随时间"变空"
     // (只剩缓存截至日之前的日子、全归零)，得悬停触发 deep 才恢复。deep 只多扫近期本地 transcript、
     // 不耗 token，5 分钟一次可接受。
-    const id = setInterval(() => fetchGlance(true), 300000);
+    // 只有主窗 deep 扫(~80MB transcript)；画布窗也挂着同一个 App，别两扇窗各扫一遍
+    const id = setInterval(() => fetchGlance(WIN_MODE === "main"), 300000);
     return () => clearInterval(id);
   }, [fetchGlance]);
 

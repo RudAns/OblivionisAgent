@@ -266,7 +266,10 @@ export class LarkTransport implements FeishuTransport {
 
   async stop(): Promise<void> {
     try {
-      this.wsClient?.stop?.();
+      // SDK(1.66) 的 WSClient 只有 close()，没有 stop()——以前这里是空操作：旧长连接+心跳一直活着，
+      // 每次重连/改凭据就多挂一条，飞书事件被分到多条连接上。
+      this.wsClient?.close?.({ force: true });
+      this.wsClient = null;
     } catch {
       /* ignore */
     }

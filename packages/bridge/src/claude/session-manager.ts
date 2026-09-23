@@ -179,7 +179,12 @@ export class SessionManager {
       extraArgs: node.data.extraArgs,
       approval: node.data.approvalMode,
       wsPort: cfg.bridge.wsPort,
-      onEvent: (event) => this.hub.broadcast({ type: "session-event", nodeId: node.id, sessionId: sid ?? "", event }),
+      // 逐 token 的 stream_event 不广播：界面不渲染它(EventRow→null)，却每秒几十条 → 两个窗口整棵 App
+      // 重渲染 + 转录逐条 appendFileSync，还把每节点 600 条的历史挤成碎片。完整回复仍由 assistant 事件带到。
+      onEvent: (event) => {
+        if (event.type === "stream_event") return;
+        this.hub.broadcast({ type: "session-event", nodeId: node.id, sessionId: sid ?? "", event });
+      },
       onStatus: (status) => this.hub.broadcast({ type: "session-status", nodeId: node.id, sessionId: sid ?? "", status }),
       onSessionId: (id) => {
         sid = id;
